@@ -1,219 +1,239 @@
-import re
-from typing import Dict, Tuple
+"""
+Enhanced article worker with new parsing pipeline
+"""
 
-import requests
-from bs4 import BeautifulSoup
-from langdetect import detect as langdetect_detect
-import trafilatura
+import logging
+import uuid
+import concurrent.futures
+from typing import Dict, List, Any, Optional
+from datetime import datetime, timezone
 
-from config import (
-    PENDING_BATCH_SIZE, CLEAN_TEXT_SHEETS_LIMIT, POLITICS_KEYS, SPORTS_KEYS, FULLTEXT_DIR
-)
-from sheets_client import SheetClient
-from utils import (
-    canonicalize_url, sha256_hex, normalize_text_for_hash, now_local_iso,
-    json_dumps, store_fulltext, domain_of
-)
+from net.http import HttpClient
+from parser.extract import extract_all, ParsedArticle
+from utils.text import compute_text_hash, compute_word_count, estimate_reading_time
+from utils.url import normalize_url, extract_domain
+from pg_client_new import PgClient
 
-def process_pending(client: SheetClient, worker_id: str = "worker-1"):
-    ws = client.ws("Raw")
-    header = ws.row_values(1)
-    rows = ws.get_all_values()
-    if len(rows)<2:
-        return
-    idx = {h:i for i,h in enumerate(header)}
-    candidates = []
-    now_iso = now_local_iso()
+logger = logging.getLogger(__name__)
 
-    for r, row in enumerate(rows[1:], start=2):
-        status = (row[idx["status"]] if len(row)>idx["status"] else "").strip().lower()
-        lock_owner = row[idx["lock_owner"]] if len(row)>idx["lock_owner"] else ""
-        if status == "pending" and not lock_owner:
-            candidates.append(r)
-        if len(candidates) >= PENDING_BATCH_SIZE:
-            break
 
-    for r in candidates:
-        ws.update_cell(r, idx["status"]+1, "processing")
-        ws.update_cell(r, idx["lock_owner"]+1, worker_id)
-        ws.update_cell(r, idx["lock_at"]+1, now_iso)
+class ArticleWorker:
+    """Enhanced article worker with concurrent processing"""
+    
+    def __init__(self, db_client, batch_size: int = 50, max_workers: int = 10):
+        self.db = db_client
+        self.batch_size = batch_size
+        self.max_workers = max_workers
+        self.http_client = HttpClient()
+        
+    def process_pending_articles(self) -> Dict[str, Any]:
+        """
+        Process pending articles in batches with concurrent processing
+        Returns statistics about the processing operation
+        """
+        logger.info("Starting article processing")
+        
+        # Get pending articles
+        articles = self.db.get_pending_articles(self.batch_size)
+        if not articles:
+            logger.info("No pending articles to process")
+            return {'articles_processed': 0, 'successful': 0, 'errors': 0, 'duplicates': 0}
+        
+        logger.info(f"Processing {len(articles)} pending articles")
+        
+        stats = {
+            'articles_processed': 0,
+            'successful': 0,
+            'duplicates': 0,
+            'errors': 0,
+            'partial': 0,
+            'error_details': []
+        }
+        
+        # Process articles concurrently
+        with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            future_to_article = {
+                executor.submit(self._process_single_article, article): article
+                for article in articles
+            }
+            
+            for future in concurrent.futures.as_completed(future_to_article):
+                article = future_to_article[future]
+                stats['articles_processed'] += 1
+                
+                try:
+                    result = future.result()
+                    
+                    if result['status'] == 'stored':
+                        stats['successful'] += 1
+                    elif result['status'] == 'duplicate':
+                        stats['duplicates'] += 1
+                    elif result['status'] == 'partial':
+                        stats['partial'] += 1
+                    else:
+                        stats['errors'] += 1
+                        if result.get('error'):
+                            stats['error_details'].append({
+                                'article_id': article['id'],
+                                'url': article['url'],
+                                'error': result['error']
+                            })
+                        
+                except Exception as e:
+                    stats['errors'] += 1
+                    error_msg = f"Exception processing article {article['url']}: {e}"
+                    logger.error(error_msg)
+                    stats['error_details'].append({
+                        'article_id': article['id'],
+                        'url': article['url'],
+                        'error': str(e)
+                    })
+                    
+                    # Update article status to error
+                    try:
+                        self.db.update_article_status(article['id'], 'error', str(e))
+                    except Exception as update_e:
+                        logger.error(f"Failed to update error status for article {article['id']}: {update_e}")
+        
+        logger.info(f"Processing complete: {stats['successful']}/{stats['articles_processed']} successful, "
+                   f"{stats['duplicates']} duplicates, {stats['errors']} errors")
+        
+        # Log to diagnostics
+        self.db.log_diagnostics(
+            level='INFO',
+            component='worker',
+            message=f"Processed {stats['articles_processed']} articles",
+            details={**stats, 'batch_id': str(uuid.uuid4())}
+        )
+        
+        return stats
 
-    for r in candidates:
+
+    def _process_single_article(self, article: Dict[str, Any]) -> Dict[str, Any]:
+        """Process a single article"""
+        result = {
+            'status': 'error',
+            'error': None
+        }
+        
+        article_id = article['id']
+        article_url = article['url']
+        
         try:
-            _process_row(client, ws, header, idx, r)
+            logger.debug(f"Processing article: {article_url}")
+            
+            # Update status to processing
+            self.db.update_article_status(article_id, 'processing')
+            
+            # Fetch HTML content
+            response, final_url, was_cached = self.http_client.get_with_conditional_headers(
+                article_url
+            )
+            
+            if response is None:
+                result['error'] = f"Failed to fetch {article_url}"
+                self.db.update_article_status(article_id, 'error', result['error'])
+                return result
+            
+            # Parse and extract content
+            rss_data = {
+                'title': article.get('title'),
+                'summary': article.get('description'),
+                'authors': article.get('authors'),
+                'published': article.get('published_at'),
+                'tags': article.get('keywords'),
+                'enclosures': article.get('enclosures')
+            }
+            
+            parsed_article = extract_all(
+                html=response.text if hasattr(response, 'text') else response.content.decode('utf-8', errors='ignore'),
+                url=article_url,
+                final_url=final_url,
+                headers=dict(response.headers),
+                rss_data=rss_data
+            )
+            
+            # Check for text-based duplicates
+            if parsed_article.text_hash:
+                existing_id = self.db.check_duplicate_by_text_hash(parsed_article.text_hash)
+                if existing_id:
+                    self.db.update_article_status(article_id, 'duplicate', 
+                                                f'Text duplicate of article {existing_id}')
+                    result['status'] = 'duplicate'
+                    logger.debug(f"Article is text duplicate: {article_url}")
+                    return result
+            
+            # Update article with extracted data
+            article_updates = {
+                'canonical_url': parsed_article.canonical_url,
+                'url_hash': parsed_article.url_hash,
+                'source': parsed_article.source,
+                'section': parsed_article.section,
+                'title': parsed_article.title or article.get('title', ''),
+                'description': parsed_article.description or article.get('description', ''),
+                'keywords': parsed_article.keywords,
+                'authors': parsed_article.authors,
+                'publisher': parsed_article.publisher,
+                'top_image': parsed_article.top_image,
+                'images': parsed_article.images,
+                'videos': parsed_article.videos,
+                'outlinks': parsed_article.outlinks,
+                'published_at': parsed_article.published_at or article.get('published_at'),
+                'updated_at': parsed_article.updated_at,
+                'language': parsed_article.language,
+                'paywalled': parsed_article.paywalled,
+                'partial': parsed_article.partial,
+                'full_text': parsed_article.full_text,
+                'text_hash': parsed_article.text_hash,
+                'word_count': parsed_article.word_count,
+                'reading_time': parsed_article.reading_time,
+                'status': parsed_article.status,
+                'error_reason': parsed_article.error_reason
+            }
+            
+            self.db.update_article(article_id, **article_updates)
+            
+            # Add to articles index for deduplication
+            if parsed_article.status == 'stored' and parsed_article.text_hash:
+                index_data = {
+                    'url_hash_v2': parsed_article.url_hash,
+                    'text_hash': parsed_article.text_hash,
+                    'title': parsed_article.title,
+                    'author': ', '.join(parsed_article.authors) if parsed_article.authors else '',
+                    'source': parsed_article.source
+                }
+                self.db.upsert_article_index(index_data)
+            
+            result['status'] = parsed_article.status
+            if parsed_article.error_reason:
+                result['error'] = parsed_article.error_reason
+            
+            logger.debug(f"Article processed successfully: {article_url} "
+                        f"({parsed_article.word_count} words, status: {parsed_article.status})")
+            
         except Exception as e:
-            ws.update_cell(r, idx["status"]+1, "error")
-            ws.update_cell(r, idx["error_msg"]+1, str(e)[:500])
-        finally:
-            status = ws.cell(r, idx["status"]+1).value or ""
-            if status != "processing":
-                ws.update_cell(r, idx["lock_owner"]+1, "")
-                ws.update_cell(r, idx["lock_at"]+1, "")
+            result['error'] = str(e)
+            logger.error(f"Error processing article {article_url}: {e}")
+            
+            try:
+                self.db.update_article_status(article_id, 'error', str(e))
+            except Exception as update_e:
+                logger.error(f"Failed to update error status: {update_e}")
+        
+        return result
 
-def _process_row(client: SheetClient, ws, header, idx, r: int):
-    article_url_canon = ws.cell(r, idx["article_url_canon"]+1).value or ""
-    if not article_url_canon:
-        article_url = ws.cell(r, idx["article_url"]+1).value or ""
-        article_url_canon = canonicalize_url(article_url)
-        ws.update_cell(r, idx["article_url_canon"]+1, article_url_canon)
-    url_hash = sha256_hex(article_url_canon)
-    ws.update_cell(r, idx["url_hash"]+1, url_hash)
 
-    html, final_url = _fetch_html(article_url_canon)
-    if final_url and final_url != article_url_canon:
-        article_url_canon = canonicalize_url(final_url)
-        url_hash = sha256_hex(article_url_canon)
-        ws.update_cell(r, idx["article_url_canon"]+1, article_url_canon)
-        ws.update_cell(r, idx["url_hash"]+1, url_hash)
+    def close(self):
+        """Clean up resources"""
+        if self.http_client:
+            self.http_client.close()
 
-    meta = extract_meta(html, article_url_canon)
-    full_text, clean_text = extract_texts(html, article_url_canon)
 
-    clean_for_hash = normalize_text_for_hash(clean_text)
-    text_hash = sha256_hex(clean_for_hash)
-    ws.update_cell(r, idx["text_hash"]+1, text_hash)
-
-    category_guess = quick_category(meta["title"], clean_text)
-    article_type = quick_article_type(meta, clean_text)
-
-    full_text_ref = store_fulltext(url_hash, full_text, base_dir=FULLTEXT_DIR)
-
-    clean_trim = clean_text[:CLEAN_TEXT_SHEETS_LIMIT]
-    out_links_json = json_dumps(sorted(set(meta["out_links"]))) if meta["out_links"] else ""
-    patch = {
-        "fetched_at": now_local_iso(),
-        "published_at": meta["published_at"] or ws.cell(r, idx["published_at"]+1).value or "",
-        "language": meta["language"] or "",
-        "title": meta["title"] or "",
-        "subtitle": meta["subtitle"] or "",
-        "authors": ", ".join(meta["authors"]) if meta["authors"] else "",
-        "section": meta["section"] or "",
-        "tags": ", ".join(meta["tags"]) if meta["tags"] else "",
-        "article_type": article_type,
-        "clean_text": clean_trim,
-        "clean_text_len": str(len(clean_text)),
-        "full_text_ref": full_text_ref,
-        "full_text_len": str(len(full_text)),
-        "word_count": str(len(clean_text.split())),
-        "out_links": out_links_json,
-        "category_guess": category_guess,
-        "status": "stored",
-        "processed_at": now_local_iso(),
-    }
-    client.update_raw_row(r, patch)
-
-    index_entry = {
-        "url_hash": url_hash,
-        "text_hash": text_hash,
-        "article_url_canon": article_url_canon,
-        "row_id_raw": str(r),
-        "first_seen": ws.cell(r, idx["found_at"]+1).value or now_local_iso(),
-        "last_seen": now_local_iso(),
-        "is_duplicate": "false",
-        "reason": "",
-        "language": meta["language"] or "",
-        "category_guess": category_guess,
-        "rev_n": "1",
-    }
-    client.upsert_index(index_entry)
-
-def _fetch_html(url: str) -> Tuple[str,str]:
-    headers = {"User-Agent": "NewsPipelineBot/1.0 (+https://example.com/bot)"}
-    r = requests.get(url, timeout=25, headers=headers, allow_redirects=True)
-    r.raise_for_status()
-    return r.text, r.url
-
-def extract_meta(html: str, base_url: str) -> Dict[str, any]:
-    soup = BeautifulSoup(html, "lxml")
-    def meta(name=None, prop=None):
-        if name:
-            tag = soup.find("meta", attrs={"name":name})
-            if tag and tag.get("content"): return tag["content"].strip()
-        if prop:
-            tag = soup.find("meta", attrs={"property":prop})
-            if tag and tag.get("content"): return tag["content"].strip()
-        return ""
-
-    title = meta(prop="og:title") or (soup.title.string.strip() if soup.title and soup.title.string else "")
-    subtitle = meta(name="description") or meta(prop="og:description") or ""
-    published = meta(prop="article:published_time") or ""
-    if not published:
-        time_tag = soup.find("time", attrs={"datetime":True})
-        if time_tag: published = time_tag["datetime"].strip()
-    authors = []
-    a1 = meta(name="author")
-    if a1: authors.append(a1)
-    section = meta(prop="article:section") or ""
-    tags = []
-    kw = meta(name="keywords")
-    if kw: tags.extend([t.strip() for t in kw.split(",") if t.strip()])
-    for a in soup.select(".tags a, .article-tags a, a[rel='tag']"):
-        if a.text and a.text.strip(): tags.append(a.text.strip())
-    tags = list(dict.fromkeys(tags))
-    html_tag = soup.find("html")
-    language = (html_tag.get("lang","") if html_tag else "").lower()
-    if not language and title:
-        try: language = langdetect_detect(title)
-        except Exception: language = ""
-    out_links = set()
-    base_dom = domain_of(base_url)
-    for a in soup.find_all("a", href=True):
-        href = a["href"].strip()
-        if href.startswith("#") or href.startswith("mailto:") or href.startswith("javascript:"): continue
-        if href.startswith("/"):
-            continue
-        dom = domain_of(href)
-        if dom and dom != base_dom: out_links.add(dom)
-
-    return {
-        "title": title,
-        "subtitle": subtitle,
-        "published_at": published,
-        "authors": authors,
-        "section": section,
-        "tags": tags,
-        "language": language if language.startswith("en") else language,
-        "out_links": list(out_links),
-    }
-
-def extract_texts(html: str, url: str) -> Tuple[str,str]:
-    downloaded = trafilatura.extract(html, include_comments=False, include_tables=True, no_fallback=False,
-                                    favor_recall=True,  output="txt")
-    full_text = downloaded or ""
-    clean_text = _clean_text(full_text)
-    return full_text, clean_text
-
-REMOVALS = [
-    r"^subscribe to.*$", r"^sign up.*$", r"^related articles.*$", r"^read more.*$",
-    r"^©.*$", r"^copyright.*$", r"^all rights reserved.*$", r"^\s*$"
-]
-REMOVALS_RE = [re.compile(pat, re.IGNORECASE) for pat in REMOVALS]
-
-def _clean_text(text: str) -> str:
-    lines = [ln.strip() for ln in (text or "").splitlines()]
-    kept = []
-    for ln in lines:
-        if any(rx.match(ln) for rx in REMOVALS_RE):
-            continue
-        kept.append(ln)
-    out = "\n".join(kept)
-    out = re.sub(r"\n{3,}", "\n\n", out).strip()
-    return out
-
-def quick_category(title: str, clean_text: str) -> str:
-    txt = f"{title}\n{clean_text[:2000]}".lower()
-    p_score = sum(1 for k in POLITICS_KEYS if k in txt)
-    s_score = sum(1 for k in SPORTS_KEYS if k in txt)
-    if p_score >= max(3, 2*s_score): return "politics"
-    if s_score >= max(3, 2*p_score): return "sports"
-    return "other"
-
-def quick_article_type(meta: Dict[str,any], clean_text: str) -> str:
-    label = " ".join([meta.get("section","") or "", ",".join(meta.get("tags",[]) or [])]).lower()
-    head = (meta.get("title","") or "").lower()
-    txt = f"{head}\n{clean_text[:2000]}".lower()
-    if any(k in label or k in txt for k in ("opinion","editorial","op-ed","commentary","column")): return "opinion"
-    if any(k in label or k in txt for k in ("analysis","explainer","what to know")): return "analysis"
-    if "interview" in label or re.search(r"\bq:\b.*\ba:\b", txt): return "interview"
-    if "live" in label or "live updates" in txt: return "live"
-    return "news"
+# Legacy function for backward compatibility
+def process_pending(db_client, worker_id: str = "worker-1", batch_size: int = 50):
+    """Legacy function wrapper for the new worker"""
+    worker = ArticleWorker(db_client, batch_size=batch_size)
+    try:
+        return worker.process_pending_articles()
+    finally:
+        worker.close()

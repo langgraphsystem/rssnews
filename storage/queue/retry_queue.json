@@ -1,0 +1,257 @@
+[
+  {
+    "url": "https://www.washingtonpost.com/climate-environment/2025/08/26/wind-energy-offshore-trump-lawsuit-orsted/",
+    "headers": {
+      "User-Agent": "Mozilla/5.0 (compatible; RSSNewsBot/1.0; +https://github.com/newsaggregator/rss-parser)",
+      "Accept-Encoding": "gzip, deflate",
+      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "Connection": "keep-alive",
+      "Accept-Language": "en-US,en;q=0.5",
+      "DNT": "1",
+      "Upgrade-Insecure-Requests": "1"
+    },
+    "attempt": 1,
+    "next_retry": "2025-08-30T02:15:46.004375",
+    "max_attempts": 5,
+    "error": "Timeout: https://www.washingtonpost.com/climate-environment/2025/08/26/wind-energy-offshore-trump-lawsuit-orsted/",
+    "context": {}
+  },
+  {
+    "url": "https://www.washingtonpost.com/advice/2025/08/27/meghan-leahy-potty-training-toddler/",
+    "headers": {
+      "User-Agent": "Mozilla/5.0 (compatible; RSSNewsBot/1.0; +https://github.com/newsaggregator/rss-parser)",
+      "Accept-Encoding": "gzip, deflate",
+      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "Connection": "keep-alive",
+      "Accept-Language": "en-US,en;q=0.5",
+      "DNT": "1",
+      "Upgrade-Insecure-Requests": "1"
+    },
+    "attempt": 1,
+    "next_retry": "2025-08-30T02:15:23.998835",
+    "max_attempts": 5,
+    "error": "Timeout: https://www.washingtonpost.com/advice/2025/08/27/meghan-leahy-potty-training-toddler/",
+    "context": {}
+  },
+  {
+    "url": "https://www.washingtonpost.com/nation/2025/08/27/wisconsin-kayaker-ryan-borgwardt-fake-death-sentenced/",
+    "headers": {
+      "User-Agent": "Mozilla/5.0 (compatible; RSSNewsBot/1.0; +https://github.com/newsaggregator/rss-parser)",
+      "Accept-Encoding": "gzip, deflate",
+      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "Connection": "keep-alive",
+      "Accept-Language": "en-US,en;q=0.5",
+      "DNT": "1",
+      "Upgrade-Insecure-Requests": "1"
+    },
+    "attempt": 1,
+    "next_retry": "2025-08-30T02:15:29.849813",
+    "max_attempts": 5,
+    "error": "Connection error: https://www.washingtonpost.com/nation/2025/08/27/wisconsin-kayaker-ryan-borgwardt-fake-death-sentenced/ - ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))",
+    "context": {}
+  },
+  {
+    "url": "https://www.washingtonpost.com/food/2025/08/27/eleven-madison-park-vegan-meat-menu/",
+    "headers": {
+      "User-Agent": "Mozilla/5.0 (compatible; RSSNewsBot/1.0; +https://github.com/newsaggregator/rss-parser)",
+      "Accept-Encoding": "gzip, deflate",
+      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "Connection": "keep-alive",
+      "Accept-Language": "en-US,en;q=0.5",
+      "DNT": "1",
+      "Upgrade-Insecure-Requests": "1"
+    },
+    "attempt": 1,
+    "next_retry": "2025-08-30T02:15:45.119729",
+    "max_attempts": 5,
+    "error": "Timeout: https://www.washingtonpost.com/food/2025/08/27/eleven-madison-park-vegan-meat-menu/",
+    "context": {}
+  },
+  {
+    "url": "https://www.washingtonpost.com/entertainment/movies/2025/best-movies-2025/",
+    "headers": {
+      "User-Agent": "Mozilla/5.0 (compatible; RSSNewsBot/1.0; +https://github.com/newsaggregator/rss-parser)",
+      "Accept-Encoding": "gzip, deflate",
+      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "Connection": "keep-alive",
+      "Accept-Language": "en-US,en;q=0.5",
+      "DNT": "1",
+      "Upgrade-Insecure-Requests": "1"
+    },
+    "attempt": 1,
+    "next_retry": "2025-08-30T02:16:23.121052",
+    "max_attempts": 5,
+    "error": "Timeout: https://www.washingtonpost.com/entertainment/movies/2025/best-movies-2025/",
+    "context": {}
+  },
+  {
+    "url": "https://www.washingtonpost.com/advice/2025/08/27/miss-manners-timeshare-upsell-salespeople/",
+    "headers": {
+      "User-Agent": "Mozilla/5.0 (compatible; RSSNewsBot/1.0; +https://github.com/newsaggregator/rss-parser)",
+      "Accept-Encoding": "gzip, deflate",
+      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "Connection": "keep-alive",
+      "Accept-Language": "en-US,en;q=0.5",
+      "DNT": "1",
+      "Upgrade-Insecure-Requests": "1"
+    },
+    "attempt": 1,
+    "next_retry": "2025-08-30T02:15:48.312441",
+    "max_attempts": 5,
+    "error": "Connection error: https://www.washingtonpost.com/advice/2025/08/27/miss-manners-timeshare-upsell-salespeople/ - ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))",
+    "context": {}
+  },
+  {
+    "url": "https://www.washingtonpost.com/recipes/summer-vegetable-korma/",
+    "headers": {
+      "User-Agent": "Mozilla/5.0 (compatible; RSSNewsBot/1.0; +https://github.com/newsaggregator/rss-parser)",
+      "Accept-Encoding": "gzip, deflate",
+      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "Connection": "keep-alive",
+      "Accept-Language": "en-US,en;q=0.5",
+      "DNT": "1",
+      "Upgrade-Insecure-Requests": "1"
+    },
+    "attempt": 1,
+    "next_retry": "2025-08-30T02:16:34.410160",
+    "max_attempts": 5,
+    "error": "Timeout: https://www.washingtonpost.com/recipes/summer-vegetable-korma/",
+    "context": {}
+  },
+  {
+    "url": "https://www.washingtonpost.com/entertainment/2025/08/26/taylor-swift-travis-kelce-engaged/",
+    "headers": {
+      "User-Agent": "Mozilla/5.0 (compatible; RSSNewsBot/1.0; +https://github.com/newsaggregator/rss-parser)",
+      "Accept-Encoding": "gzip, deflate",
+      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "Connection": "keep-alive",
+      "Accept-Language": "en-US,en;q=0.5",
+      "DNT": "1",
+      "Upgrade-Insecure-Requests": "1"
+    },
+    "attempt": 1,
+    "next_retry": "2025-08-30T02:15:47.732547",
+    "max_attempts": 5,
+    "error": "Timeout: https://www.washingtonpost.com/entertainment/2025/08/26/taylor-swift-travis-kelce-engaged/",
+    "context": {}
+  },
+  {
+    "url": "https://www.washingtonpost.com/advice/2025/08/27/asking-eric-emotional-affair-therapy/",
+    "headers": {
+      "User-Agent": "Mozilla/5.0 (compatible; RSSNewsBot/1.0; +https://github.com/newsaggregator/rss-parser)",
+      "Accept-Encoding": "gzip, deflate",
+      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "Connection": "keep-alive",
+      "Accept-Language": "en-US,en;q=0.5",
+      "DNT": "1",
+      "Upgrade-Insecure-Requests": "1"
+    },
+    "attempt": 1,
+    "next_retry": "2025-08-30T02:16:37.465306",
+    "max_attempts": 5,
+    "error": "Timeout: https://www.washingtonpost.com/advice/2025/08/27/asking-eric-emotional-affair-therapy/",
+    "context": {}
+  },
+  {
+    "url": "https://www.washingtonpost.com/entertainment/music/2025/08/26/sombr-album-tiktok/",
+    "headers": {
+      "User-Agent": "Mozilla/5.0 (compatible; RSSNewsBot/1.0; +https://github.com/newsaggregator/rss-parser)",
+      "Accept-Encoding": "gzip, deflate",
+      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "Connection": "keep-alive",
+      "Accept-Language": "en-US,en;q=0.5",
+      "DNT": "1",
+      "Upgrade-Insecure-Requests": "1"
+    },
+    "attempt": 1,
+    "next_retry": "2025-08-30T02:16:24.868347",
+    "max_attempts": 5,
+    "error": "Timeout: https://www.washingtonpost.com/entertainment/music/2025/08/26/sombr-album-tiktok/",
+    "context": {}
+  },
+  {
+    "url": "https://www.washingtonpost.com/advice/2025/08/27/carolyn-hax-invite-parents-little-kids/",
+    "headers": {
+      "User-Agent": "Mozilla/5.0 (compatible; RSSNewsBot/1.0; +https://github.com/newsaggregator/rss-parser)",
+      "Accept-Encoding": "gzip, deflate",
+      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "Connection": "keep-alive",
+      "Accept-Language": "en-US,en;q=0.5",
+      "DNT": "1",
+      "Upgrade-Insecure-Requests": "1"
+    },
+    "attempt": 1,
+    "next_retry": "2025-08-30T02:16:26.636755",
+    "max_attempts": 5,
+    "error": "Timeout: https://www.washingtonpost.com/advice/2025/08/27/carolyn-hax-invite-parents-little-kids/",
+    "context": {}
+  },
+  {
+    "url": "https://www.washingtonpost.com/nation/2025/08/27/swatting-hoaxes-us-colleges/",
+    "headers": {
+      "User-Agent": "Mozilla/5.0 (compatible; RSSNewsBot/1.0; +https://github.com/newsaggregator/rss-parser)",
+      "Accept-Encoding": "gzip, deflate",
+      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "Connection": "keep-alive",
+      "Accept-Language": "en-US,en;q=0.5",
+      "DNT": "1",
+      "Upgrade-Insecure-Requests": "1"
+    },
+    "attempt": 1,
+    "next_retry": "2025-08-30T02:16:02.603596",
+    "max_attempts": 5,
+    "error": "Timeout: https://www.washingtonpost.com/nation/2025/08/27/swatting-hoaxes-us-colleges/",
+    "context": {}
+  },
+  {
+    "url": "https://www.washingtonpost.com/education/2025/08/27/school-cellphone-bans-analog-entertainment-games/",
+    "headers": {
+      "User-Agent": "Mozilla/5.0 (compatible; RSSNewsBot/1.0; +https://github.com/newsaggregator/rss-parser)",
+      "Accept-Encoding": "gzip, deflate",
+      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "Connection": "keep-alive",
+      "Accept-Language": "en-US,en;q=0.5",
+      "DNT": "1",
+      "Upgrade-Insecure-Requests": "1"
+    },
+    "attempt": 1,
+    "next_retry": "2025-08-30T02:16:33.472369",
+    "max_attempts": 5,
+    "error": "Connection error: https://www.washingtonpost.com/education/2025/08/27/school-cellphone-bans-analog-entertainment-games/ - ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))",
+    "context": {}
+  },
+  {
+    "url": "https://www.washingtonpost.com/food/2025/08/26/cracker-barrel-logo-peg-game-controversy/",
+    "headers": {
+      "User-Agent": "Mozilla/5.0 (compatible; RSSNewsBot/1.0; +https://github.com/newsaggregator/rss-parser)",
+      "Accept-Encoding": "gzip, deflate",
+      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "Connection": "keep-alive",
+      "Accept-Language": "en-US,en;q=0.5",
+      "DNT": "1",
+      "Upgrade-Insecure-Requests": "1"
+    },
+    "attempt": 1,
+    "next_retry": "2025-08-30T02:16:10.257933",
+    "max_attempts": 5,
+    "error": "Connection error: https://www.washingtonpost.com/food/2025/08/26/cracker-barrel-logo-peg-game-controversy/ - ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))",
+    "context": {}
+  },
+  {
+    "url": "https://www.washingtonpost.com/nation/2025/08/26/cracker-barrel-old-logo-back-trump/",
+    "headers": {
+      "User-Agent": "Mozilla/5.0 (compatible; RSSNewsBot/1.0; +https://github.com/newsaggregator/rss-parser)",
+      "Accept-Encoding": "gzip, deflate",
+      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "Connection": "keep-alive",
+      "Accept-Language": "en-US,en;q=0.5",
+      "DNT": "1",
+      "Upgrade-Insecure-Requests": "1"
+    },
+    "attempt": 1,
+    "next_retry": "2025-08-30T02:16:11.964227",
+    "max_attempts": 5,
+    "error": "Timeout: https://www.washingtonpost.com/nation/2025/08/26/cracker-barrel-old-logo-back-trump/",
+    "context": {}
+  }
+]

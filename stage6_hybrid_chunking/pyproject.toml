@@ -1,0 +1,92 @@
+[tool.poetry]
+name = "stage6-hybrid-chunking"
+version = "1.0.0"
+description = "Production-grade hybrid chunking with Gemini 2.5 Flash API for RSS pipeline"
+authors = ["RSS Pipeline Team"]
+readme = "README.md"
+packages = [{include = "src"}]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+sqlalchemy = {extras = ["asyncio"], version = "^2.0.0"}
+alembic = "^1.13.0"
+asyncpg = "^0.29.0"
+redis = "^5.0.0"
+celery = "^5.3.0"
+pydantic = {extras = ["email"], version = "^2.8.0"}
+pydantic-settings = "^2.4.0"
+httpx = "^0.27.0"
+structlog = "^24.2.0"
+prometheus-client = "^0.20.0"
+opentelemetry-api = "^1.25.0"
+opentelemetry-sdk = "^1.25.0"
+opentelemetry-instrumentation-sqlalchemy = "^0.46b0"
+opentelemetry-instrumentation-httpx = "^0.46b0"
+click = "^8.1.0"
+uvloop = "^0.19.0"
+orjson = "^3.10.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.0"
+pytest-asyncio = "^0.24.0"
+pytest-mock = "^3.14.0"
+mypy = "^1.11.0"
+ruff = "^0.6.0"
+black = "^24.8.0"
+coverage = "^7.6.0"
+faker = "^25.8.0"
+
+[tool.poetry.group.test.dependencies]
+pytest-postgresql = "^6.0.0"
+pytest-redis = "^3.1.0"
+testcontainers = "^4.7.0"
+
+[tool.poetry.scripts]
+stage6 = "src.cli:main"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+plugins = ["pydantic.mypy"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 88
+select = [
+    "E",  # pycodestyle errors
+    "W",  # pycodestyle warnings
+    "F",  # pyflakes
+    "I",  # isort
+    "B",  # flake8-bugbear
+    "C4", # flake8-comprehensions
+    "UP", # pyupgrade
+]
+ignore = [
+    "E501",  # line too long, handled by black
+    "B008",  # do not perform function calls in argument defaults
+]
+
+[tool.ruff.per-file-ignores]
+"__init__.py" = ["F401"]
+"tests/*" = ["B011"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short --strict-markers"
+markers = [
+    "unit: Unit tests",
+    "integration: Integration tests",
+    "resilience: Resilience tests",
+    "slow: Slow tests that require external services"
+]

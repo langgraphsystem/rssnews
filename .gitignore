@@ -1,0 +1,10 @@
+__pycache__/
+*.log
+.env
+
+# runtime artifacts
+logs/
+storage/queue/retry_queue.json
+
+# secrets
+service_account.json

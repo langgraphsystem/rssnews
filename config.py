@@ -1,5 +1,4 @@
 import os
-from datetime import timedelta
 
 # === ОБЩИЕ НАСТРОЙКИ ===
 TZ = "America/Chicago"
@@ -19,18 +18,64 @@ FULLTEXT_DIR = os.getenv("FULLTEXT_DIR", "./storage/articles")  # файлы .tx
 
 # === ФИЛЬТРАЦИЯ/КАНОНИЗАЦИЯ ===
 TRACKING_PARAMS = {
-    "utm_source","utm_medium","utm_campaign","utm_term","utm_content","utm_id",
-    "gclid","fbclid","mc_cid","mc_eid","yclid","vero_id","rb_clickid","ref","ref_src"
+    "utm_source",
+    "utm_medium",
+    "utm_campaign",
+    "utm_term",
+    "utm_content",
+    "utm_id",
+    "gclid",
+    "fbclid",
+    "mc_cid",
+    "mc_eid",
+    "yclid",
+    "vero_id",
+    "rb_clickid",
+    "ref",
+    "ref_src",
 }
 REMOVE_PATH_SUFFIXES = {"/amp", "/index.html", "/index.htm"}
 
 # === РУБРИКАЦИЯ (до LLM) ===
 POLITICS_KEYS = {
-    "government","election","senate","parliament","congress","policy","bill",
-    "minister","cabinet","president","presidency","diplomacy","sanctions","ceasefire",
-    "regulator","supreme court","white house","kremlin","eu commission","parliamentary"
+    "government",
+    "election",
+    "senate",
+    "parliament",
+    "congress",
+    "policy",
+    "bill",
+    "minister",
+    "cabinet",
+    "president",
+    "presidency",
+    "diplomacy",
+    "sanctions",
+    "ceasefire",
+    "regulator",
+    "supreme court",
+    "white house",
+    "kremlin",
+    "eu commission",
+    "parliamentary",
 }
 SPORTS_KEYS = {
-    "match","game","player","coach","league","cup","tournament","goal","score",
-    "transfer","nba","nfl","mlb","nhl","fifa","uefa","olympics","grand slam"
+    "match",
+    "game",
+    "player",
+    "coach",
+    "league",
+    "cup",
+    "tournament",
+    "goal",
+    "score",
+    "transfer",
+    "nba",
+    "nfl",
+    "mlb",
+    "nhl",
+    "fifa",
+    "uefa",
+    "olympics",
+    "grand slam",
 }

@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python:*)",
+      "Bash(pip install:*)",
+      "Bash(powershell:*)",
+      "Bash(set PG_DSN=postgresql://postgres:kVRUPMOdeXVEdUuKihPeJTgzZVIxqbZy@caboose.proxy.rlwy.net:13102/railway)",
+      "Bash(export PG_DSN=\"postgresql://postgres:kVRUPMOdeXVEdUuKihPeJTgzZVIxqbZy@caboose.proxy.rlwy.net:13102/railway\")",
+      "Bash(tree:*)",
+      "Bash(pytest:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
