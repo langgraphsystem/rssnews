@@ -1,10 +1,26 @@
 __pycache__/
 *.log
+*.pyc
 .env
+.env.*
+.DS_Store
+
+# virtualenvs
+.venv/
+venv/
+
+# caches
+.pytest_cache/
+.ruff_cache/
+
+# editor/assistant
+.claude/
+.vscode/
 
 # runtime artifacts
 logs/
 storage/queue/retry_queue.json
+storage/articles/
 
 # secrets
 service_account.json

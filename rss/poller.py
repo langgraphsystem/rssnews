@@ -244,8 +244,8 @@ class RSSPoller:
         # url_hash_v2 must be SHA256 of canonical URL
         url_hash_v2 = compute_url_hash(canonical)
         
-        # Check for duplicate by URL
-        if self.db.check_duplicate_by_url_hash(url_hash):
+        # Check for duplicate by URL (use the v2 hash value)
+        if self.db.check_duplicate_by_url_hash(url_hash_v2):
             return entry_stats
         
         # Extract basic metadata

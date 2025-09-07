@@ -299,6 +299,43 @@ def main():
             return
 
         if args.cmd == "index":
+            logger.info("Starting Stage 7 indexing")
+            # Fetch chunks missing FTS/embeddings
+            chunks = client.get_chunks_for_indexing(limit=args.limit)
+            if not chunks:
+                print("No chunks need indexing")
+                return
+            # Update FTS vectors first (safe, no external deps)
+            try:
+                ids = [c['id'] for c in chunks if 'id' in c]
+                fts_updated = client.update_chunks_fts(ids)
+                print(f"✓ Indexing complete: fts_updated={fts_updated}, considered={len(ids)}")
+            except Exception as e:
+                logger.error(f"Indexing failed: {e}")
+                print(f"✗ Indexing failed: {e}")
+            return
+
+        if args.cmd == "rag":
+            logger.info("Starting Stage 8 RAG retrieval")
+            try:
+                from stage8_retrieval.retriever import HybridRetriever
+                retriever = HybridRetriever(client)
+                res = retriever.hybrid_retrieve(args.query, limit=args.limit, alpha=args.alpha)
+                print("=== RAG Results ===")
+                print(f"Query (normalized): {res.query_normalized}")
+                print(f"Search type: {res.search_type}")
+                print(f"Results: {len(res.chunks)}")
+                for i, ch in enumerate(res.chunks, 1):
+                    title = ch.get('title_norm') or ch.get('title') or ''
+                    url = ch.get('url') or ''
+                    src = ch.get('source_domain') or ch.get('source') or ''
+                    print(f"[{i}] {title} | {src} | {url}")
+            except Exception as e:
+                logger.error(f"RAG retrieval failed: {e}")
+                print(f"✗ RAG retrieval failed: {e}")
+            return
+
+        if args.cmd == "index":
             logger.info("Starting Stage 7 indexing (FTS + embeddings)")
             from stage6_hybrid_chunking.src.config.settings import get_settings
             from stage6_hybrid_chunking.src.llm.gemini_client import GeminiClient

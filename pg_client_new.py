@@ -205,7 +205,7 @@ class PgClient:
     def set_config(self, key: str, value: str):
         """Set configuration value"""
         try:
-            with self.conn.cursor() as cur:
+            with self._cursor() as cur:
                 cur.execute("""
                     INSERT INTO config (k, v) VALUES (%s, %s)
                     ON CONFLICT (k) DO UPDATE SET v = EXCLUDED.v
@@ -217,7 +217,7 @@ class PgClient:
     def get_config(self, key: str) -> Optional[str]:
         """Get configuration value"""
         try:
-            with self.conn.cursor() as cur:
+            with self._cursor() as cur:
                 cur.execute("SELECT v FROM config WHERE k = %s", (key,))
                 result = cur.fetchone()
                 return result[0] if result else None
@@ -229,7 +229,7 @@ class PgClient:
     def insert_feed(self, url: str, lang: str = None, category: str = None) -> int:
         """Insert new feed"""
         try:
-            with self.conn.cursor() as cur:
+            with self._cursor() as cur:
                 # First check if feed already exists
                 cur.execute("SELECT id FROM feeds WHERE feed_url = %s", (url,))
                 existing = cur.fetchone()
@@ -251,7 +251,7 @@ class PgClient:
     def get_active_feeds(self, limit: int = None) -> List[Dict[str, Any]]:
         """Get active feeds for polling"""
         try:
-            with self.conn.cursor(cursor_factory=RealDictCursor) as cur:
+            with self._cursor() as cur:
                 query = """
                     SELECT id, feed_url as url, status, lang, category, etag as last_etag, 
                            last_modified, last_entry_date
@@ -263,7 +263,8 @@ class PgClient:
                     query += f" LIMIT {limit}"
                 
                 cur.execute(query)
-                return [dict(row) for row in cur.fetchall()]
+                cols = [d[0] for d in cur.description]
+                return [dict(zip(cols, r)) for r in cur.fetchall()]
         except Exception as e:
             logger.error(f"Failed to get active feeds: {e}")
             return []
