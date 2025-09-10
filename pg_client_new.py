@@ -120,16 +120,30 @@ class PgClient:
         CREATE INDEX IF NOT EXISTS idx_raw_text_hash ON raw(text_hash);
         CREATE INDEX IF NOT EXISTS idx_raw_url_hash ON raw(url_hash);
 
-        -- articles_index (for dedup across time)
+        -- articles_index (for dedup across time + Stage6 readiness)
         CREATE TABLE IF NOT EXISTS articles_index (
           id BIGSERIAL PRIMARY KEY,
           url_hash TEXT,
+          -- optional v2 column used by newer pipeline versions
+          url_hash_v2 TEXT,
           text_hash TEXT UNIQUE,
           title TEXT,
           author TEXT,
           source TEXT,
           first_seen TIMESTAMPTZ DEFAULT NOW(),
-          last_seen TIMESTAMPTZ DEFAULT NOW()
+          last_seen TIMESTAMPTZ DEFAULT NOW(),
+          -- extended fields expected by Stage 6
+          article_id TEXT,
+          url TEXT,
+          title_norm TEXT,
+          clean_text TEXT,
+          language TEXT,
+          category TEXT,
+          tags_norm JSONB,
+          published_at TIMESTAMPTZ,
+          processing_version INTEGER DEFAULT 1,
+          ready_for_chunking BOOLEAN DEFAULT FALSE,
+          chunking_completed BOOLEAN
         );
         CREATE INDEX IF NOT EXISTS idx_articles_url_hash ON articles_index(url_hash);
         CREATE INDEX IF NOT EXISTS idx_articles_text_hash ON articles_index(text_hash);
@@ -159,7 +173,7 @@ class PgClient:
             authors_norm JSONB,
             quality_score REAL,
             fts_vector TSVECTOR,
-            embedding public.vector(384),
+            embedding public.vector(768),
             created_at TIMESTAMPTZ DEFAULT NOW(),
             UNIQUE(article_id, processing_version, chunk_index)
         );
@@ -188,6 +202,38 @@ class PgClient:
         try:
             with self._cursor() as cur:
                 cur.execute(schema_sql)
+                # Backward-compatible ALTERs for instances created before extended fields
+                cur.execute("""
+                    ALTER TABLE articles_index ADD COLUMN IF NOT EXISTS url_hash_v2 TEXT;
+                    ALTER TABLE articles_index ADD COLUMN IF NOT EXISTS article_id TEXT;
+                    ALTER TABLE articles_index ADD COLUMN IF NOT EXISTS url TEXT;
+                    ALTER TABLE articles_index ADD COLUMN IF NOT EXISTS title_norm TEXT;
+                    ALTER TABLE articles_index ADD COLUMN IF NOT EXISTS clean_text TEXT;
+                    ALTER TABLE articles_index ADD COLUMN IF NOT EXISTS language TEXT;
+                    ALTER TABLE articles_index ADD COLUMN IF NOT EXISTS category TEXT;
+                    ALTER TABLE articles_index ADD COLUMN IF NOT EXISTS tags_norm JSONB;
+                    ALTER TABLE articles_index ADD COLUMN IF NOT EXISTS published_at TIMESTAMPTZ;
+                    ALTER TABLE articles_index ADD COLUMN IF NOT EXISTS processing_version INTEGER DEFAULT 1;
+                    ALTER TABLE articles_index ADD COLUMN IF NOT EXISTS ready_for_chunking BOOLEAN DEFAULT FALSE;
+                    ALTER TABLE articles_index ADD COLUMN IF NOT EXISTS chunking_completed BOOLEAN;
+                """)
+                # Ensure article_chunks has fields produced by chunker
+                cur.execute("""
+                    ALTER TABLE article_chunks ADD COLUMN IF NOT EXISTS boundary_confidence REAL;
+                    ALTER TABLE article_chunks ADD COLUMN IF NOT EXISTS llm_action TEXT;
+                    ALTER TABLE article_chunks ADD COLUMN IF NOT EXISTS llm_confidence REAL;
+                    ALTER TABLE article_chunks ADD COLUMN IF NOT EXISTS llm_reason TEXT;
+                """)
+                # Indices may fail if they already exist; IF NOT EXISTS guards above suffice for most
+                cur.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_articles_url_hash_v2 ON articles_index(url_hash_v2);
+                """)
+                cur.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_ai_ready ON articles_index(ready_for_chunking) WHERE ready_for_chunking IS TRUE;
+                """)
+                cur.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_ai_chunk_done ON articles_index(chunking_completed);
+                """)
             logger.info("Database schema ensured")
         except Exception as e:
             logger.error(f"Failed to create schema: {e}")
@@ -526,28 +572,76 @@ class PgClient:
 
     # Articles index operations
     def upsert_article_index(self, index_data: Dict[str, Any]):
-        """Insert or update article index for deduplication.
+        """Insert or update article index for deduplication and Stage 6 readiness.
         Accepts optional url_hash_v2 key and maps to url_hash for backward compatibility.
+        Supports extended fields: article_id, url, title_norm, clean_text, language, category,
+        tags_norm (JSON), published_at, processing_version, ready_for_chunking.
         """
         try:
             payload = index_data.copy()
             # Prefer v2 hash if provided
             if 'url_hash_v2' in payload:
                 payload['url_hash'] = payload['url_hash_v2']
+            # JSON fields
+            if 'tags_norm' in payload and isinstance(payload['tags_norm'], (list, dict)):
+                payload['tags_norm'] = Json(payload['tags_norm'])
+            # Default processing_version
+            if 'processing_version' not in payload or payload.get('processing_version') is None:
+                payload['processing_version'] = 1
             with self._cursor() as cur:
                 try:
                     cur.execute("""
-                        INSERT INTO articles_index (url_hash_v2, text_hash, title, author, source)
-                        VALUES (%(url_hash)s, %(text_hash)s, %(title)s, %(author)s, %(source)s)
+                        INSERT INTO articles_index (
+                            url_hash_v2, text_hash, title, author, source,
+                            article_id, url, title_norm, clean_text, language, category,
+                            tags_norm, published_at, processing_version, ready_for_chunking
+                        ) VALUES (
+                            %(url_hash)s, %(text_hash)s, %(title)s, %(author)s, %(source)s,
+                            %(article_id)s, %(url)s, %(title_norm)s, %(clean_text)s, %(language)s, %(category)s,
+                            %(tags_norm)s, %(published_at)s, %(processing_version)s, %(ready_for_chunking)s
+                        )
                         ON CONFLICT (text_hash) DO UPDATE SET
-                            last_seen = NOW()
+                            last_seen = NOW(),
+                            title = COALESCE(EXCLUDED.title, articles_index.title),
+                            author = COALESCE(EXCLUDED.author, articles_index.author),
+                            source = COALESCE(EXCLUDED.source, articles_index.source),
+                            article_id = COALESCE(EXCLUDED.article_id, articles_index.article_id),
+                            url = COALESCE(EXCLUDED.url, articles_index.url),
+                            title_norm = COALESCE(EXCLUDED.title_norm, articles_index.title_norm),
+                            clean_text = COALESCE(EXCLUDED.clean_text, articles_index.clean_text),
+                            language = COALESCE(EXCLUDED.language, articles_index.language),
+                            category = COALESCE(EXCLUDED.category, articles_index.category),
+                            tags_norm = COALESCE(EXCLUDED.tags_norm, articles_index.tags_norm),
+                            published_at = COALESCE(EXCLUDED.published_at, articles_index.published_at),
+                            processing_version = GREATEST(articles_index.processing_version, COALESCE(EXCLUDED.processing_version, 1)),
+                            ready_for_chunking = (articles_index.ready_for_chunking OR COALESCE(EXCLUDED.ready_for_chunking, FALSE))
                     """, payload)
                 except Exception:
                     cur.execute("""
-                        INSERT INTO articles_index (url_hash, text_hash, title, author, source)
-                        VALUES (%(url_hash)s, %(text_hash)s, %(title)s, %(author)s, %(source)s)
+                        INSERT INTO articles_index (
+                            url_hash, text_hash, title, author, source,
+                            article_id, url, title_norm, clean_text, language, category,
+                            tags_norm, published_at, processing_version, ready_for_chunking
+                        ) VALUES (
+                            %(url_hash)s, %(text_hash)s, %(title)s, %(author)s, %(source)s,
+                            %(article_id)s, %(url)s, %(title_norm)s, %(clean_text)s, %(language)s, %(category)s,
+                            %(tags_norm)s, %(published_at)s, %(processing_version)s, %(ready_for_chunking)s
+                        )
                         ON CONFLICT (text_hash) DO UPDATE SET
-                            last_seen = NOW()
+                            last_seen = NOW(),
+                            title = COALESCE(EXCLUDED.title, articles_index.title),
+                            author = COALESCE(EXCLUDED.author, articles_index.author),
+                            source = COALESCE(EXCLUDED.source, articles_index.source),
+                            article_id = COALESCE(EXCLUDED.article_id, articles_index.article_id),
+                            url = COALESCE(EXCLUDED.url, articles_index.url),
+                            title_norm = COALESCE(EXCLUDED.title_norm, articles_index.title_norm),
+                            clean_text = COALESCE(EXCLUDED.clean_text, articles_index.clean_text),
+                            language = COALESCE(EXCLUDED.language, articles_index.language),
+                            category = COALESCE(EXCLUDED.category, articles_index.category),
+                            tags_norm = COALESCE(EXCLUDED.tags_norm, articles_index.tags_norm),
+                            published_at = COALESCE(EXCLUDED.published_at, articles_index.published_at),
+                            processing_version = GREATEST(articles_index.processing_version, COALESCE(EXCLUDED.processing_version, 1)),
+                            ready_for_chunking = (articles_index.ready_for_chunking OR COALESCE(EXCLUDED.ready_for_chunking, FALSE))
                     """, payload)
         except Exception as e:
             logger.error(f"Failed to upsert article index: {e}")
@@ -754,7 +848,7 @@ class PgClient:
                 cur.execute(
                     f"""
                     UPDATE article_chunks
-                    SET fts_vector = to_tsvector('simple', coalesce(text, ''))
+                    SET fts_vector = to_tsvector('english', coalesce(text, ''))
                     WHERE id = ANY(%s)
                     """,
                     (ids,)
@@ -793,9 +887,10 @@ class PgClient:
                     """
                     SELECT 
                         id, article_id, chunk_index, text,
-                        ts_rank_cd(fts_vector, plainto_tsquery('simple', %s)) as score
+                        url, title_norm, source_domain,
+                        ts_rank_cd(fts_vector, plainto_tsquery('english', %s)) as score
                     FROM article_chunks
-                    WHERE fts_vector @@ plainto_tsquery('simple', %s)
+                    WHERE fts_vector @@ plainto_tsquery('english', %s)
                     ORDER BY score DESC
                     LIMIT %s
                     """,
@@ -807,6 +902,54 @@ class PgClient:
             logger.error(f"FTS search failed for query '{query}': {e}")
             return []
 
+    def search_chunks_fts_ts(self, tsquery: Optional[str], plainto: str,
+                              sources: List[str], since_days: Optional[int],
+                              limit: int = 10) -> List[Dict[str, Any]]:
+        """Search using to_tsquery when tsquery provided; otherwise plainto_tsquery.
+        Can filter by source_domain list and published_at > now()-interval 'N days'.
+        """
+        try:
+            where = ["TRUE"]
+            params: List[Any] = []
+            if tsquery:
+                where.append("fts_vector @@ to_tsquery('english', %s)")
+                params.append(tsquery)
+                rank_expr = "ts_rank_cd(fts_vector, to_tsquery('english', %s))"
+                rank_param_first = True
+            else:
+                where.append("fts_vector @@ plainto_tsquery('english', %s)")
+                params.append(plainto)
+                rank_expr = "ts_rank_cd(fts_vector, plainto_tsquery('english', %s))"
+                rank_param_first = True
+
+            if sources:
+                where.append("source_domain = ANY(%s)")
+                params.append(sources)
+            if since_days:
+                where.append("published_at IS NOT NULL AND published_at > NOW() - (%s || ' days')::interval")
+                params.append(int(since_days))
+
+            sql = f"""
+                SELECT id, article_id, chunk_index, text, url, title_norm, source_domain,
+                       {rank_expr} as score
+                FROM article_chunks
+                WHERE {' AND '.join(where)}
+                ORDER BY score DESC
+                LIMIT %s
+            """
+            if rank_param_first:
+                params_rank = [params[0]]
+            else:
+                params_rank = []
+            qparams = params_rank + params + [limit]
+            with self._cursor() as cur:
+                cur.execute(sql, qparams)
+                cols = [d[0] for d in cur.description]
+                return [dict(zip(cols, r)) for r in cur.fetchall()]
+        except Exception as e:
+            logger.error(f"FTS TS search failed: {e}")
+            return []
+
     def search_chunks_embedding(self, query_vector: List[float], limit: int = 10) -> List[Dict[str, Any]]:
         """Search chunks using pgvector cosine similarity."""
         try:
@@ -816,6 +959,7 @@ class PgClient:
                     """
                     SELECT 
                         id, article_id, chunk_index, text,
+                        url, title_norm, source_domain,
                         1 - (embedding <=> %s::vector) as score
                     FROM article_chunks
                     WHERE embedding IS NOT NULL

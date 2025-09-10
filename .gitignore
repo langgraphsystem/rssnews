@@ -1,26 +1,75 @@
+# Byte-compiled / optimized / DLL files
 __pycache__/
-*.log
-*.pyc
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+*.hypothesis/
+.pytest_cache/
+
+# Type checker caches
+.mypy_cache/
+.pyre/
+.pytype/
+
+# Environments
 .env
 .env.*
-.DS_Store
-
-# virtualenvs
 .venv/
 venv/
+ENV/
+env/
+env.bak/
+venv.bak/
 
-# caches
-.pytest_cache/
-.ruff_cache/
-
-# editor/assistant
-.claude/
+# IDEs and editors
+.idea/
 .vscode/
+*.swp
+*.swo
 
-# runtime artifacts
+# Logs
 logs/
-storage/queue/retry_queue.json
-storage/articles/
+*.log
 
-# secrets
-service_account.json
+# OS files
+.DS_Store
+Thumbs.db
+
+# Local app data
+storage/queue/*.lock
+

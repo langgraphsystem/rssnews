@@ -195,12 +195,26 @@ class ArticleWorker:
             
             # Add to articles index for deduplication
             if parsed_article.status == 'stored' and parsed_article.text_hash:
+                # Determine readiness for chunking: must have full_text and not be duplicate
+                has_text = bool(parsed_article.full_text)
+                ready = has_text
                 index_data = {
                     'url_hash_v2': parsed_article.url_hash,
                     'text_hash': parsed_article.text_hash,
                     'title': parsed_article.title,
                     'author': ', '.join(parsed_article.authors) if parsed_article.authors else '',
-                    'source': parsed_article.source
+                    'source': parsed_article.source,
+                    # extended fields for Stage 6 readiness
+                    'article_id': str(article_id),
+                    'url': parsed_article.canonical_url or article_url,
+                    'title_norm': (parsed_article.title or '').strip() if parsed_article.title else (article.get('title') or '').strip(),
+                    'clean_text': parsed_article.full_text or '',
+                    'language': parsed_article.language,
+                    'category': parsed_article.section or article.get('section'),
+                    'tags_norm': parsed_article.keywords or [],
+                    'published_at': parsed_article.published_at or article.get('published_at'),
+                    'processing_version': int(1),
+                    'ready_for_chunking': bool(ready)
                 }
                 self.db.upsert_article_index(index_data)
             

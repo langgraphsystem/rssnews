@@ -4,7 +4,13 @@ import secrets
 from functools import lru_cache
 from typing import Dict, List, Optional, Set
 
-from pydantic import BaseSettings, Field, validator
+# Pydantic v2 moved BaseSettings to pydantic-settings.
+try:
+    from pydantic_settings import BaseSettings  # type: ignore
+except Exception:
+    # Fallback for environments pinned to pydantic<2
+    from pydantic import BaseSettings  # type: ignore
+from pydantic import Field, validator
 from pydantic.types import PositiveInt, SecretStr
 
 
@@ -54,8 +60,8 @@ class GeminiSettings(BaseSettings):
         description="Gemini model to use"
     )
     embedding_model: str = Field(
-        default="text-embedding-001",
-        env="EMBEDDING_MODEL",
+        default="embedding-001",
+        env=["GEMINI_EMBEDDING_MODEL", "EMBEDDING_MODEL"],
         description="Gemini model to use for embeddings"
     )
     base_url: str = Field(
@@ -178,7 +184,7 @@ class ObservabilitySettings(BaseSettings):
     
     # Logging
     log_level: str = Field(default="INFO", env="LOG_LEVEL")
-    log_format: str = Field(default="json", env="LOG_FORMAT", regex=r"^(json|text)$")
+    log_format: str = Field(default="json", env="LOG_FORMAT", pattern=r"^(json|text)$")
     
     # Metrics
     metrics_enabled: bool = Field(default=True, env="METRICS_ENABLED")
@@ -201,7 +207,7 @@ class Settings(BaseSettings):
     """Main application settings."""
     
     # Environment
-    environment: str = Field(default="development", env="ENVIRONMENT", regex=r"^(development|testing|staging|production)$")
+    environment: str = Field(default="development", env="ENVIRONMENT", pattern=r"^(development|testing|staging|production)$")
     debug: bool = Field(default=False, env="DEBUG")
     
     # Application

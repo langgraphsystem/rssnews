@@ -40,3 +40,6 @@ urllib3==2.2.2
 
 # Logging
 loguru==0.7.2
+
+# Google AI client
+google-generativeai==0.7.2

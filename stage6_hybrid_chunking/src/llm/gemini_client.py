@@ -405,8 +405,9 @@ class GeminiClient:
         
         url = f"{self.base_url}/v1beta/models/{self.model}:generateContent"
         
+        # Gemini API expects API key in 'x-goog-api-key' header (or as query param), not Bearer auth
         headers = {
-            "Authorization": f"Bearer {self.api_key}",
+            "x-goog-api-key": self.api_key,
             "Content-Type": "application/json"
         }
         
@@ -469,6 +470,35 @@ class GeminiClient:
         tokens_used = len(request.prompt) // 4 + len(generated_text) // 4
         
         return parsed_response, tokens_used
+
+    async def generate_text(self, prompt: str) -> str:
+        """Generate plain text using current Gemini model. Returns empty string on failure."""
+        try:
+            url = f"{self.base_url}/v1beta/models/{self.model}:generateContent"
+            headers = {"x-goog-api-key": self.api_key, "Content-Type": "application/json"}
+            payload = {
+                "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+                "generationConfig": {
+                    "temperature": self.settings.gemini.temperature,
+                    "topP": self.settings.gemini.top_p,
+                    "maxOutputTokens": max(256, self.settings.gemini.max_output_tokens)
+                },
+                "safetySettings": []
+            }
+            r = await self.client.post(url, headers=headers, json=payload)
+            if r.status_code != 200:
+                return ""
+            data = r.json()
+            cands = data.get("candidates") or []
+            if not cands:
+                return ""
+            parts = (cands[0].get("content") or {}).get("parts") or []
+            if not parts:
+                return ""
+            return str(parts[0].get("text") or "")
+        except Exception as e:
+            logger.warning("generate_text_failed", err=str(e))
+            return ""
     
     def _parse_and_validate_response(self, 
                                    response_data: Dict,
@@ -615,23 +645,60 @@ class GeminiClient:
         """
         if not self.settings.gemini.embedding_model:
             return [[] for _ in texts]
-        try:
-            url = f"{self.base_url}/v1beta/models/{self.settings.gemini.embedding_model}:embedContent"
-            headers = {"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"}
-            out: List[List[float]] = []
-            async with httpx.AsyncClient(timeout=self.client.timeout, limits=self.client._limits) as ac:
+        model = (self.settings.gemini.embedding_model or '').strip()
+        # Branch 1: Use google-generativeai client for gemini-embedding-001
+        if model == 'gemini-embedding-001' or model.endswith('/gemini-embedding-001'):
+            try:
+                import google.generativeai as genai  # type: ignore
+                genai.configure(api_key=self.api_key)
+                api_model = model if model.startswith('models/') else f'models/{model}'
+                out: List[List[float]] = []
                 for t in texts:
-                    payload = {"content": {"parts": [{"text": t[:2000]}]}}
-                    r = await ac.post(url, headers=headers, json=payload)
-                    if r.status_code != 200:
+                    try:
+                        res = genai.embed_content(
+                            model=api_model,
+                            content=t[:2000],
+                            task_type="RETRIEVAL_DOCUMENT"
+                        )
+                        vec = None
+                        if isinstance(res, dict):
+                            emb = res.get('embedding')
+                            if isinstance(emb, dict):
+                                vec = emb.get('values') or emb.get('value')
+                            elif isinstance(emb, list):
+                                vec = emb
+                        if isinstance(vec, list):
+                            out.append([float(x) for x in vec])
+                        else:
+                            out.append([])
+                    except Exception as e:
+                        logger.warning("embed_single_failed_genai", err=str(e))
                         out.append([])
-                        continue
-                    data = r.json()
-                    vec = data.get('embedding', {}).get('values') or data.get('embedding', {}).get('value')
-                    if isinstance(vec, list):
-                        out.append([float(x) for x in vec])
-                    else:
-                        out.append([])
+                return out
+            except Exception as e:
+                logger.warning("embed_texts_genai_failed", err=str(e))
+                # fall through to HTTP path
+
+        # Branch 2: Direct Generative Language API (e.g., text-embedding-004)
+        try:
+            api_model = model if model.startswith('models/') else f'models/{model}'
+            base = self.base_url.rstrip('/')
+            url = f"{base}/v1beta/{api_model}:embedContent"
+            headers = {"x-goog-api-key": self.api_key, "Content-Type": "application/json"}
+            out: List[List[float]] = []
+            ac = self.client
+            for t in texts:
+                payload = {"content": {"parts": [{"text": t[:2000]}]}}
+                r = await ac.post(url, headers=headers, json=payload)
+                if r.status_code != 200:
+                    out.append([])
+                    continue
+                data = r.json()
+                vec = data.get('embedding', {}).get('values') or data.get('embedding', {}).get('value')
+                if isinstance(vec, list):
+                    out.append([float(x) for x in vec])
+                else:
+                    out.append([])
             return out
         except Exception as e:
             logger.warning("embed_texts_failed", err=str(e))
