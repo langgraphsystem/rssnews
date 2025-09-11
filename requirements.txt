@@ -42,6 +42,7 @@ httpx==0.27.0
 
 # Logging
 loguru==0.7.2
+structlog==24.2.0
 
 # Google AI client
 google-generativeai==0.7.2
