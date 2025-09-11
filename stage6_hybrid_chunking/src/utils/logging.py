@@ -146,11 +146,11 @@ def configure_logging(log_level: str = "INFO",
     """
     
     # Configure standard library logging
-    logging.basicConfig(
-        format="%(message)s",
-        stream=sys.stdout,
-        level=getattr(logging, log_level.upper(), logging.INFO),
-    )
+    # logging.basicConfig(
+    #     format="%(message)s",
+    #     stream=sys.stdout,
+    #     level=getattr(logging, log_level.upper(), logging.INFO),
+    # )
     
     # Configure structlog processors
     processors = [

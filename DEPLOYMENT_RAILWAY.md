@@ -53,3 +53,18 @@ The app writes queue/state files under `storage/`. Attach a Volume so state surv
 ## Notes on timezones
 The polling schedule is enforced by Railway Cron using `America/New_York`. Some internal date logic uses a fixed TZ in `config.py`; when you allow code changes, switch it to New York for full alignment.
 
+## Embeddings dimension (gemini-embedding-001)
+If you use `GEMINI_EMBEDDING_MODEL=gemini-embedding-001`, embeddings may be 3072‑dim. The schema here initially uses `vector(768)`. To migrate:
+
+1) Pause the `index` service cron.
+2) Open Railway → Postgres → SQL and run the statements in
+   `migrations/2025-09-11_resize_embedding_to_3072.sql` step by step:
+   - Drop old embedding indexes
+   - (Optionally) clear old vectors
+   - `ALTER TABLE ... TYPE vector(3072)`
+   - Create an embedding index (HNSW for pgvector ≥ 0.5.0, IVFFLAT otherwise)
+3) Set variables on the `index` service:
+   - `GEMINI_API_KEY`
+   - `GEMINI_EMBEDDING_MODEL=gemini-embedding-001`
+4) Resume `index` cron, Run now, and verify logs show `embeddings_updated > 0`.
+
