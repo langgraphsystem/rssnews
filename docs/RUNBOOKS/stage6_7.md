@@ -31,7 +31,7 @@ export PG_DSN="postgresql://user:pass@localhost:5432/test_db"
 
 # Optional: LLM configuration (mocked in tests)
 export GEMINI_API_KEY="test_key"
-export EMBEDDING_MODEL="embedding-001"
+export EMBEDDING_MODEL="gemini-embedding-001"
 export LLM_MAX_SHARE=0.3
 export LLM_DAILY_COST_CAP_USD=100.0
 export EMB_DAILY_COST_CAP_USD=100.0

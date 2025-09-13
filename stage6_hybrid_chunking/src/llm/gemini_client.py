@@ -650,33 +650,83 @@ class GeminiClient:
         if model == 'gemini-embedding-001' or model.endswith('/gemini-embedding-001'):
             try:
                 import google.generativeai as genai  # type: ignore
+
                 genai.configure(api_key=self.api_key)
                 api_model = model if model.startswith('models/') else f'models/{model}'
-                out: List[List[float]] = []
-                for t in texts:
-                    try:
-                        res = genai.embed_content(
-                            model=api_model,
-                            content=t[:2000],
-                            task_type="RETRIEVAL_DOCUMENT"
-                        )
-                        vec = None
-                        if isinstance(res, dict):
-                            emb = res.get('embedding')
-                            if isinstance(emb, dict):
-                                vec = emb.get('values') or emb.get('value')
+
+                # Try batch processing first - more efficient
+                truncated_texts = [t[:2000] for t in texts]  # Limit input length
+
+                try:
+                    # Use batch embedding with proper parameters
+                    result = genai.embed_content(
+                        model=api_model,
+                        content=truncated_texts,
+                        task_type="RETRIEVAL_DOCUMENT",
+                        output_dimensionality=3072  # Full 3072 dimensions for Pinecone
+                    )
+
+                    # Handle batch response
+                    out: List[List[float]] = []
+                    if isinstance(result, dict):
+                        embeddings = result.get('embeddings', [])
+                        for emb in embeddings:
+                            if isinstance(emb, dict) and 'values' in emb:
+                                out.append([float(x) for x in emb['values']])
                             elif isinstance(emb, list):
-                                vec = emb
-                        if isinstance(vec, list):
-                            out.append([float(x) for x in vec])
+                                out.append([float(x) for x in emb])
+                            else:
+                                out.append([])
+                    else:
+                        # Fallback: assume single embedding in result['embedding']
+                        if hasattr(result, 'embedding') and hasattr(result.embedding, 'values'):
+                            values = [float(x) for x in result.embedding.values]
+                            out = [values for _ in texts]  # Duplicate for all texts
                         else:
-                            out.append([])
-                    except Exception as e:
-                        logger.warning("embed_single_failed_genai", err=str(e))
+                            out = [[] for _ in texts]
+
+                    # Ensure we have the right number of results
+                    while len(out) < len(texts):
                         out.append([])
-                return out
+
+                    return out[:len(texts)]
+
+                except Exception as e:
+                    logger.warning("embed_batch_failed_genai", err=str(e), model=api_model, text_count=len(texts))
+
+                    # Fallback: process texts individually
+                    out: List[List[float]] = []
+                    for t in truncated_texts:
+                        try:
+                            result = genai.embed_content(
+                                model=api_model,
+                                content=t,
+                                task_type="RETRIEVAL_DOCUMENT",
+                                output_dimensionality=3072
+                            )
+
+                            # Extract single embedding
+                            if isinstance(result, dict) and 'embedding' in result:
+                                emb_data = result['embedding']
+                                if isinstance(emb_data, dict) and 'values' in emb_data:
+                                    out.append([float(x) for x in emb_data['values']])
+                                elif isinstance(emb_data, list):
+                                    out.append([float(x) for x in emb_data])
+                                else:
+                                    out.append([])
+                            elif hasattr(result, 'embedding') and hasattr(result.embedding, 'values'):
+                                out.append([float(x) for x in result.embedding.values])
+                            else:
+                                out.append([])
+
+                        except Exception as e2:
+                            logger.warning("embed_single_failed_genai", err=str(e2), text=t[:50])
+                            out.append([])
+
+                    return out
+
             except Exception as e:
-                logger.warning("embed_texts_genai_failed", err=str(e))
+                logger.warning("embed_texts_genai_setup_failed", err=str(e))
                 # fall through to HTTP path
 
         # Branch 2: Direct Generative Language API (e.g., text-embedding-004)

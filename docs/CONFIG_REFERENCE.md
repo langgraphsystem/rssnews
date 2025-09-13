@@ -6,7 +6,7 @@
 | REDIS_URL | Redis connection URL for queues/locks/rate‑limits |
 | GEMINI_API_KEY | API key for Gemini LLM/embeddings |
 | CHUNK_LLM_MODEL | Model for Stage 6 refining (e.g., gemini-2.5-flash) |
-| EMBEDDING_MODEL | Model for embeddings (e.g., text-embedding-001) |
+| EMBEDDING_MODEL | Model for embeddings (e.g., gemini-embedding-001) |
 | LLM_MAX_SHARE | Max fraction of items allowed to use LLM (e.g., 0.3) |
 | BATCH_SIZE_DEFAULT | Default batch size for workers |
 | BATCH_SIZE_MIN | Minimum allowed batch size |

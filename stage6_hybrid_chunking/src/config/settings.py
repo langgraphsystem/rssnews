@@ -60,7 +60,7 @@ class GeminiSettings(BaseSettings):
         description="Gemini model to use"
     )
     embedding_model: str = Field(
-        default="embedding-001",
+        default="gemini-embedding-001",
         env=["GEMINI_EMBEDDING_MODEL", "EMBEDDING_MODEL"],
         description="Gemini model to use for embeddings"
     )

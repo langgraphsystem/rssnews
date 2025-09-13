@@ -81,7 +81,7 @@ def test_embeddings_budget_guard(monkeypatch):
 
     # Patch settings with very low daily cap
     settings_stub = types.SimpleNamespace(
-        gemini=types.SimpleNamespace(embedding_model='embedding-001'),
+        gemini=types.SimpleNamespace(embedding_model='gemini-embedding-001'),
         rate_limit=types.SimpleNamespace(embedding_daily_cost_limit_usd=0.01, cost_per_token_input=1.0)
     )
     fake_mod = types.ModuleType('stage6_hybrid_chunking.src.config.settings')

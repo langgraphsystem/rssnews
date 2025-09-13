@@ -97,7 +97,7 @@ def test_chunk_index_e2e(monkeypatch):
     assert ('A1', 1) in fake.completed
 
     # Prepare embedding settings stub and fake Gemini
-    monkeypatch.setenv('EMBEDDING_MODEL', 'embedding-001')
+    monkeypatch.setenv('EMBEDDING_MODEL', 'gemini-embedding-001')
     monkeypatch.setenv('GEMINI_API_KEY', 'key')
 
     class FakeGemini:
@@ -114,7 +114,7 @@ def test_chunk_index_e2e(monkeypatch):
     # Monkeypatch get_settings to avoid Pydantic
     # Inject a fake settings module before import to avoid pydantic dependency in tests
     settings_stub = types.SimpleNamespace(
-        gemini=types.SimpleNamespace(embedding_model='embedding-001'),
+        gemini=types.SimpleNamespace(embedding_model='gemini-embedding-001'),
         rate_limit=types.SimpleNamespace(embedding_daily_cost_limit_usd=100.0, cost_per_token_input=0.0)
     )
     fake_mod = types.ModuleType('stage6_hybrid_chunking.src.config.settings')

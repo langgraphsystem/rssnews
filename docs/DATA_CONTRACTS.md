@@ -49,7 +49,7 @@ This document defines key tables used before/for RAG preparation.
 | chunk_id | text | FK to article_chunks.chunk_id (unique) |
 | embedding | vector | pgvector |
 | dim | int | Embedding dimensionality |
-| model | text | e.g., `text-embedding-001` |
+| model | text | e.g., `gemini-embedding-001` |
 | created_at | timestamptz | |
 
 - Uniqueness: `chunk_id`
