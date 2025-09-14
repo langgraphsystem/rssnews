@@ -378,8 +378,9 @@ def main():
                         if pnc.enabled and pnc.connect():
                             logger.info("Pinecone connection successful")
                             payload = []
-                            for (t, row), vec in zip(selected, vectors):
-                                if vec:
+                            for i, ((t, row), vec) in enumerate(zip(selected, vectors)):
+                                logger.info(f"Vector {i}: type={type(vec)}, len={len(vec) if hasattr(vec, '__len__') else 'N/A'}, sample={vec[:3] if vec and hasattr(vec, '__len__') and len(vec) > 0 else vec}")
+                                if vec and isinstance(vec, list) and len(vec) > 0:
                                     payload.append({
                                         'id': str(row['id']),
                                         'values': vec,
@@ -389,6 +390,8 @@ def main():
                                             'language': row.get('language') or ''
                                         }
                                     })
+                                else:
+                                    logger.warning(f"Skipping invalid vector {i} for chunk {row['id']}: {vec}")
                             logger.info(f"Prepared {len(payload)} vectors for Pinecone upsert")
                             if payload:
                                 emb_count = pnc.upsert(payload)
