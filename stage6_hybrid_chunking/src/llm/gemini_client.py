@@ -666,11 +666,17 @@ class GeminiClient:
                         output_dimensionality=3072  # Full 3072 dimensions for Pinecone
                     )
 
+                    logger.info(f"Gemini API response type: {type(result)}")
+                    logger.info(f"Gemini API response keys: {list(result.keys()) if isinstance(result, dict) else 'not dict'}")
+                    logger.info(f"Gemini API response sample: {str(result)[:200]}")
+
                     # Handle batch response
                     out: List[List[float]] = []
                     if isinstance(result, dict):
                         embeddings = result.get('embeddings', [])
-                        for emb in embeddings:
+                        logger.info(f"Found embeddings key with {len(embeddings)} items")
+                        for i, emb in enumerate(embeddings):
+                            logger.info(f"Embedding {i}: type={type(emb)}, sample={str(emb)[:100]}")
                             if isinstance(emb, dict) and 'values' in emb:
                                 out.append([float(x) for x in emb['values']])
                             elif isinstance(emb, list):
@@ -683,6 +689,7 @@ class GeminiClient:
                             values = [float(x) for x in result.embedding.values]
                             out = [values for _ in texts]  # Duplicate for all texts
                         else:
+                            logger.warning(f"No embedding found in result: {result}")
                             out = [[] for _ in texts]
 
                     # Ensure we have the right number of results
