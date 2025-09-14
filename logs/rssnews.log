@@ -7118,3 +7118,10 @@ DETAIL:  Key (url_hash)=(0b860b956df6507f8688e6c3a3b7b418e7c458a90f50e91576d113c
 2025-09-09 17:19:51,771 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/embedding-001:embedContent "HTTP/1.1 200 OK"
 2025-09-09 17:19:51,983 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/embedding-001:embedContent "HTTP/1.1 200 OK"
 2025-09-09 17:19:52,181 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/embedding-001:embedContent "HTTP/1.1 200 OK"
+2025-09-14 07:41:20,943 - __main__ - INFO - Initializing database connection
+2025-09-14 07:41:21,570 - pg_client_new - INFO - DB pool initialized
+2025-09-14 07:41:21,571 - __main__ - INFO - Starting Stage 7 indexing (FTS + optional embeddings)
+2025-09-14 07:41:21,632 - pg_client_new - ERROR - Failed to get chunks for indexing: relation "article_chunks" does not exist
+LINE 3:                     FROM article_chunks
+                                 ^
+

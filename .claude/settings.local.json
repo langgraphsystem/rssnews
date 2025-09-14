@@ -25,7 +25,8 @@
       "Bash(set PINECONE_INDEX=rssnews-embeddings)",
       "Bash(set PINECONE_REGION=us-east-1-aws)",
       "Bash(export PINECONE_INDEX=rssnews-embeddings)",
-      "Bash(export:*)"
+      "Bash(export:*)",
+      "Bash(git commit:*)"
     ],
     "deny": [],
     "ask": []

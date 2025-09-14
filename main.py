@@ -338,19 +338,24 @@ def main():
                 from stage6_hybrid_chunking.src.vector.pinecone_client import PineconeClient
                 settings = get_settings()
 
+                logger.info(f"Checking embedding settings: has_model={bool(settings.gemini.embedding_model)}")
                 if settings.gemini.embedding_model:
+                    logger.info(f"Embedding model configured: {settings.gemini.embedding_model}")
                     texts = [row.get('text', '') for row in chunks]
                     # Budget guard: rough token estimate -> cost cap
                     budget_cap = settings.rate_limit.embedding_daily_cost_limit_usd
+                    logger.info(f"Budget cap: ${budget_cap}, cost per token: ${settings.rate_limit.cost_per_token_input}")
                     est_cost = 0.0
                     selected = []
                     for t, row in zip(texts, chunks):
                         tokens = max(1, len(t) // 4)
                         cost = tokens * settings.rate_limit.cost_per_token_input
                         if est_cost + cost > budget_cap:
+                            logger.info(f"Budget exceeded at chunk {row['id']}: cost {est_cost + cost} > cap {budget_cap}")
                             continue
                         est_cost += cost
                         selected.append((t, row))
+                    logger.info(f"Selected {len(selected)}/{len(chunks)} chunks for embedding (estimated cost: ${est_cost})")
                     if selected:
                         import asyncio
                         async def _do_embed(pairs):
@@ -369,7 +374,9 @@ def main():
                         # If Pinecone configured, upsert there; otherwise fall back to PG update
                         pnc = PineconeClient()
                         used_pinecone = False
+                        logger.info(f"Pinecone enabled: {pnc.enabled}, vectors generated: {len(vectors)}")
                         if pnc.enabled and pnc.connect():
+                            logger.info("Pinecone connection successful")
                             payload = []
                             for (t, row), vec in zip(selected, vectors):
                                 if vec:
@@ -382,9 +389,13 @@ def main():
                                             'language': row.get('language') or ''
                                         }
                                     })
+                            logger.info(f"Prepared {len(payload)} vectors for Pinecone upsert")
                             if payload:
                                 emb_count = pnc.upsert(payload)
                                 used_pinecone = emb_count > 0
+                                logger.info(f"Pinecone upsert result: {emb_count} vectors")
+                        else:
+                            logger.info("Pinecone connection failed or not enabled")
                         if not used_pinecone:
                             # Fallback: store in Postgres column if available
                             for (t, row), vec in zip(selected, vectors):
