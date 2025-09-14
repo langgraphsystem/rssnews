@@ -974,6 +974,41 @@ class PgClient:
             logger.error(f"Embedding search failed: {e}")
             return []
 
+    def get_chunks_by_ids(self, chunk_ids: List[int]) -> List[Dict[str, Any]]:
+        """Get chunks by their IDs with preserved order."""
+        if not chunk_ids:
+            return []
+
+        try:
+            with self._cursor() as cur:
+                # Create a placeholder for each ID and preserve order using CASE
+                placeholders = ','.join(['%s'] * len(chunk_ids))
+                order_cases = []
+                for i, chunk_id in enumerate(chunk_ids):
+                    order_cases.append(f"WHEN id = {chunk_id} THEN {i}")
+
+                order_clause = f"ORDER BY CASE {' '.join(order_cases)} ELSE {len(chunk_ids)} END"
+
+                cur.execute(
+                    f"""
+                    SELECT
+                        id, article_id, chunk_index, text,
+                        url, title_norm, source_domain, language
+                    FROM article_chunks
+                    WHERE id IN ({placeholders})
+                    {order_clause}
+                    """,
+                    chunk_ids
+                )
+
+                rows = cur.fetchall()
+                columns = [desc[0] for desc in cur.description]
+                return [dict(zip(columns, row)) for row in rows]
+
+        except Exception as e:
+            logger.error(f"Get chunks by IDs failed: {e}")
+            return []
+
     def hybrid_search(self, query: str, query_vector: List[float], limit: int = 10, alpha: float = 0.5) -> List[Dict[str, Any]]:
         """Combines FTS and embedding search with weighted ranking (Reciprocal Rank Fusion)."""
         try:

@@ -112,14 +112,14 @@ class EmbeddingClient:
             gemini_client = self._get_gemini_client()
             
             # Use embed_texts method from existing GeminiClient
-            embeddings = gemini_client.embed_texts([query])
-            # Handle async client method
             try:
                 import asyncio
-                if hasattr(embeddings, "__await__"):
-                    embeddings = asyncio.get_event_loop().run_until_complete(embeddings)
-            except Exception:
-                pass
+                # embed_texts is async, so we need to await it
+                embeddings = asyncio.run(gemini_client.embed_texts([query]))
+            except RuntimeError:
+                # Fallback if an event loop is already running
+                loop = asyncio.get_event_loop()
+                embeddings = loop.run_until_complete(gemini_client.embed_texts([query]))
             
             if embeddings and len(embeddings) > 0:
                 return embeddings[0]
@@ -134,11 +134,22 @@ class EmbeddingClient:
 
 class HybridRetriever:
     """Main retriever class that orchestrates hybrid search."""
-    
+
     def __init__(self, pg_client, settings=None):
         self.pg_client = pg_client
         self.query_normalizer = QueryNormalizer()
         self.embedding_client = EmbeddingClient(settings)
+        self.pinecone_client = None
+
+        # Initialize Pinecone if available
+        try:
+            from stage6_hybrid_chunking.src.vector.pinecone_client import PineconeClient
+            pc = PineconeClient()
+            if pc.enabled and pc.connect():
+                self.pinecone_client = pc
+                logger.info("Pinecone client initialized for hybrid search")
+        except Exception as e:
+            logger.info(f"Pinecone not available for search: {e}")
         
     def hybrid_retrieve(self, query: str, limit: int = 10, alpha: float = 0.5) -> RetrievalResult:
         """Perform hybrid retrieval combining FTS and embedding search.
@@ -177,12 +188,24 @@ class HybridRetriever:
                 logger.info(f"Performing FTS-only search with alpha={alpha}")
                 
             elif alpha <= 0.0:
-                # Embedding only
+                # Embedding only - prefer Pinecone if available
                 query_vector = self.embedding_client.get_query_embedding(normalized_query)
-                if query_vector:
+                if query_vector and self.pinecone_client:
+                    # Search in Pinecone then get full chunks from PostgreSQL
+                    pinecone_results = self.pinecone_client.search(query_vector, top_k=limit)
+                    chunk_ids = [int(r['id']) for r in pinecone_results if r.get('id')]
+                    chunks = self.pg_client.get_chunks_by_ids(chunk_ids) if chunk_ids else []
+                    # Add Pinecone scores to chunks
+                    score_map = {int(r['id']): r['score'] for r in pinecone_results}
+                    for chunk in chunks:
+                        chunk['pinecone_score'] = score_map.get(chunk.get('id'), 0.0)
+                    search_type = "pinecone_embedding"
+                    logger.info(f"Performing Pinecone embedding search with alpha={alpha}")
+                elif query_vector:
+                    # Fallback to PostgreSQL embedding search
                     chunks = self.pg_client.search_chunks_embedding(query_vector, limit)
-                    search_type = "embedding"
-                    logger.info(f"Performing embedding-only search with alpha={alpha}")
+                    search_type = "postgres_embedding"
+                    logger.info(f"Performing PostgreSQL embedding search with alpha={alpha}")
                 else:
                     # Fallback to FTS if embedding fails
                     chunks = self.pg_client.search_chunks_fts(normalized_query, limit)
@@ -190,12 +213,29 @@ class HybridRetriever:
                     logger.warning("Embedding failed, falling back to FTS")
                     
             else:
-                # Hybrid search
+                # Hybrid search - combine FTS and Pinecone/PostgreSQL embedding
                 query_vector = self.embedding_client.get_query_embedding(normalized_query)
                 if query_vector:
-                    chunks = self.pg_client.hybrid_search(normalized_query, query_vector, limit, alpha)
-                    search_type = "hybrid"
-                    logger.info(f"Performing hybrid search with alpha={alpha}")
+                    # Get FTS results
+                    fts_chunks = self.pg_client.search_chunks_fts(normalized_query, limit * 2)
+
+                    # Get embedding results
+                    if self.pinecone_client:
+                        pinecone_results = self.pinecone_client.search(query_vector, top_k=limit * 2)
+                        chunk_ids = [int(r['id']) for r in pinecone_results if r.get('id')]
+                        emb_chunks = self.pg_client.get_chunks_by_ids(chunk_ids) if chunk_ids else []
+                        # Add Pinecone scores
+                        score_map = {int(r['id']): r['score'] for r in pinecone_results}
+                        for chunk in emb_chunks:
+                            chunk['pinecone_score'] = score_map.get(chunk.get('id'), 0.0)
+                        search_type = "hybrid_pinecone"
+                    else:
+                        emb_chunks = self.pg_client.search_chunks_embedding(query_vector, limit * 2)
+                        search_type = "hybrid_postgres"
+
+                    # Combine and rerank results
+                    chunks = self._combine_results(fts_chunks, emb_chunks, alpha, limit)
+                    logger.info(f"Performing {search_type} search with alpha={alpha}")
                 else:
                     # Fallback to FTS if embedding fails
                     chunks = self.pg_client.search_chunks_fts(normalized_query, limit)
@@ -225,7 +265,62 @@ class HybridRetriever:
                 total_results=0,
                 search_time_ms=search_time_ms
             )
-    
+
+    def _combine_results(self, fts_chunks: List[Dict], emb_chunks: List[Dict], alpha: float, limit: int) -> List[Dict]:
+        """Combine FTS and embedding results using weighted scoring.
+
+        Args:
+            fts_chunks: Results from FTS search
+            emb_chunks: Results from embedding search
+            alpha: Weight for FTS vs embedding (0.0=embedding only, 1.0=FTS only)
+            limit: Maximum number of results to return
+
+        Returns:
+            Combined and reranked results
+        """
+        # Create lookup maps by chunk ID
+        fts_map = {}
+        for i, chunk in enumerate(fts_chunks):
+            chunk_id = chunk.get('id')
+            if chunk_id:
+                # FTS score: higher rank = lower score (inverse ranking)
+                fts_score = 1.0 / (i + 1)
+                chunk['fts_score'] = fts_score
+                fts_map[chunk_id] = chunk
+
+        emb_map = {}
+        for i, chunk in enumerate(emb_chunks):
+            chunk_id = chunk.get('id')
+            if chunk_id:
+                # Embedding score: use Pinecone score if available, otherwise ranking
+                emb_score = chunk.get('pinecone_score', 1.0 / (i + 1))
+                chunk['emb_score'] = emb_score
+                emb_map[chunk_id] = chunk
+
+        # Combine results with hybrid scoring
+        combined = {}
+        all_chunk_ids = set(fts_map.keys()) | set(emb_map.keys())
+
+        for chunk_id in all_chunk_ids:
+            fts_chunk = fts_map.get(chunk_id)
+            emb_chunk = emb_map.get(chunk_id)
+
+            # Use the chunk with more complete data
+            chunk = fts_chunk or emb_chunk
+
+            # Calculate hybrid score
+            fts_score = fts_chunk['fts_score'] if fts_chunk else 0.0
+            emb_score = emb_chunk['emb_score'] if emb_chunk else 0.0
+
+            hybrid_score = alpha * fts_score + (1.0 - alpha) * emb_score
+            chunk['hybrid_score'] = hybrid_score
+
+            combined[chunk_id] = chunk
+
+        # Sort by hybrid score and return top results
+        sorted_chunks = sorted(combined.values(), key=lambda x: x['hybrid_score'], reverse=True)
+        return sorted_chunks[:limit]
+
     def get_retrieval_stats(self) -> Dict[str, Any]:
         """Get retrieval system statistics."""
         try:

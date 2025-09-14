@@ -59,3 +59,42 @@ class PineconeClient:
             total += len(chunk)
         return total
 
+    def search(self, query_vector: List[float], top_k: int = 10, include_metadata: bool = True) -> List[Dict]:
+        """Search for similar vectors in Pinecone.
+
+        Args:
+            query_vector: Query embedding vector
+            top_k: Number of results to return
+            include_metadata: Whether to include metadata in results
+
+        Returns:
+            List of search results with id, score, and metadata
+        """
+        if not self._index or not query_vector:
+            return []
+
+        try:
+            response = self._index.query(
+                vector=query_vector,
+                top_k=top_k,
+                include_metadata=include_metadata,
+                namespace=self.namespace
+            )
+
+            results = []
+            if hasattr(response, 'matches'):
+                for match in response.matches:
+                    result = {
+                        'id': match.id,
+                        'score': float(match.score),
+                    }
+                    if include_metadata and hasattr(match, 'metadata') and match.metadata:
+                        result['metadata'] = match.metadata
+                    results.append(result)
+
+            return results
+
+        except Exception as e:
+            print(f"Pinecone search failed: {e}")
+            return []
+
