@@ -673,18 +673,25 @@ class GeminiClient:
                     # Handle batch response
                     out: List[List[float]] = []
                     if isinstance(result, dict):
-                        embeddings = result.get('embeddings', [])
-                        logger.info(f"Found embeddings key with {len(embeddings)} items")
-                        for i, emb in enumerate(embeddings):
-                            logger.info(f"Embedding {i}: type={type(emb)}, sample={str(emb)[:100]}")
-                            if isinstance(emb, dict) and 'values' in emb:
-                                out.append([float(x) for x in emb['values']])
-                            elif isinstance(emb, list):
-                                out.append([float(x) for x in emb])
-                            else:
-                                out.append([])
+                        # Try both 'embeddings' (plural) and 'embedding' (singular) keys
+                        embeddings = result.get('embeddings', result.get('embedding', []))
+                        logger.info(f"Found embedding data with {len(embeddings)} items")
+
+                        # If embeddings is a list of lists (batch response)
+                        if isinstance(embeddings, list) and len(embeddings) > 0:
+                            for i, emb in enumerate(embeddings):
+                                logger.info(f"Embedding {i}: type={type(emb)}, len={len(emb) if hasattr(emb, '__len__') else 'N/A'}")
+                                if isinstance(emb, list) and len(emb) > 0:
+                                    out.append([float(x) for x in emb])
+                                elif isinstance(emb, dict) and 'values' in emb:
+                                    out.append([float(x) for x in emb['values']])
+                                else:
+                                    out.append([])
+                        else:
+                            logger.warning(f"Unexpected embedding format: {type(embeddings)}")
+                            out = [[] for _ in texts]
                     else:
-                        # Fallback: assume single embedding in result['embedding']
+                        # Fallback: assume single embedding in result.embedding
                         if hasattr(result, 'embedding') and hasattr(result.embedding, 'values'):
                             values = [float(x) for x in result.embedding.values]
                             out = [values for _ in texts]  # Duplicate for all texts
