@@ -329,11 +329,13 @@ def main():
             except Exception as e:
                 logger.error(f"FTS update failed: {e}")
 
-            # 2) Try embeddings if configured
+            # 2) Try embeddings if configured (PG vector or Pinecone)
             emb_count = 0
             try:
                 from stage6_hybrid_chunking.src.config.settings import get_settings  # lazy import
                 from stage6_hybrid_chunking.src.llm.gemini_client import GeminiClient
+                # Optional Pinecone integration
+                from stage6_hybrid_chunking.src.vector.pinecone_client import PineconeClient
                 settings = get_settings()
 
                 if settings.gemini.embedding_model:
@@ -364,11 +366,32 @@ def main():
                             # Fallback if an event loop is already running
                             loop = asyncio.get_event_loop()
                             vectors = loop.run_until_complete(_do_embed(selected))
-                        for (t, row), vec in zip(selected, vectors):
-                            if vec:
-                                ok = client.update_chunk_embedding(row['id'], vec)
-                                if ok:
-                                    emb_count += 1
+                        # If Pinecone configured, upsert there; otherwise fall back to PG update
+                        pnc = PineconeClient()
+                        used_pinecone = False
+                        if pnc.enabled and pnc.connect():
+                            payload = []
+                            for (t, row), vec in zip(selected, vectors):
+                                if vec:
+                                    payload.append({
+                                        'id': str(row['id']),
+                                        'values': vec,
+                                        'metadata': {
+                                            'article_id': str(row.get('article_id') or ''),
+                                            'chunk_index': int(row.get('chunk_index') or 0),
+                                            'language': row.get('language') or ''
+                                        }
+                                    })
+                            if payload:
+                                emb_count = pnc.upsert(payload)
+                                used_pinecone = emb_count > 0
+                        if not used_pinecone:
+                            # Fallback: store in Postgres column if available
+                            for (t, row), vec in zip(selected, vectors):
+                                if vec:
+                                    ok = client.update_chunk_embedding(row['id'], vec)
+                                    if ok:
+                                        emb_count += 1
             except Exception as e:
                 logger.warning(f"Embedding step skipped/failed: {e}")
 

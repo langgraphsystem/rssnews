@@ -7,7 +7,21 @@
       "Bash(set PG_DSN=postgresql://postgres:kVRUPMOdeXVEdUuKihPeJTgzZVIxqbZy@caboose.proxy.rlwy.net:13102/railway)",
       "Bash(export PG_DSN=\"postgresql://postgres:kVRUPMOdeXVEdUuKihPeJTgzZVIxqbZy@caboose.proxy.rlwy.net:13102/railway\")",
       "Bash(tree:*)",
-      "Bash(pytest:*)"
+      "Bash(pytest:*)",
+      "WebSearch",
+      "WebFetch(domain:ai.google.dev)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:python.langchain.com)",
+      "WebFetch(domain:googleapis.github.io)",
+      "Bash(psql:*)",
+      "Bash(ping:*)",
+      "Bash(curl:*)",
+      "Read(//c/Users/Etsy/Downloads/**)",
+      "WebFetch(domain:qdrant.tech)",
+      "Bash(pip uninstall:*)",
+      "Bash(set PINECONE_API_KEY=pcsk_757TcS_S6kYGDmBVWs3ciuxAmixwRMY6XAb5Dzhaj9D4jizcgzQWBrHJxctHeCKCMP1FiV)",
+      "Bash(git add:*)",
+      "Bash(git push:*)"
     ],
     "deny": [],
     "ask": []

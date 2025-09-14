@@ -49,6 +49,7 @@ The app writes queue/state files under `storage/`. Attach a Volume so state surv
 - `TZ=America/New_York`: aligns schedules/logs to New York time.
 - `GEMINI_API_KEY` (optional): enables LLM features in Stage 6–8.
 - `LOG_LEVEL`/`LOG_FORMAT` (optional): tune logging verbosity/format.
+ - `PINECONE_API_KEY` / `PINECONE_INDEX` / `PINECONE_REGION` (optional): enable Pinecone for embeddings upsert in Stage 7. If set, embeddings are stored in Pinecone instead of Postgres.
 
 ## Notes on timezones
 The polling schedule is enforced by Railway Cron using `America/New_York`. Some internal date logic uses a fixed TZ in `config.py`; when you allow code changes, switch it to New York for full alignment.
@@ -68,3 +69,11 @@ If you use `GEMINI_EMBEDDING_MODEL=gemini-embedding-001`, embeddings may be 3072
    - `GEMINI_EMBEDDING_MODEL=gemini-embedding-001`
 4) Resume `index` cron, Run now, and verify logs show `embeddings_updated > 0`.
 
+## Pinecone mode (optional)
+If `PINECONE_API_KEY` and `PINECONE_INDEX` are set, the Stage 7 `index` command will:
+- Always update FTS in Postgres
+- Generate embeddings via Gemini and upsert them to Pinecone (serverless region set by `PINECONE_REGION`, default `us-east-1-aws`)
+- Skip writing embeddings into Postgres vector column
+
+Recommended Pinecone index settings for gemini-embedding-001:
+- `dimension=3072`, `metric=cosine`, serverless, a concise metadata schema (avoid large texts in metadata)
