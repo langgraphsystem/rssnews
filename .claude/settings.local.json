@@ -21,7 +21,11 @@
       "Bash(pip uninstall:*)",
       "Bash(set PINECONE_API_KEY=pcsk_757TcS_S6kYGDmBVWs3ciuxAmixwRMY6XAb5Dzhaj9D4jizcgzQWBrHJxctHeCKCMP1FiV)",
       "Bash(git add:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(set PINECONE_INDEX=rssnews-embeddings)",
+      "Bash(set PINECONE_REGION=us-east-1-aws)",
+      "Bash(export PINECONE_INDEX=rssnews-embeddings)",
+      "Bash(export:*)"
     ],
     "deny": [],
     "ask": []
