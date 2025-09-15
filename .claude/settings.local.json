@@ -26,7 +26,13 @@
       "Bash(set PINECONE_REGION=us-east-1-aws)",
       "Bash(export PINECONE_INDEX=rssnews-embeddings)",
       "Bash(export:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(railway --version)",
+      "Bash(railway status:*)",
+      "Bash(railway service:*)",
+      "Bash(railway project:*)",
+      "Bash(railway:*)",
+      "Bash(git restore:*)"
     ],
     "deny": [],
     "ask": []
