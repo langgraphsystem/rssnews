@@ -9,11 +9,12 @@ from typing import Dict, Any, Optional
 import requests
 import json
 import asyncio
+from html import escape as _html_escape
 
 logger = logging.getLogger(__name__)
 
 
-def generate_report(client, period_hours: int = 8, format: str = "markdown") -> str:
+def generate_report(client, period_hours: int = 8, format: str = "html") -> str:
     """Generate comprehensive system report"""
 
     # Calculate time period
@@ -40,14 +41,23 @@ async def generate_enhanced_telegram_report(client, period_hours: int = 8) -> st
     # Collect statistics
     stats = collect_statistics(client, period_start, now)
 
-    # Generate base report
-    base_report = format_markdown_report(stats, period_hours)
+    # Generate base report (HTML-safe)
+    base_report_md = format_markdown_report(stats, period_hours)
+    base_report = f"<pre>{_html_escape(base_report_md)}</pre>"
 
     # Add GPT analysis
     gpt_analysis = await generate_gpt5_analysis(stats, period_hours)
 
-    # Combine reports
-    enhanced_report = f"{base_report}\n\n{gpt_analysis}"
+    # Convert GPT analysis to HTML-safe section
+    if isinstance(gpt_analysis, str):
+        parts = gpt_analysis.split("\n", 1)
+        gpt_body = parts[1] if len(parts) > 1 else gpt_analysis
+    else:
+        gpt_body = str(gpt_analysis)
+    gpt_section = f"<b>🤖 GPT-5 Анализ:</b><br><pre>{_html_escape(gpt_body)}</pre>"
+
+    # Combine reports (HTML)
+    enhanced_report = f"{base_report}<br>{gpt_section}"
 
     return enhanced_report
 
@@ -264,17 +274,9 @@ def format_markdown_report(stats: Dict[str, Any], period_hours: int) -> str:
 
 
 def format_html_report(stats: Dict[str, Any], period_hours: int) -> str:
-    """Format report as HTML"""
-
-    # Convert markdown to basic HTML
+    """Format report as HTML (safe-escaped, preformatted)."""
     markdown_report = format_markdown_report(stats, period_hours)
-
-    # Simple markdown to HTML conversion
-    html_report = markdown_report.replace('**', '<b>').replace('**', '</b>')
-    html_report = html_report.replace('• ', '• ')
-    html_report = html_report.replace('\n', '<br>\n')
-
-    return f"<pre>{html_report}</pre>"
+    return f"<pre>{_html_escape(markdown_report)}</pre>"
 
 
 async def generate_gpt5_analysis(stats: Dict[str, Any], period_hours: int) -> str:
@@ -403,7 +405,7 @@ async def generate_gpt5_analysis(stats: Dict[str, Any], period_hours: int) -> st
         return f"⚠️ *GPT анализ недоступен:* {str(e)[:100]}"
 
 
-def send_telegram_report(report: str, format: str = "markdown") -> None:
+def send_telegram_report(report: str, format: str = "html") -> None:
     """Send report to Telegram"""
 
     bot_token = os.getenv('TELEGRAM_BOT_TOKEN')
@@ -418,7 +420,7 @@ def send_telegram_report(report: str, format: str = "markdown") -> None:
     payload = {
         'chat_id': chat_id,
         'text': report,
-        'parse_mode': 'Markdown' if format == 'markdown' else 'HTML',
+        'parse_mode': 'HTML' if format == 'html' else 'Markdown',
         'disable_web_page_preview': True
     }
 
@@ -444,11 +446,11 @@ async def send_enhanced_telegram_report(client, period_hours: int = 8) -> None:
     """Generate and send enhanced report with GPT analysis to Telegram"""
 
     try:
-        # Generate enhanced report with GPT analysis
+        # Generate enhanced report with GPT analysis (HTML-safe)
         report = await generate_enhanced_telegram_report(client, period_hours)
 
-        # Send to Telegram
-        send_telegram_report(report, format="markdown")
+        # Send to Telegram as HTML
+        send_telegram_report(report, format="html")
 
         logger.info("Enhanced report with GPT analysis sent to Telegram successfully")
 

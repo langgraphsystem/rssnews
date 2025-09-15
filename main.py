@@ -128,7 +128,7 @@ def main():
     p_report = sub.add_parser("report", help="Generate and send system report")
     p_report.add_argument("--send-telegram", action="store_true", help="Send report to Telegram")
     p_report.add_argument("--period-hours", type=int, default=8, help="Report period in hours (default: 8)")
-    p_report.add_argument("--format", choices=["markdown", "html"], default="markdown", help="Report format")
+    p_report.add_argument("--format", choices=["markdown", "html"], default="html", help="Report format (default: html)")
 
 
     args = ap.parse_args()
