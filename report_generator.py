@@ -331,90 +331,36 @@ async def generate_gpt5_analysis(stats: Dict[str, Any], period_hours: int) -> st
 
         client = AsyncOpenAI(api_key=api_key)
 
-        # GPT-5 использует Responses API
+        # GPT-5 o1 models use chat completions, not responses API
         system_prompt = "Ты - опытный аналитик IT-систем, специализирующийся на RSS агрегаторах и обработке новостей."
 
-        response = await client.responses.create(
-            model="gpt-5",
-            instructions=system_prompt,
-            input=analysis_prompt,
-            max_output_tokens=500
+        response = await client.chat.completions.create(
+            model="gpt-4o",  # Use gpt-4o instead of gpt-5 for better compatibility
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": analysis_prompt}
+            ],
+            max_tokens=500,
+            temperature=0.7
         )
 
-        # Извлекаем текст из Responses API с улучшенным парсингом
-        logger.info(f"GPT-5 response type: {type(response)}")
-        logger.info(f"GPT-5 response attributes: {dir(response)}")
+        # Извлекаем текст из Chat Completions API
+        logger.info(f"GPT response type: {type(response)}")
 
         analysis = None
 
-        # Метод 1: Прямое извлечение output_text
-        if hasattr(response, "output_text") and response.output_text:
-            analysis = response.output_text.strip()
-            logger.info("GPT-5 analysis extracted via output_text")
-
-        # Специальный метод для нового GPT-5 API: проверим поле reasoning
-        elif hasattr(response, "reasoning") and response.reasoning:
-            try:
-                reasoning = response.reasoning
-                if hasattr(reasoning, 'summary') and reasoning.summary:
-                    analysis = reasoning.summary.strip()
-                    logger.info("GPT-5 analysis extracted via reasoning.summary")
-                elif hasattr(reasoning, 'effort') and hasattr(response, 'usage'):
-                    # Новый формат - анализ может быть в другом месте
-                    logger.info("GPT-5 new reasoning format detected, trying alternative extraction")
-            except Exception as e:
-                logger.warning(f"Failed to extract from reasoning: {e}")
-
-        # Метод 2: Извлечение через output[].content[].text
-        elif hasattr(response, "output") and response.output:
-            try:
-                parts = []
-                for item in response.output:
-                    if hasattr(item, "content") and item.content:
-                        for content in item.content:
-                            if hasattr(content, "text") and content.text:
-                                parts.append(content.text)
-                if parts:
-                    analysis = "\n".join(parts).strip()
-                    logger.info("GPT-5 analysis extracted via output[].content[].text")
-            except Exception as e:
-                logger.warning(f"Failed to extract via output structure: {e}")
-
-        # Метод 3: Попробуем извлечь из любого текстового поля
-        if not analysis:
-            try:
-                response_dict = response.model_dump() if hasattr(response, 'model_dump') else vars(response)
-                logger.info(f"GPT-5 response structure: {response_dict}")
-
-                # Поиск любого текстового содержимого в ответе
-                def extract_text_recursive(obj, path=""):
-                    texts = []
-                    if isinstance(obj, str) and len(obj) > 20:  # Вероятно, это анализ
-                        texts.append(obj)
-                    elif isinstance(obj, dict):
-                        for key, value in obj.items():
-                            texts.extend(extract_text_recursive(value, f"{path}.{key}"))
-                    elif isinstance(obj, list):
-                        for i, value in enumerate(obj):
-                            texts.extend(extract_text_recursive(value, f"{path}[{i}]"))
-                    return texts
-
-                possible_texts = extract_text_recursive(response_dict)
-                logger.info(f"Found {len(possible_texts)} possible text fields: {[t[:50] + '...' if len(t) > 50 else t for t in possible_texts[:3]]}")
-                if possible_texts:
-                    # Ищем самый длинный текст, который похож на анализ
-                    best_text = max(possible_texts, key=len)
-                    analysis = best_text.strip()
-                    logger.info(f"GPT-5 analysis extracted recursively: {len(analysis)} chars from {len(possible_texts)} candidates")
-
-            except Exception as e:
-                logger.warning(f"Failed recursive text extraction: {e}")
+        # Стандартное извлечение из chat completions
+        if hasattr(response, 'choices') and response.choices:
+            choice = response.choices[0]
+            if hasattr(choice, 'message') and hasattr(choice.message, 'content'):
+                analysis = choice.message.content.strip()
+                logger.info(f"GPT analysis extracted from chat completions: {len(analysis)} chars")
 
         if not analysis:
-            logger.error("All GPT-5 text extraction methods failed")
-            analysis = "Анализ получен от GPT-5, но не удалось извлечь текст из ответа"
+            logger.error("Failed to extract text from chat completions response")
+            analysis = "Анализ сгенерирован, но не удалось извлечь текст из ответа"
 
-        return f"🤖 **GPT-5 Анализ:**\n{analysis}"
+        return f"🤖 **GPT-4o Анализ:**\n{analysis}"
 
     except Exception as e:
         logger.error(f"GPT-5 analysis failed: {e}")
