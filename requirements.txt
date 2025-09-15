@@ -45,5 +45,6 @@ pinecone-client==5.0.1
 loguru==0.7.2
 structlog==24.2.0
 
-# Google AI client
+# AI clients
 google-generativeai==0.7.2
+openai==1.107.0
