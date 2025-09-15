@@ -339,26 +339,64 @@ async def generate_gpt5_analysis(stats: Dict[str, Any], period_hours: int) -> st
             max_output_tokens=500
         )
 
-        # Извлекаем текст из Responses API (используем тот же подход что в main.py)
-        analysis = getattr(response, "output_text", None)
+        # Извлекаем текст из Responses API с улучшенным парсингом
+        logger.info(f"GPT-5 response type: {type(response)}")
+        logger.info(f"GPT-5 response attributes: {dir(response)}")
+
+        analysis = None
+
+        # Метод 1: Прямое извлечение output_text
+        if hasattr(response, "output_text") and response.output_text:
+            analysis = response.output_text.strip()
+            logger.info("GPT-5 analysis extracted via output_text")
+
+        # Метод 2: Извлечение через output[].content[].text
+        elif hasattr(response, "output") and response.output:
+            try:
+                parts = []
+                for item in response.output:
+                    if hasattr(item, "content") and item.content:
+                        for content in item.content:
+                            if hasattr(content, "text") and content.text:
+                                parts.append(content.text)
+                if parts:
+                    analysis = "\n".join(parts).strip()
+                    logger.info("GPT-5 analysis extracted via output[].content[].text")
+            except Exception as e:
+                logger.warning(f"Failed to extract via output structure: {e}")
+
+        # Метод 3: Попробуем извлечь из любого текстового поля
         if not analysis:
             try:
-                # Fallback к структуре .output[0].content[0].text
-                parts = []
-                output = getattr(response, "output", None) or []
-                for item in output:
-                    for content in getattr(item, "content", []) or []:
-                        text = getattr(content, "text", None)
-                        if text:
-                            parts.append(text)
-                analysis = "\n".join(parts)
-            except Exception:
-                analysis = None
+                response_dict = response.model_dump() if hasattr(response, 'model_dump') else vars(response)
+                logger.info(f"GPT-5 response structure: {response_dict}")
+
+                # Поиск любого текстового содержимого в ответе
+                def extract_text_recursive(obj, path=""):
+                    texts = []
+                    if isinstance(obj, str) and len(obj) > 20:  # Вероятно, это анализ
+                        texts.append(obj)
+                    elif isinstance(obj, dict):
+                        for key, value in obj.items():
+                            texts.extend(extract_text_recursive(value, f"{path}.{key}"))
+                    elif isinstance(obj, list):
+                        for i, value in enumerate(obj):
+                            texts.extend(extract_text_recursive(value, f"{path}[{i}]"))
+                    return texts
+
+                possible_texts = extract_text_recursive(response_dict)
+                if possible_texts:
+                    analysis = possible_texts[0].strip()  # Берем первый найденный длинный текст
+                    logger.info(f"GPT-5 analysis extracted recursively: {len(analysis)} chars")
+
+            except Exception as e:
+                logger.warning(f"Failed recursive text extraction: {e}")
 
         if not analysis:
-            analysis = "Анализ завершен, но текст не удалось извлечь"
+            logger.error("All GPT-5 text extraction methods failed")
+            analysis = "Анализ получен от GPT-5, но не удалось извлечь текст из ответа"
 
-        return f"🤖 **GPT-5 Анализ:**\n{analysis.strip()}"
+        return f"🤖 **GPT-5 Анализ:**\n{analysis}"
 
     except Exception as e:
         logger.error(f"GPT-5 analysis failed: {e}")
