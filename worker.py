@@ -199,7 +199,7 @@ class ArticleWorker:
                 has_text = bool(parsed_article.full_text)
                 ready = has_text
                 index_data = {
-                    'url_hash_v2': parsed_article.url_hash,
+                    'url_hash': parsed_article.url_hash,
                     'text_hash': parsed_article.text_hash,
                     'title': parsed_article.title,
                     'author': ', '.join(parsed_article.authors) if parsed_article.authors else '',
@@ -216,7 +216,19 @@ class ArticleWorker:
                     'processing_version': int(1),
                     'ready_for_chunking': bool(ready)
                 }
-                self.db.upsert_article_index(index_data)
+                try:
+                    self.db.upsert_article_index(index_data)
+                except Exception as e:
+                    # Handle duplicate constraint violations gracefully
+                    if 'duplicate key value' in str(e) or 'already exists' in str(e):
+                        logger.debug(f"Article already exists in index: {article_url}")
+                        # Mark as duplicate instead of error
+                        self.db.update_article_status(article_id, 'duplicate',
+                                                    f'Duplicate detected during indexing: {str(e)[:100]}')
+                        result['status'] = 'duplicate'
+                    else:
+                        # Re-raise other exceptions
+                        raise
             
             result['status'] = parsed_article.status
             if parsed_article.error_reason:

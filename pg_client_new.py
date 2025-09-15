@@ -25,9 +25,9 @@ class PgClient:
         self.dsn = os.environ.get('PG_DSN')
         if not self.dsn:
             raise ValueError("PG_DSN environment variable is required")
-        # Initialize connection pool (thread-safe)
-        minconn = int(os.environ.get('DB_POOL_MIN', '1'))
-        maxconn = int(os.environ.get('DB_POOL_MAX', '10'))
+        # Initialize connection pool (thread-safe) - increased for high load
+        minconn = int(os.environ.get('DB_POOL_MIN', '5'))
+        maxconn = int(os.environ.get('DB_POOL_MAX', '25'))
         try:
             self.pool = psycopg2_pool.ThreadedConnectionPool(minconn, maxconn, self.dsn)
             logger.info("DB pool initialized")
@@ -441,34 +441,19 @@ class PgClient:
         inserted = 0
         conflicted = 0
         with self._cursor() as cur:
-            try:
-                # Prefer v2 column
-                sql = """
-                    INSERT INTO raw (
-                        url, canonical_url, url_hash_v2, source, section, title, description,
-                        keywords, authors, publisher, top_image, images, videos, enclosures, outlinks,
-                        published_at, updated_at, fetched_at, language, paywalled, partial,
-                        full_text, text_hash, word_count, reading_time, status, error_reason
-                    ) VALUES %s
-                    ON CONFLICT (url_hash_v2) DO NOTHING
-                """
-                values = [tuple(r.get(c) for c in cols) for r in rows]
-                execute_values(cur, sql, values)
-                inserted = cur.rowcount if cur.rowcount is not None else 0
-            except Exception:
-                # Fallback to legacy url_hash
-                sql = """
-                    INSERT INTO raw (
-                        url, canonical_url, url_hash, source, section, title, description,
-                        keywords, authors, publisher, top_image, images, videos, enclosures, outlinks,
-                        published_at, updated_at, fetched_at, language, paywalled, partial,
-                        full_text, text_hash, word_count, reading_time, status, error_reason
-                    ) VALUES %s
-                    ON CONFLICT (url_hash) DO NOTHING
-                """
-                values = [tuple(r.get(c) for c in cols) for r in rows]
-                execute_values(cur, sql, values)
-                inserted = cur.rowcount if cur.rowcount is not None else 0
+            # Use url_hash constraint (matches existing schema)
+            sql = """
+                INSERT INTO raw (
+                    url, canonical_url, url_hash, source, section, title, description,
+                    keywords, authors, publisher, top_image, images, videos, enclosures, outlinks,
+                    published_at, updated_at, fetched_at, language, paywalled, partial,
+                    full_text, text_hash, word_count, reading_time, status, error_reason
+                ) VALUES %s
+                ON CONFLICT (url_hash) DO NOTHING
+            """
+            values = [tuple(r.get(c) for c in cols) for r in rows]
+            execute_values(cur, sql, values)
+            inserted = cur.rowcount if cur.rowcount is not None else 0
 
         conflicted = len(rows) - inserted
         logger.info(f"bulk_upsert_raw", extra={"inserted": inserted, "conflicted": conflicted})
@@ -589,45 +574,18 @@ class PgClient:
             if 'processing_version' not in payload or payload.get('processing_version') is None:
                 payload['processing_version'] = 1
             with self._cursor() as cur:
-                try:
-                    cur.execute("""
-                        INSERT INTO articles_index (
-                            url_hash_v2, text_hash, title, author, source,
-                            article_id, url, title_norm, clean_text, language, category,
-                            tags_norm, published_at, processing_version, ready_for_chunking
-                        ) VALUES (
-                            %(url_hash)s, %(text_hash)s, %(title)s, %(author)s, %(source)s,
-                            %(article_id)s, %(url)s, %(title_norm)s, %(clean_text)s, %(language)s, %(category)s,
-                            %(tags_norm)s, %(published_at)s, %(processing_version)s, %(ready_for_chunking)s
-                        )
-                        ON CONFLICT (text_hash) DO UPDATE SET
-                            last_seen = NOW(),
-                            title = COALESCE(EXCLUDED.title, articles_index.title),
-                            author = COALESCE(EXCLUDED.author, articles_index.author),
-                            source = COALESCE(EXCLUDED.source, articles_index.source),
-                            article_id = COALESCE(EXCLUDED.article_id, articles_index.article_id),
-                            url = COALESCE(EXCLUDED.url, articles_index.url),
-                            title_norm = COALESCE(EXCLUDED.title_norm, articles_index.title_norm),
-                            clean_text = COALESCE(EXCLUDED.clean_text, articles_index.clean_text),
-                            language = COALESCE(EXCLUDED.language, articles_index.language),
-                            category = COALESCE(EXCLUDED.category, articles_index.category),
-                            tags_norm = COALESCE(EXCLUDED.tags_norm, articles_index.tags_norm),
-                            published_at = COALESCE(EXCLUDED.published_at, articles_index.published_at),
-                            processing_version = GREATEST(articles_index.processing_version, COALESCE(EXCLUDED.processing_version, 1)),
-                            ready_for_chunking = (articles_index.ready_for_chunking OR COALESCE(EXCLUDED.ready_for_chunking, FALSE))
-                    """, payload)
-                except Exception:
-                    cur.execute("""
-                        INSERT INTO articles_index (
-                            url_hash, text_hash, title, author, source,
-                            article_id, url, title_norm, clean_text, language, category,
-                            tags_norm, published_at, processing_version, ready_for_chunking
-                        ) VALUES (
-                            %(url_hash)s, %(text_hash)s, %(title)s, %(author)s, %(source)s,
-                            %(article_id)s, %(url)s, %(title_norm)s, %(clean_text)s, %(language)s, %(category)s,
-                            %(tags_norm)s, %(published_at)s, %(processing_version)s, %(ready_for_chunking)s
-                        )
-                        ON CONFLICT (text_hash) DO UPDATE SET
+                # Use url_hash (consistent with existing schema)
+                cur.execute("""
+                    INSERT INTO articles_index (
+                        url_hash, text_hash, title, author, source,
+                        article_id, url, title_norm, clean_text, language, category,
+                        tags_norm, published_at, processing_version, ready_for_chunking
+                    ) VALUES (
+                        %(url_hash)s, %(text_hash)s, %(title)s, %(author)s, %(source)s,
+                        %(article_id)s, %(url)s, %(title_norm)s, %(clean_text)s, %(language)s, %(category)s,
+                        %(tags_norm)s, %(published_at)s, %(processing_version)s, %(ready_for_chunking)s
+                    )
+                    ON CONFLICT (text_hash) DO UPDATE SET
                             last_seen = NOW(),
                             title = COALESCE(EXCLUDED.title, articles_index.title),
                             author = COALESCE(EXCLUDED.author, articles_index.author),
