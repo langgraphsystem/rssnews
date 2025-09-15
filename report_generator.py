@@ -336,8 +336,7 @@ async def generate_gpt5_analysis(stats: Dict[str, Any], period_hours: int) -> st
             model="gpt-5",
             instructions=system_prompt,
             input=analysis_prompt,
-            max_output_tokens=500,
-            temperature=0.7
+            max_output_tokens=500
         )
 
         # Извлекаем текст из Responses API (используем тот же подход что в main.py)
