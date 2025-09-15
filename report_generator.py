@@ -48,16 +48,16 @@ async def generate_enhanced_telegram_report(client, period_hours: int = 8) -> st
     # Add GPT analysis
     gpt_analysis = await generate_gpt5_analysis(stats, period_hours)
 
-    # Convert GPT analysis to HTML-safe section
+    # Convert GPT analysis to Telegram-safe HTML
     if isinstance(gpt_analysis, str):
         parts = gpt_analysis.split("\n", 1)
         gpt_body = parts[1] if len(parts) > 1 else gpt_analysis
     else:
         gpt_body = str(gpt_analysis)
-    gpt_section = f"<b>🤖 GPT-5 Анализ:</b><br><pre>{_html_escape(gpt_body)}</pre>"
+    gpt_section = f"<b>🤖 GPT-5 Анализ:</b>\n<pre>{_html_escape(gpt_body)}</pre>"
 
-    # Combine reports (HTML)
-    enhanced_report = f"{base_report}<br>{gpt_section}"
+    # Combine reports (Telegram HTML - no <br> tags)
+    enhanced_report = f"{base_report}\n\n{gpt_section}"
 
     return enhanced_report
 
@@ -352,6 +352,19 @@ async def generate_gpt5_analysis(stats: Dict[str, Any], period_hours: int) -> st
             analysis = response.output_text.strip()
             logger.info("GPT-5 analysis extracted via output_text")
 
+        # Специальный метод для нового GPT-5 API: проверим поле reasoning
+        elif hasattr(response, "reasoning") and response.reasoning:
+            try:
+                reasoning = response.reasoning
+                if hasattr(reasoning, 'summary') and reasoning.summary:
+                    analysis = reasoning.summary.strip()
+                    logger.info("GPT-5 analysis extracted via reasoning.summary")
+                elif hasattr(reasoning, 'effort') and hasattr(response, 'usage'):
+                    # Новый формат - анализ может быть в другом месте
+                    logger.info("GPT-5 new reasoning format detected, trying alternative extraction")
+            except Exception as e:
+                logger.warning(f"Failed to extract from reasoning: {e}")
+
         # Метод 2: Извлечение через output[].content[].text
         elif hasattr(response, "output") and response.output:
             try:
@@ -387,9 +400,12 @@ async def generate_gpt5_analysis(stats: Dict[str, Any], period_hours: int) -> st
                     return texts
 
                 possible_texts = extract_text_recursive(response_dict)
+                logger.info(f"Found {len(possible_texts)} possible text fields: {[t[:50] + '...' if len(t) > 50 else t for t in possible_texts[:3]]}")
                 if possible_texts:
-                    analysis = possible_texts[0].strip()  # Берем первый найденный длинный текст
-                    logger.info(f"GPT-5 analysis extracted recursively: {len(analysis)} chars")
+                    # Ищем самый длинный текст, который похож на анализ
+                    best_text = max(possible_texts, key=len)
+                    analysis = best_text.strip()
+                    logger.info(f"GPT-5 analysis extracted recursively: {len(analysis)} chars from {len(possible_texts)} candidates")
 
             except Exception as e:
                 logger.warning(f"Failed recursive text extraction: {e}")
