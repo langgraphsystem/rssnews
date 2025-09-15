@@ -329,18 +329,37 @@ async def generate_gpt5_analysis(stats: Dict[str, Any], period_hours: int) -> st
 
         client = AsyncOpenAI(api_key=api_key)
 
-        response = await client.chat.completions.create(
-            model="gpt-5",  # Используем GPT-5 для максимального качества анализа
-            messages=[
-                {"role": "system", "content": "Ты - опытный аналитик IT-систем, специализирующийся на RSS агрегаторах и обработке новостей."},
-                {"role": "user", "content": analysis_prompt}
-            ],
-            max_tokens=500,
+        # GPT-5 использует Responses API
+        system_prompt = "Ты - опытный аналитик IT-систем, специализирующийся на RSS агрегаторах и обработке новостей."
+
+        response = await client.responses.create(
+            model="gpt-5",
+            instructions=system_prompt,
+            input=analysis_prompt,
+            max_output_tokens=500,
             temperature=0.7
         )
 
-        analysis = response.choices[0].message.content.strip()
-        return f"🤖 **GPT-5 Анализ:**\n{analysis}"
+        # Извлекаем текст из Responses API (используем тот же подход что в main.py)
+        analysis = getattr(response, "output_text", None)
+        if not analysis:
+            try:
+                # Fallback к структуре .output[0].content[0].text
+                parts = []
+                output = getattr(response, "output", None) or []
+                for item in output:
+                    for content in getattr(item, "content", []) or []:
+                        text = getattr(content, "text", None)
+                        if text:
+                            parts.append(text)
+                analysis = "\n".join(parts)
+            except Exception:
+                analysis = None
+
+        if not analysis:
+            analysis = "Анализ завершен, но текст не удалось извлечь"
+
+        return f"🤖 **GPT-5 Анализ:**\n{analysis.strip()}"
 
     except Exception as e:
         logger.error(f"GPT-5 analysis failed: {e}")
