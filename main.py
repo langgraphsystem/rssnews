@@ -124,6 +124,12 @@ def main():
     p_db.add_argument("--sample", type=int, default=None, help="Show last N rows per core table")
     p_db.add_argument("--summary", action="store_true", help="Show summary stats (default if no flags)")
 
+    # Report command
+    p_report = sub.add_parser("report", help="Generate and send system report")
+    p_report.add_argument("--send-telegram", action="store_true", help="Send report to Telegram")
+    p_report.add_argument("--period-hours", type=int, default=8, help="Report period in hours (default: 8)")
+    p_report.add_argument("--format", choices=["markdown", "html"], default="markdown", help="Report format")
+
 
     args = ap.parse_args()
     
@@ -672,7 +678,37 @@ def main():
 
             except Exception as e:
                 logger.error(f"RAG pipeline failed: {e}", exc_info=True)
-            
+            return
+
+        if args.cmd == "report":
+            logger.info("Generating system report")
+            try:
+                from report_generator import generate_report, send_telegram_report
+
+                # Generate report
+                report = generate_report(
+                    client,
+                    period_hours=args.period_hours,
+                    format=args.format
+                )
+
+                print("=== System Report ===")
+                print(report)
+
+                # Send to Telegram if requested
+                if args.send_telegram:
+                    try:
+                        send_telegram_report(report, format=args.format)
+                        print("✓ Report sent to Telegram")
+                    except Exception as e:
+                        logger.error(f"Failed to send Telegram report: {e}")
+                        print(f"✗ Telegram send failed: {e}")
+
+            except Exception as e:
+                logger.error(f"Report generation failed: {e}")
+                print(f"✗ Report failed: {e}")
+            return
+
     except KeyboardInterrupt:
         logger.info("Interrupted by user")
         print("\nInterrupted")

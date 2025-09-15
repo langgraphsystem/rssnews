@@ -173,7 +173,7 @@ class PgClient:
             authors_norm JSONB,
             quality_score REAL,
             fts_vector TSVECTOR,
-            embedding public.vector(768),
+            embedding TEXT,  -- JSON array as text until pgvector is available
             created_at TIMESTAMPTZ DEFAULT NOW(),
             UNIQUE(article_id, processing_version, chunk_index)
         );
@@ -860,7 +860,7 @@ class PgClient:
 
     def update_chunk_embedding(self, chunk_id: int, embedding: List[float]) -> bool:
         """Update embedding vector for single chunk.
-        Formats vector as string and casts to vector.
+        Stores as JSON string until pgvector is available.
         """
         try:
             vec_str = '[' + ','.join(str(float(x)) for x in embedding) + ']'
@@ -868,7 +868,7 @@ class PgClient:
                 cur.execute(
                     """
                     UPDATE article_chunks
-                    SET embedding = %s::vector
+                    SET embedding = %s
                     WHERE id = %s
                     """,
                     (vec_str, chunk_id)
@@ -951,25 +951,43 @@ class PgClient:
             return []
 
     def search_chunks_embedding(self, query_vector: List[float], limit: int = 10) -> List[Dict[str, Any]]:
-        """Search chunks using pgvector cosine similarity."""
+        """Search chunks using basic cosine similarity (fallback without pgvector)."""
         try:
-            vec_str = '[' + ','.join(str(float(x)) for x in query_vector) + ']'
+            import json
             with self._cursor() as cur:
+                # Get all chunks with embeddings and compute similarity in Python
                 cur.execute(
                     """
-                    SELECT 
+                    SELECT
                         id, article_id, chunk_index, text,
-                        url, title_norm, source_domain,
-                        1 - (embedding <=> %s::vector) as score
+                        url, title_norm, source_domain, embedding
                     FROM article_chunks
-                    WHERE embedding IS NOT NULL
-                    ORDER BY score DESC
-                    LIMIT %s
-                    """,
-                    (vec_str, limit)
-                )
-                cols = [d[0] for d in cur.description]
-                return [dict(zip(cols, r)) for r in cur.fetchall()]
+                    WHERE embedding IS NOT NULL AND embedding != ''
+                    """)
+
+                results = []
+                for row in cur.fetchall():
+                    try:
+                        stored_vector = json.loads(row[7])  # embedding column
+                        if len(stored_vector) == len(query_vector):
+                            # Simple cosine similarity
+                            dot_product = sum(a * b for a, b in zip(query_vector, stored_vector))
+                            norm_a = sum(a * a for a in query_vector) ** 0.5
+                            norm_b = sum(b * b for b in stored_vector) ** 0.5
+                            similarity = dot_product / (norm_a * norm_b) if norm_a > 0 and norm_b > 0 else 0
+
+                            results.append({
+                                'id': row[0], 'article_id': row[1], 'chunk_index': row[2],
+                                'text': row[3], 'url': row[4], 'title_norm': row[5],
+                                'source_domain': row[6], 'score': similarity
+                            })
+                    except (json.JSONDecodeError, ValueError):
+                        continue
+
+                # Sort by similarity and limit
+                results.sort(key=lambda x: x['score'], reverse=True)
+                return results[:limit]
+
         except Exception as e:
             logger.error(f"Embedding search failed: {e}")
             return []

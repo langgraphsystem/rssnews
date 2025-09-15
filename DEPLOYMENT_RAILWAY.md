@@ -35,21 +35,32 @@ The app writes queue/state files under `storage/`. Attach a Volume so state surv
 - Timezone: `America/New_York` (select in UI if available; otherwise set project var `TZ=America/New_York`).
 - Concurrency: disable parallel runs (skip/start only if previous finished).
 
-## 6) Observability
+## 6) Cron job (report)
+- Create a separate Cron Job for system reports.
+- Command: `python main.py report --send-telegram`.
+- Schedule: `0 9,15,21 * * *` (3 times daily: 09:00, 15:00, 21:00 New York time).
+- Alternative: `0 */8 * * *` (every 8 hours).
+- Timezone: `America/New_York`.
+- Concurrency: disable parallel runs (skip if previous is still running).
+
+## 7) Observability
 - Logs: Railway captures stdout/stderr. Note: the app also writes `logs/rssnews.log` — OK to ignore on Railway.
 - Alerts: enable notifications for failed deploys or failed cron executions.
 
-## 7) First‑run checklist
+## 8) First‑run checklist
 - Manually trigger the Cron Job once (Run now) to validate DB connectivity and polling.
 - Verify the Worker service processes queued articles.
 - Confirm the Volume mounted at `/app/storage` contains queue files after runs.
+- Test the report command: manually run the report cron job to validate Telegram integration.
 
-## 8) Useful variables
+## 9) Useful variables
 - `PG_DSN` (required): PostgreSQL DSN.
 - `TZ=America/New_York`: aligns schedules/logs to New York time.
 - `GEMINI_API_KEY` (optional): enables LLM features in Stage 6–8.
 - `LOG_LEVEL`/`LOG_FORMAT` (optional): tune logging verbosity/format.
- - `PINECONE_API_KEY` / `PINECONE_INDEX` / `PINECONE_REGION` (optional): enable Pinecone for embeddings upsert in Stage 7. If set, embeddings are stored in Pinecone instead of Postgres.
+- `PINECONE_API_KEY` / `PINECONE_INDEX` / `PINECONE_REGION` (optional): enable Pinecone for embeddings upsert in Stage 7. If set, embeddings are stored in Pinecone instead of Postgres.
+- `TELEGRAM_BOT_TOKEN` (required for reports): Telegram bot token for sending reports.
+- `TELEGRAM_CHAT_ID` (required for reports): Chat ID where reports will be sent (can be user ID or channel/group ID).
 
 ## Notes on timezones
 The polling schedule is enforced by Railway Cron using `America/New_York`. Some internal date logic uses a fixed TZ in `config.py`; when you allow code changes, switch it to New York for full alignment.
