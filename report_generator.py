@@ -330,7 +330,7 @@ async def generate_gpt5_analysis(stats: Dict[str, Any], period_hours: int) -> st
         client = AsyncOpenAI(api_key=api_key)
 
         response = await client.chat.completions.create(
-            model="gpt-4o",  # Используем gpt-4o как наиболее доступную модель
+            model="gpt-5",  # Используем GPT-5 для максимального качества анализа
             messages=[
                 {"role": "system", "content": "Ты - опытный аналитик IT-систем, специализирующийся на RSS агрегаторах и обработке новостей."},
                 {"role": "user", "content": analysis_prompt}
@@ -340,7 +340,7 @@ async def generate_gpt5_analysis(stats: Dict[str, Any], period_hours: int) -> st
         )
 
         analysis = response.choices[0].message.content.strip()
-        return f"🤖 **GPT-4o Анализ:**\n{analysis}"
+        return f"🤖 **GPT-5 Анализ:**\n{analysis}"
 
     except Exception as e:
         logger.error(f"GPT-5 analysis failed: {e}")
