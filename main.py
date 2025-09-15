@@ -683,9 +683,9 @@ def main():
         if args.cmd == "report":
             logger.info("Generating system report")
             try:
-                from report_generator import generate_report, send_telegram_report
+                from report_generator import generate_report, send_telegram_report, send_enhanced_telegram_report
 
-                # Generate report
+                # Generate basic report for console
                 report = generate_report(
                     client,
                     period_hours=args.period_hours,
@@ -698,11 +698,24 @@ def main():
                 # Send to Telegram if requested
                 if args.send_telegram:
                     try:
-                        send_telegram_report(report, format=args.format)
-                        print("✓ Report sent to Telegram")
+                        # Use enhanced report with GPT analysis for Telegram
+                        import asyncio
+                        try:
+                            asyncio.run(send_enhanced_telegram_report(client, args.period_hours))
+                        except RuntimeError:
+                            # Fallback if event loop is already running
+                            loop = asyncio.get_event_loop()
+                            loop.run_until_complete(send_enhanced_telegram_report(client, args.period_hours))
+                        print("✓ Enhanced report with GPT analysis sent to Telegram")
                     except Exception as e:
-                        logger.error(f"Failed to send Telegram report: {e}")
-                        print(f"✗ Telegram send failed: {e}")
+                        logger.error(f"Failed to send enhanced Telegram report: {e}")
+                        # Fallback to basic report
+                        try:
+                            send_telegram_report(report, format=args.format)
+                            print("✓ Basic report sent to Telegram (GPT analysis failed)")
+                        except Exception as e2:
+                            logger.error(f"Failed to send basic Telegram report: {e2}")
+                            print(f"✗ Telegram send failed: {e}")
 
             except Exception as e:
                 logger.error(f"Report generation failed: {e}")

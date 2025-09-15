@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from typing import Dict, Any, Optional
 import requests
 import json
+import asyncio
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +28,28 @@ def generate_report(client, period_hours: int = 8, format: str = "markdown") -> 
         return format_html_report(stats, period_hours)
     else:
         return format_markdown_report(stats, period_hours)
+
+
+async def generate_enhanced_telegram_report(client, period_hours: int = 8) -> str:
+    """Generate enhanced report with GPT analysis for Telegram"""
+
+    # Calculate time period
+    now = datetime.now()
+    period_start = now - timedelta(hours=period_hours)
+
+    # Collect statistics
+    stats = collect_statistics(client, period_start, now)
+
+    # Generate base report
+    base_report = format_markdown_report(stats, period_hours)
+
+    # Add GPT analysis
+    gpt_analysis = await generate_gpt5_analysis(stats, period_hours)
+
+    # Combine reports
+    enhanced_report = f"{base_report}\n\n{gpt_analysis}"
+
+    return enhanced_report
 
 
 def collect_statistics(client, period_start: datetime, period_end: datetime) -> Dict[str, Any]:
@@ -254,6 +277,76 @@ def format_html_report(stats: Dict[str, Any], period_hours: int) -> str:
     return f"<pre>{html_report}</pre>"
 
 
+async def generate_gpt5_analysis(stats: Dict[str, Any], period_hours: int) -> str:
+    """Generate GPT-5 analysis of RSS system statistics in Russian"""
+
+    try:
+        # Check if OpenAI API key is available
+        api_key = os.getenv('OPENAI_API_KEY')
+        if not api_key:
+            return "⚠️ *GPT-5 анализ недоступен:* OPENAI_API_KEY не настроен"
+
+        # Import OpenAI client
+        try:
+            from openai import AsyncOpenAI
+        except ImportError:
+            return "⚠️ *GPT-5 анализ недоступен:* openai библиотека не установлена"
+
+        # Prepare statistics summary for analysis
+        total_articles = sum(stats['raw_articles'].get(status, 0)
+                           for status in ['stored', 'partial', 'duplicate', 'pending', 'processing', 'error'])
+        period_total = sum(stats['raw_articles'].get('period', {}).values())
+
+        # Calculate key metrics
+        success_rate = (stats['raw_articles'].get('stored', 0) / max(total_articles, 1)) * 100
+        error_rate = (stats['raw_articles'].get('error', 0) / max(total_articles, 1)) * 100
+        fts_coverage = (stats['stage7']['fts_indexed'] / max(stats['stage6']['total_chunks'], 1)) * 100
+
+        # Create analysis prompt
+        analysis_prompt = f"""
+Ты - аналитик RSS новостной системы. Проанализируй статистику работы системы за {period_hours} часов и дай краткий анализ на русском языке.
+
+Статистика:
+- Активных фидов: {stats['feeds']['active']}/{stats['feeds']['total']}
+- Всего статей: {total_articles:,}
+- Новых статей за период: {period_total}
+- Успешно сохранено: {stats['raw_articles'].get('stored', 0)} ({success_rate:.1f}%)
+- Ошибок: {stats['raw_articles'].get('error', 0)} ({error_rate:.1f}%)
+- В очереди: {stats['raw_articles'].get('pending', 0)}
+- Готово к чанкингу: {stats['stage6']['ready_for_chunking']}
+- Завершено чанков: {stats['stage6']['chunking_completed']}
+- Всего чанков: {stats['stage6']['total_chunks']}
+- FTS индексация: {stats['stage7']['fts_indexed']}/{stats['stage6']['total_chunks']} ({fts_coverage:.1f}%)
+- Embeddings: {stats['stage7']['embeddings_stored']}
+
+Дай краткий анализ (2-3 предложения):
+1. Общее состояние системы
+2. Основные проблемы или достижения
+3. Рекомендации по улучшению
+
+Отвечай коротко и по делу, используй эмодзи для наглядности.
+"""
+
+        client = AsyncOpenAI(api_key=api_key)
+
+        response = await client.chat.completions.create(
+            model="gpt-4o",  # Используем gpt-4o как наиболее доступную модель
+            messages=[
+                {"role": "system", "content": "Ты - опытный аналитик IT-систем, специализирующийся на RSS агрегаторах и обработке новостей."},
+                {"role": "user", "content": analysis_prompt}
+            ],
+            max_tokens=500,
+            temperature=0.7
+        )
+
+        analysis = response.choices[0].message.content.strip()
+        return f"🤖 **GPT-4o Анализ:**\n{analysis}"
+
+    except Exception as e:
+        logger.error(f"GPT-5 analysis failed: {e}")
+        return f"⚠️ *GPT анализ недоступен:* {str(e)[:100]}"
+
+
 def send_telegram_report(report: str, format: str = "markdown") -> None:
     """Send report to Telegram"""
 
@@ -289,3 +382,20 @@ def send_telegram_report(report: str, format: str = "markdown") -> None:
         raise Exception(f"Telegram API error: {result.get('description', 'Unknown error')}")
 
     logger.info("Report sent to Telegram successfully")
+
+
+async def send_enhanced_telegram_report(client, period_hours: int = 8) -> None:
+    """Generate and send enhanced report with GPT analysis to Telegram"""
+
+    try:
+        # Generate enhanced report with GPT analysis
+        report = await generate_enhanced_telegram_report(client, period_hours)
+
+        # Send to Telegram
+        send_telegram_report(report, format="markdown")
+
+        logger.info("Enhanced report with GPT analysis sent to Telegram successfully")
+
+    except Exception as e:
+        logger.error(f"Failed to send enhanced Telegram report: {e}")
+        raise
