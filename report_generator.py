@@ -95,13 +95,13 @@ def collect_statistics(client, period_start: datetime, period_end: datetime) -> 
             cur.execute("SELECT COUNT(*) FROM article_chunks WHERE fts_vector IS NOT NULL")
             stats['stage7']['fts_indexed'] = cur.fetchone()[0]
 
-            cur.execute("SELECT COUNT(*) FROM article_chunks WHERE embedding IS NOT NULL AND embedding != ''")
+            cur.execute("SELECT COUNT(*) FROM article_chunks WHERE embedding IS NOT NULL")
             stats['stage7']['embeddings_stored'] = cur.fetchone()[0]
 
             cur.execute("SELECT COUNT(*) FROM article_chunks WHERE fts_vector IS NULL")
             stats['stage7']['fts_missing'] = cur.fetchone()[0]
 
-            cur.execute("SELECT COUNT(*) FROM article_chunks WHERE embedding IS NULL OR embedding = ''")
+            cur.execute("SELECT COUNT(*) FROM article_chunks WHERE embedding IS NULL")
             stats['stage7']['embeddings_missing'] = cur.fetchone()[0]
 
     except Exception as e:
