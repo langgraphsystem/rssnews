@@ -7125,3 +7125,529 @@ DETAIL:  Key (url_hash)=(0b860b956df6507f8688e6c3a3b7b418e7c458a90f50e91576d113c
 LINE 3:                     FROM article_chunks
                                  ^
 
+2025-09-14 17:00:21,206 - __main__ - INFO - Initializing database connection
+2025-09-14 17:00:25,292 - pg_client_new - ERROR - Failed to initialize DB pool: connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+
+2025-09-14 17:03:55,006 - __main__ - INFO - Initializing database connection
+2025-09-14 17:03:59,088 - pg_client_new - ERROR - Failed to initialize DB pool: connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+
+2025-09-14 17:04:30,180 - __main__ - INFO - Initializing database connection
+2025-09-14 17:04:30,180 - pg_client_new - ERROR - Failed to initialize DB pool: invalid sslmode value: "disable "
+
+2025-09-14 17:04:40,414 - __main__ - INFO - Initializing database connection
+2025-09-14 17:04:40,731 - pg_client_new - INFO - DB pool initialized
+2025-09-14 17:04:40,731 - __main__ - INFO - Starting Stage 8 RAG retrieval
+2025-09-14 17:04:40,897 - stage8_retrieval.retriever - INFO - Query normalized: 'artificial intelligence' -> 'artificial intelligence'
+2025-09-14 17:04:41,057 - stage8_retrieval.retriever - INFO - Performing FTS-only search with alpha=1.0
+2025-09-14 17:04:41,057 - stage8_retrieval.retriever - INFO - Retrieved 15 chunks in 159.7ms using fts
+2025-09-15 12:49:50,768 - __main__ - INFO - Initializing database connection
+2025-09-15 12:49:52,630 - pg_client_new - INFO - DB pool initialized
+2025-09-15 12:49:52,837 - __main__ - ERROR - Command failed: column "ready_for_chunking" does not exist
+LINE 1: ...ELECT COUNT(*) FROM articles_index WHERE COALESCE(ready_for_...
+                                                             ^
+
+2025-09-15 12:49:59,853 - __main__ - INFO - Initializing database connection
+2025-09-15 12:50:07,435 - pg_client_new - INFO - DB pool initialized
+2025-09-15 12:50:12,551 - __main__ - INFO - Initializing database connection
+2025-09-15 12:50:12,964 - pg_client_new - INFO - DB pool initialized
+2025-09-15 12:50:17,280 - __main__ - INFO - Initializing database connection
+2025-09-15 12:50:17,627 - pg_client_new - INFO - DB pool initialized
+2025-09-15 12:50:17,627 - __main__ - INFO - Generating statistics
+2025-09-15 12:55:40,599 - __main__ - INFO - Initializing database connection
+2025-09-15 12:55:41,122 - pg_client_new - INFO - DB pool initialized
+2025-09-15 12:55:41,123 - __main__ - INFO - Ensuring database schema
+2025-09-15 12:55:41,202 - pg_client_new - ERROR - Failed to create schema: type "public.vector" does not exist
+LINE 117:             embedding public.vector(768),
+                                ^
+
+2025-09-15 12:55:41,203 - __main__ - ERROR - Command failed: type "public.vector" does not exist
+LINE 117:             embedding public.vector(768),
+                                ^
+
+2025-09-15 12:56:41,581 - __main__ - INFO - Initializing database connection
+2025-09-15 12:56:41,951 - pg_client_new - INFO - DB pool initialized
+2025-09-15 12:56:41,951 - __main__ - INFO - Ensuring database schema
+2025-09-15 12:56:42,288 - pg_client_new - INFO - Database schema ensured
+2025-09-15 12:56:51,212 - __main__ - INFO - Initializing database connection
+2025-09-15 12:56:51,613 - pg_client_new - INFO - DB pool initialized
+2025-09-15 12:56:57,179 - __main__ - INFO - Initializing database connection
+2025-09-15 12:56:57,592 - pg_client_new - INFO - DB pool initialized
+2025-09-15 12:57:02,388 - __main__ - INFO - Initializing database connection
+2025-09-15 12:57:02,852 - pg_client_new - INFO - DB pool initialized
+2025-09-15 12:57:22,089 - __main__ - INFO - Initializing database connection
+2025-09-15 12:57:22,487 - pg_client_new - INFO - DB pool initialized
+2025-09-15 12:57:22,488 - __main__ - INFO - Starting Stage 6 chunking
+2025-09-15 12:57:22,806 - __main__ - WARNING - LLM refine skipped: 1 validation error for GeminiSettings
+api_key
+  Field required [type=missing, input_value={}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.8/v/missing
+2025-09-15 12:57:22,925 - __main__ - WARNING - LLM refine skipped: 1 validation error for GeminiSettings
+api_key
+  Field required [type=missing, input_value={}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.8/v/missing
+2025-09-15 12:57:23,024 - __main__ - WARNING - LLM refine skipped: 1 validation error for GeminiSettings
+api_key
+  Field required [type=missing, input_value={}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.8/v/missing
+2025-09-15 12:57:27,670 - __main__ - INFO - Initializing database connection
+2025-09-15 12:57:28,197 - pg_client_new - INFO - DB pool initialized
+2025-09-15 12:57:28,197 - __main__ - INFO - Starting Stage 7 indexing (FTS + optional embeddings)
+2025-09-15 12:57:28,549 - __main__ - WARNING - Embedding step skipped/failed: 1 validation error for GeminiSettings
+api_key
+  Field required [type=missing, input_value={}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.8/v/missing
+2025-09-15 12:57:33,297 - __main__ - INFO - Initializing database connection
+2025-09-15 12:57:33,738 - pg_client_new - INFO - DB pool initialized
+2025-09-15 12:57:33,738 - __main__ - INFO - Starting Stage 8 RAG retrieval
+2025-09-15 12:57:33,756 - stage8_retrieval.retriever - INFO - Query normalized: 'What is AI technology?' -> 'ai technology'
+2025-09-15 12:57:33,933 - stage8_retrieval.retriever - ERROR - Failed to initialize Gemini client: 1 validation error for GeminiSettings
+api_key
+  Field required [type=missing, input_value={}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.8/v/missing
+2025-09-15 12:57:33,933 - stage8_retrieval.retriever - ERROR - Failed to generate embedding for query: 1 validation error for GeminiSettings
+api_key
+  Field required [type=missing, input_value={}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.8/v/missing
+2025-09-15 12:57:34,015 - stage8_retrieval.retriever - WARNING - Embedding failed in hybrid mode, falling back to FTS
+2025-09-15 12:57:34,015 - stage8_retrieval.retriever - INFO - Retrieved 0 chunks in 258.6ms using fts_fallback
+2025-09-15 12:57:38,670 - __main__ - INFO - Initializing database connection
+2025-09-15 12:57:39,032 - pg_client_new - INFO - DB pool initialized
+2025-09-15 13:50:37,340 - __main__ - INFO - Initializing database connection
+2025-09-15 13:50:37,852 - pg_client_new - INFO - DB pool initialized
+2025-09-15 13:50:37,852 - __main__ - INFO - Generating system report
+2025-09-15 14:24:06,577 - __main__ - INFO - Initializing database connection
+2025-09-15 14:24:07,024 - pg_client_new - INFO - DB pool initialized
+2025-09-15 14:24:07,024 - __main__ - INFO - Generating system report
+2025-09-15 15:14:24,713 - __main__ - INFO - Initializing database connection
+2025-09-15 15:14:25,202 - pg_client_new - INFO - DB pool initialized
+2025-09-15 15:14:25,202 - __main__ - INFO - Generating system report
+2025-09-15 15:16:57,094 - __main__ - INFO - Initializing database connection
+2025-09-15 15:16:57,575 - pg_client_new - INFO - DB pool initialized
+2025-09-15 15:16:57,575 - __main__ - INFO - Generating system report
+2025-09-15 15:20:43,968 - __main__ - INFO - Initializing database connection
+2025-09-15 15:20:44,444 - pg_client_new - INFO - DB pool initialized
+2025-09-15 15:20:44,444 - __main__ - INFO - Generating system report
+2025-09-15 16:01:31,863 - __main__ - INFO - Initializing database connection
+2025-09-15 16:01:32,195 - pg_client_new - INFO - DB pool initialized
+2025-09-15 16:01:32,195 - __main__ - INFO - Generating system report
+2025-09-15 16:03:03,632 - __main__ - INFO - Initializing database connection
+2025-09-15 16:03:03,632 - pg_client_new - ERROR - Failed to initialize DB pool: invalid sslmode value: "disable "
+
+2025-09-15 16:03:17,925 - __main__ - INFO - Initializing database connection
+2025-09-15 16:03:18,284 - pg_client_new - INFO - DB pool initialized
+2025-09-15 16:04:17,755 - __main__ - INFO - Initializing database connection
+2025-09-15 16:04:17,975 - pg_client_new - INFO - DB pool initialized
+2025-09-15 16:05:25,665 - __main__ - INFO - Initializing database connection
+2025-09-15 16:05:25,879 - pg_client_new - INFO - DB pool initialized
+2025-09-15 16:06:33,073 - __main__ - INFO - Initializing database connection
+2025-09-15 16:06:33,263 - pg_client_new - INFO - DB pool initialized
+2025-09-15 16:06:35,103 - __main__ - INFO - Initializing database connection
+2025-09-15 16:06:35,466 - pg_client_new - INFO - DB pool initialized
+2025-09-15 16:06:35,466 - __main__ - INFO - Generating system report
+2025-09-15 16:27:22,756 - __main__ - INFO - Initializing database connection
+2025-09-15 16:27:22,956 - pg_client_new - INFO - DB pool initialized
+2025-09-15 16:27:22,956 - __main__ - INFO - Adding 1 feeds
+2025-09-15 16:27:23,581 - __main__ - INFO - Initializing database connection
+2025-09-15 16:27:23,836 - pg_client_new - INFO - DB pool initialized
+2025-09-15 16:27:23,836 - __main__ - INFO - Adding 1 feeds
+2025-09-15 16:27:24,510 - __main__ - INFO - Initializing database connection
+2025-09-15 16:27:24,735 - pg_client_new - INFO - DB pool initialized
+2025-09-15 16:27:24,735 - __main__ - INFO - Adding 1 feeds
+2025-09-15 16:27:25,370 - __main__ - INFO - Initializing database connection
+2025-09-15 16:27:25,562 - pg_client_new - INFO - DB pool initialized
+2025-09-15 16:27:25,563 - __main__ - INFO - Adding 1 feeds
+2025-09-15 16:27:26,217 - __main__ - INFO - Initializing database connection
+2025-09-15 16:27:26,417 - pg_client_new - INFO - DB pool initialized
+2025-09-15 16:27:26,417 - __main__ - INFO - Adding 1 feeds
+2025-09-15 16:27:27,054 - __main__ - INFO - Initializing database connection
+2025-09-15 16:27:27,216 - pg_client_new - INFO - DB pool initialized
+2025-09-15 16:27:27,216 - __main__ - INFO - Adding 1 feeds
+2025-09-15 16:27:27,846 - __main__ - INFO - Initializing database connection
+2025-09-15 16:27:28,082 - pg_client_new - INFO - DB pool initialized
+2025-09-15 16:27:28,082 - __main__ - INFO - Adding 1 feeds
+2025-09-15 16:27:28,694 - __main__ - INFO - Initializing database connection
+2025-09-15 16:27:28,884 - pg_client_new - INFO - DB pool initialized
+2025-09-15 16:27:28,884 - __main__ - INFO - Adding 1 feeds
+2025-09-15 16:27:29,523 - __main__ - INFO - Initializing database connection
+2025-09-15 16:27:29,714 - pg_client_new - INFO - DB pool initialized
+2025-09-15 16:27:29,714 - __main__ - INFO - Adding 1 feeds
+2025-09-15 16:29:37,306 - __main__ - INFO - Initializing database connection
+2025-09-15 16:29:37,515 - pg_client_new - INFO - DB pool initialized
+2025-09-15 17:29:03,000 - __main__ - INFO - Initializing database connection
+2025-09-15 17:29:03,185 - pg_client_new - INFO - DB pool initialized
+2025-09-15 17:29:03,185 - __main__ - INFO - Adding 15 feeds
+2025-09-15 17:30:05,895 - __main__ - INFO - Initializing database connection
+2025-09-15 17:30:06,102 - pg_client_new - INFO - DB pool initialized
+2025-09-15 17:32:59,620 - __main__ - INFO - Initializing database connection
+2025-09-15 17:33:00,035 - pg_client_new - INFO - DB pool initialized
+2025-09-15 17:40:13,399 - __main__ - INFO - Initializing database connection
+2025-09-15 17:40:15,421 - pg_client_new - INFO - DB pool initialized
+2025-09-15 17:49:42,282 - __main__ - INFO - Initializing database connection
+2025-09-15 17:49:43,209 - pg_client_new - INFO - DB pool initialized
+2025-09-15 17:49:43,209 - __main__ - INFO - Starting Stage 6 chunking
+2025-09-15 17:49:43,691 - __main__ - WARNING - LLM refine skipped: Logger._log() got an unexpected keyword argument 'err'
+2025-09-15 17:50:25,251 - __main__ - INFO - Initializing database connection
+2025-09-15 17:50:26,224 - pg_client_new - INFO - DB pool initialized
+2025-09-15 17:50:26,224 - __main__ - INFO - Starting Stage 6 chunking
+2025-09-15 17:50:26,620 - stage6_hybrid_chunking.src.stage6.interfaces - WARNING - stage6.llm.refine.error: 'GeminiClient' object has no attribute 'send_refinement_request'
+Traceback (most recent call last):
+  File "d:\Программы\rss\rssnews\stage6_hybrid_chunking\src\stage6\interfaces.py", line 135, in _refine_one
+    result: LLMRefinementResult | None = await client.send_refinement_request(
+                                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'GeminiClient' object has no attribute 'send_refinement_request'
+2025-09-15 17:50:26,639 - __main__ - WARNING - LLM refine skipped: Logger._log() got an unexpected keyword argument 'refined'
+2025-09-15 17:51:34,903 - __main__ - INFO - Initializing database connection
+2025-09-15 17:51:35,785 - pg_client_new - INFO - DB pool initialized
+2025-09-15 17:51:35,785 - __main__ - INFO - Starting Stage 6 chunking
+2025-09-15 17:51:36,192 - stage6_hybrid_chunking.src.stage6.interfaces - INFO - stage6.llm.refine.done, refined=0
+2025-09-15 17:52:06,777 - __main__ - INFO - Initializing database connection
+2025-09-15 17:52:07,707 - pg_client_new - INFO - DB pool initialized
+2025-09-15 17:52:07,707 - __main__ - INFO - Starting article processing
+2025-09-15 17:52:07,707 - worker - INFO - Starting article processing
+2025-09-15 17:52:07,811 - worker - INFO - Processing 50 pending articles
+2025-09-15 17:52:28,008 - net.http - INFO - Added to retry queue: https://www.washingtonpost.com/sports/2025/06/17/panthers-oilers-stanley-cup-finals/?utm_source=rss&utm_medium=referral&utm_campaign=wp_homepage (attempt 1/5)
+2025-09-15 17:52:37,128 - net.http - INFO - Added to retry queue: https://www.washingtonpost.com/obituaries/2025/09/06/ken-dryden-dead-montreal-canadiens/?utm_source=rss&utm_medium=referral&utm_campaign=wp_homepage (attempt 1/5)
+2025-09-15 17:52:37,129 - net.http - INFO - Added to retry queue: https://www.washingtonpost.com/food/2024/09/28/jewish-high-holidays-recipes-brisket-kugel-challah/ (attempt 1/5)
+2025-09-15 17:52:37,133 - net.http - INFO - Added to retry queue: https://www.washingtonpost.com/sports/2025/09/10/capitals-paper-tickets/?utm_source=rss&utm_medium=referral&utm_campaign=wp_homepage (attempt 1/5)
+2025-09-15 17:52:38,833 - net.http - INFO - Added to retry queue: https://www.washingtonpost.com/sports/2025/07/24/hockey-canada-trial-sexual-assault-not-guilty/?utm_source=rss&utm_medium=referral&utm_campaign=wp_homepage (attempt 1/5)
+2025-09-15 17:52:47,951 - net.http - ERROR - Failed to load retry queue: Expecting value: line 1 column 1 (char 0)
+2025-09-15 17:52:47,953 - net.http - ERROR - Failed to load retry queue: Expecting value: line 1 column 1 (char 0)
+2025-09-15 17:52:47,953 - net.http - ERROR - Failed to load retry queue: Expecting value: line 1 column 1 (char 0)
+2025-09-15 17:52:47,958 - net.http - ERROR - Failed to load retry queue: Expecting value: line 1376 column 14 (char 63806)
+2025-09-15 17:52:57,033 - net.http - INFO - Added to retry queue: https://www.washingtonpost.com/sports/2025/09/03/ryan-leonard-capitals-rookie-showcase/?utm_source=rss&utm_medium=referral&utm_campaign=wp_homepage (attempt 1/5)
+2025-09-15 17:52:57,047 - net.http - ERROR - Failed to load retry queue: Extra data: line 19 column 2 (char 745)
+2025-09-15 17:53:06,104 - net.http - INFO - Added to retry queue: https://www.washingtonpost.com/sports/2025/08/28/capitals-promotional-schedule/?utm_source=rss&utm_medium=referral&utm_campaign=wp_homepage (attempt 1/5)
+2025-09-15 17:53:15,176 - net.http - INFO - Added to retry queue: https://www.washingtonpost.com/entertainment/tv/2025/09/15/emmys-2025-review-snubs-surprises/ (attempt 1/5)
+2025-09-15 17:53:24,242 - net.http - INFO - Added to retry queue: https://www.washingtonpost.com/obituaries/2025/07/01/alex-delvecchio-dies-nhl/?utm_source=rss&utm_medium=referral&utm_campaign=wp_homepage (attempt 1/5)
+2025-09-15 17:53:24,243 - net.http - INFO - Added to retry queue: https://www.washingtonpost.com/entertainment/theater/2025/09/15/merry-wives-shakespeare-theatre/ (attempt 1/5)
+2025-09-15 17:53:24,243 - net.http - INFO - Added to retry queue: https://www.washingtonpost.com/food/2025/09/15/continuous-glucose-monitors-personalized-nutrition/ (attempt 1/5)
+2025-09-15 17:53:24,244 - net.http - INFO - Added to retry queue: https://www.washingtonpost.com/home/2025/09/15/co-sleeping-with-pets-risks-benefits/ (attempt 1/5)
+2025-09-15 17:53:24,244 - net.http - INFO - Added to retry queue: https://www.washingtonpost.com/style/interactive/2025/emmy-winners-2025-list/ (attempt 1/5)
+2025-09-15 17:53:33,511 - net.http - INFO - Added to retry queue: https://www.washingtonpost.com/entertainment/tv/2025/09/15/emmys-2025-highlights-best-moments-awards/ (attempt 1/5)
+2025-09-15 17:53:33,512 - net.http - ERROR - Failed to load retry queue: Expecting value: line 1 column 1 (char 0)
+2025-09-15 17:53:33,512 - net.http - INFO - Added to retry queue: https://www.washingtonpost.com/advice/2025/09/15/carolyn-hax-drinking-mom-pregnant/ (attempt 1/5)
+2025-09-15 17:53:33,513 - net.http - INFO - Added to retry queue: https://www.washingtonpost.com/recipes/beef-stuffed-eggplant/ (attempt 1/5)
+2025-09-15 17:53:33,513 - net.http - INFO - Added to retry queue: https://www.washingtonpost.com/entertainment/2025/09/14/stephen-colbert-late-show-emmys/ (attempt 1/5)
+2025-09-15 17:53:34,631 - net.http - INFO - Added to retry queue: https://www.washingtonpost.com/advice/2025/09/15/miss-manners-insulting-joke-home/ (attempt 1/5)
+2025-09-15 17:53:43,636 - net.http - INFO - Added to retry queue: https://www.washingtonpost.com/advice/2025/09/14/asking-eric-mother-new-boyfriend/ (attempt 1/5)
+2025-09-15 17:53:52,879 - net.http - INFO - Added to retry queue: https://www.washingtonpost.com/technology/2025/09/15/spacex-dragon-musk-nasa-space-station/ (attempt 1/5)
+2025-09-15 17:53:52,908 - net.http - INFO - Added to retry queue: https://www.washingtonpost.com/technology/2025/09/15/hawley-warren-amazon-workers/ (attempt 1/5)
+2025-09-15 17:53:52,908 - net.http - INFO - Added to retry queue: https://www.washingtonpost.com/technology/2025/09/15/trump-china-tiktok-deal/ (attempt 1/5)
+2025-09-15 17:53:53,306 - parser.extract - ERROR - Failed to extract article from https://www.npr.org/sections/shots-health-news/2025/09/15/nx-s1-5542390/cdc-vaccine-advisers-committee: 'list' object has no attribute 'strip'
+2025-09-15 17:53:53,315 - parser.extract - ERROR - Failed to extract article from https://www.npr.org/2025/09/15/nx-s1-5534314/a-look-at-the-pomp-and-pageantry-that-will-define-trumps-u-k-summit: 'list' object has no attribute 'strip'
+2025-09-15 17:53:53,361 - pg_client_new - ERROR - Failed to update article 9917: duplicate key value violates unique constraint "raw_url_hash_key"
+DETAIL:  Key (url_hash)=() already exists.
+
+2025-09-15 17:53:53,361 - pg_client_new - ERROR - Failed to update article 9919: duplicate key value violates unique constraint "raw_url_hash_key"
+DETAIL:  Key (url_hash)=() already exists.
+
+2025-09-15 17:53:53,361 - worker - ERROR - Error processing article https://www.npr.org/sections/shots-health-news/2025/09/15/nx-s1-5542390/cdc-vaccine-advisers-committee: duplicate key value violates unique constraint "raw_url_hash_key"
+DETAIL:  Key (url_hash)=() already exists.
+
+2025-09-15 17:53:53,361 - worker - ERROR - Error processing article https://www.npr.org/2025/09/15/nx-s1-5534314/a-look-at-the-pomp-and-pageantry-that-will-define-trumps-u-k-summit: duplicate key value violates unique constraint "raw_url_hash_key"
+DETAIL:  Key (url_hash)=() already exists.
+
+2025-09-15 17:53:53,606 - parser.extract - INFO - Extracted article: Data investigation: Childhood vaccination rates ar... (3098 words, status: stored)
+2025-09-15 17:53:53,842 - parser.extract - INFO - Extracted article: Vaccination map: How protected is your community?... (283 words, status: stored)
+2025-09-15 17:53:54,041 - parser.extract - INFO - Extracted article: Behind the data: Tracking the rate of vaccination ... (1208 words, status: stored)
+2025-09-15 17:53:54,427 - parser.extract - ERROR - Failed to extract article from https://www.npr.org/2025/09/15/nx-s1-5535554/this-book-arrived-in-mailboxes-all-around-baltimore-with-no-explanation-until-now: 'list' object has no attribute 'strip'
+2025-09-15 17:53:54,475 - pg_client_new - ERROR - Failed to update article 9925: duplicate key value violates unique constraint "raw_url_hash_key"
+DETAIL:  Key (url_hash)=() already exists.
+
+2025-09-15 17:53:54,475 - worker - ERROR - Error processing article https://www.npr.org/2025/09/15/nx-s1-5535554/this-book-arrived-in-mailboxes-all-around-baltimore-with-no-explanation-until-now: duplicate key value violates unique constraint "raw_url_hash_key"
+DETAIL:  Key (url_hash)=() already exists.
+
+2025-09-15 17:53:54,874 - parser.extract - INFO - Extracted article: Trump Fed pick Stephen Miran gets a Senate vote be... (836 words, status: stored)
+2025-09-15 17:53:55,069 - parser.extract - INFO - Extracted article: Trump World’s Deals With the U.A.E. - The New York... (1326 words, status: stored)
+2025-09-15 17:53:55,207 - parser.extract - ERROR - Failed to extract article from https://www.npr.org/2025/09/15/nx-s1-5542195/vance-hosted-charlie-kirks-show-monday-in-episode-that-was-part-tribute-part-outrage: 'list' object has no attribute 'strip'
+2025-09-15 17:53:55,252 - pg_client_new - ERROR - Failed to update article 9927: duplicate key value violates unique constraint "raw_url_hash_key"
+DETAIL:  Key (url_hash)=() already exists.
+
+2025-09-15 17:53:55,252 - worker - ERROR - Error processing article https://www.npr.org/2025/09/15/nx-s1-5542195/vance-hosted-charlie-kirks-show-monday-in-episode-that-was-part-tribute-part-outrage: duplicate key value violates unique constraint "raw_url_hash_key"
+DETAIL:  Key (url_hash)=() already exists.
+
+2025-09-15 17:53:55,663 - parser.extract - INFO - Extracted article: How Gen Z-led protests are rattling governments ac... (1124 words, status: stored)
+2025-09-15 17:53:55,749 - parser.extract - INFO - Extracted article: Rev William Barber condemns Kirk’s killing and war... (783 words, status: stored)
+2025-09-15 17:53:55,807 - parser.extract - INFO - Extracted article: Another endangered orca in Washington state is see... (517 words, status: stored)
+2025-09-15 17:53:56,224 - parser.extract - INFO - Extracted article: 8/11: The Takeout with Major Garrett - CBS News... (0 words, status: partial)
+2025-09-15 17:53:56,492 - parser.extract - INFO - Extracted article: President Trump: U.S. strikes another Venezuelan b... (8 words, status: partial)
+2025-09-15 17:53:56,643 - parser.extract - INFO - Extracted article: A school district’s battle between vax rules and b... (8 words, status: partial)
+2025-09-15 17:53:57,007 - parser.extract - INFO - Extracted article: Kash Patel faces scrutiny ahead of congressional h... (1392 words, status: stored)
+2025-09-15 17:53:57,027 - parser.extract - ERROR - Failed to extract article from https://www.npr.org/2025/09/15/nx-s1-5529419/death-row-inmate-robert-roberson-points-to-new-evidence-as-execution-nears-in-texas: 'list' object has no attribute 'strip'
+2025-09-15 17:53:57,074 - pg_client_new - ERROR - Failed to update article 9931: duplicate key value violates unique constraint "raw_url_hash_key"
+DETAIL:  Key (url_hash)=() already exists.
+
+2025-09-15 17:53:57,074 - worker - ERROR - Error processing article https://www.npr.org/2025/09/15/nx-s1-5529419/death-row-inmate-robert-roberson-points-to-new-evidence-as-execution-nears-in-texas: duplicate key value violates unique constraint "raw_url_hash_key"
+DETAIL:  Key (url_hash)=() already exists.
+
+2025-09-15 17:53:57,598 - parser.extract - INFO - Extracted article: Google News... (41801 words, status: stored)
+2025-09-15 17:53:58,211 - parser.extract - INFO - Extracted article: Google News... (41801 words, status: stored)
+2025-09-15 17:53:58,306 - parser.extract - INFO - Extracted article: Cuomo, Staunch Supporter of Israel, Says ‘Horrific... (1315 words, status: stored)
+2025-09-15 17:53:59,176 - parser.extract - INFO - Extracted article: Google News... (41801 words, status: stored)
+2025-09-15 17:54:03,496 - net.http - ERROR - Failed to load retry queue: Expecting value: line 1 column 1 (char 0)
+2025-09-15 17:54:03,496 - net.http - INFO - Added to retry queue: https://www.washingtonpost.com/advice/2025/09/14/carolyn-hax-wife-nitpicks-housework-husband/ (attempt 1/5)
+2025-09-15 17:54:03,496 - net.http - INFO - Added to retry queue: https://www.washingtonpost.com/advice/2025/09/15/asking-eric-garden-neighbor-peace/ (attempt 1/5)
+2025-09-15 17:54:03,497 - net.http - INFO - Added to retry queue: https://www.washingtonpost.com/food/2025/09/14/pickle-chicken-salad/ (attempt 1/5)
+2025-09-15 17:54:03,497 - net.http - INFO - Added to retry queue: https://www.washingtonpost.com/lifestyle/2025/09/14/solution-evan-birnholzs-sept-14-crossword-pint-size/ (attempt 1/5)
+2025-09-15 17:54:03,706 - net.http - INFO - Added to retry queue: https://www.washingtonpost.com/technology/2025/09/15/ios-26-update-features-iphone/ (attempt 1/5)
+2025-09-15 17:54:04,836 - net.http - INFO - Added to retry queue: https://www.washingtonpost.com/technology/2025/09/15/openai-chatgpt-study-use-cases/ (attempt 1/5)
+2025-09-15 17:54:13,837 - net.http - INFO - Added to retry queue: https://www.washingtonpost.com/technology/2025/09/14/zoox-robotaxis-vegas-police/ (attempt 1/5)
+2025-09-15 17:54:13,900 - worker - INFO - Processing complete: 13/50 successful, 1 duplicates, 34 errors
+2025-09-15 17:56:02,205 - __main__ - INFO - Initializing database connection
+2025-09-15 17:56:03,230 - pg_client_new - INFO - DB pool initialized
+2025-09-15 17:56:03,230 - __main__ - INFO - Starting article processing
+2025-09-15 17:56:03,230 - worker - INFO - Starting article processing
+2025-09-15 17:56:03,377 - worker - INFO - Processing 50 pending articles
+2025-09-15 17:56:04,707 - parser.extract - INFO - Extracted article: Italian skier Matteo Franzoso dies at the age of 2... (507 words, status: stored)
+2025-09-15 17:56:05,224 - parser.extract - INFO - Extracted article: Google News... (41803 words, status: stored)
+2025-09-15 17:56:05,597 - parser.extract - INFO - Extracted article: Google News... (41801 words, status: stored)
+2025-09-15 17:56:05,960 - parser.extract - INFO - Extracted article: Google News... (41803 words, status: stored)
+2025-09-15 17:56:06,320 - parser.extract - INFO - Extracted article: Google News... (41801 words, status: stored)
+2025-09-15 17:56:06,605 - parser.extract - INFO - Extracted article: Gov. Stein requests $13.5B more from Congress for ... (749 words, status: stored)
+2025-09-15 17:56:06,675 - parser.extract - INFO - Extracted article: Congress asks if Boar's Head deli meat plant tied ... (641 words, status: stored)
+2025-09-15 17:56:06,814 - parser.extract - INFO - Extracted article: U.S. Strikes a 2nd Venezuela Boat, Killing 3, Trum... (1239 words, status: stored)
+2025-09-15 17:56:06,930 - parser.extract - INFO - Extracted article: Kennedy Adds Five New Members to Vaccine Committee... (447 words, status: stored)
+2025-09-15 17:56:06,959 - parser.extract - INFO - Extracted article: Trump's Harvard cuts threaten a giant in the biome... (1214 words, status: stored)
+2025-09-15 17:56:06,983 - parser.extract - INFO - Extracted article: US judge rejects lawsuit challenge to SpaceX launc... (497 words, status: stored)
+2025-09-15 17:56:07,617 - parser.extract - INFO - Extracted article: Hillsborough law will mean serious wrongdoing is p... (1006 words, status: stored)
+2025-09-15 17:56:07,662 - pg_client_new - ERROR - Failed to update article 9942: duplicate key value violates unique constraint "raw_url_hash_key"
+DETAIL:  Key (url_hash)=(7b85ad7699c732f6380019ba8541cc8b07cbe667e1af46b7a9c708707b3b3d34) already exists.
+
+2025-09-15 17:56:07,662 - worker - ERROR - Error processing article https://news.google.com/rss/articles/CBMikwFBVV95cUxQR0RFR3gzM0VGYnRCRWZFSlJCVjJVRlZuWHRTNktOSzgxQTBTSTFjV0xzb3M4aTRIeUE3MC1fTTlBSTZXT2VzNXRMYUdUNXFlRGFkY254VmJYRlZOUW9ad0tEZW5NRnVQbE1Lc2J6dHhUWnctNW1yeVpKWGYzaHVaRTNxOW1leVRmY2UwdWVHY2phSWc?oc=5: duplicate key value violates unique constraint "raw_url_hash_key"
+DETAIL:  Key (url_hash)=(7b85ad7699c732f6380019ba8541cc8b07cbe667e1af46b7a9c708707b3b3d34) already exists.
+
+2025-09-15 17:56:08,662 - parser.extract - INFO - Extracted article: Trump signs memo sending federal law enforcement t... (845 words, status: stored)
+2025-09-15 17:56:09,555 - parser.extract - INFO - Extracted article: Trump posts about Dallas motel manager killing, bl... (728 words, status: stored)
+2025-09-15 17:56:09,694 - pg_client_new - ERROR - Failed to update article 9954: duplicate key value violates unique constraint "raw_url_hash_key"
+DETAIL:  Key (url_hash)=(c4857853ca54e5ad0fdd0df278fb7e0903683f78f319965eba20ee3000929b9d) already exists.
+
+2025-09-15 17:56:09,695 - worker - ERROR - Error processing article https://www.cbsnews.com/news/trump-post-dallas-beheading-ice-biden-deportation-cuba/: duplicate key value violates unique constraint "raw_url_hash_key"
+DETAIL:  Key (url_hash)=(c4857853ca54e5ad0fdd0df278fb7e0903683f78f319965eba20ee3000929b9d) already exists.
+
+2025-09-15 17:56:09,879 - parser.extract - INFO - Extracted article: Eden Project architect Sir Nicholas Grimshaw dies... (424 words, status: stored)
+2025-09-15 17:56:09,961 - parser.extract - INFO - Extracted article: US destroys alleged Venezuelan drug boat, killing ... (871 words, status: stored)
+2025-09-15 17:56:10,004 - parser.extract - INFO - Extracted article: Hillsborough Law will include duty of candour on p... (590 words, status: stored)
+2025-09-15 17:56:10,062 - parser.extract - INFO - Extracted article: Hillsborough Law - what is it and how did we get h... (1534 words, status: stored)
+2025-09-15 17:56:10,066 - pg_client_new - ERROR - Failed to update article 9952: duplicate key value violates unique constraint "raw_url_hash_key"
+DETAIL:  Key (url_hash)=(834d7a59a922f297a8a6a69eef83ee9c32b8241b294a6db17bd45945c2ba4f26) already exists.
+
+2025-09-15 17:56:10,067 - worker - ERROR - Error processing article https://www.bbc.com/news/articles/cx2jel4gyezo?at_medium=RSS&at_campaign=rss: duplicate key value violates unique constraint "raw_url_hash_key"
+DETAIL:  Key (url_hash)=(834d7a59a922f297a8a6a69eef83ee9c32b8241b294a6db17bd45945c2ba4f26) already exists.
+
+2025-09-15 17:56:10,438 - parser.extract - INFO - Extracted article: Google News... (41801 words, status: stored)
+2025-09-15 17:56:10,905 - parser.extract - INFO - Extracted article: Google News... (41801 words, status: stored)
+2025-09-15 17:56:11,004 - pg_client_new - ERROR - Failed to update article 9959: duplicate key value violates unique constraint "raw_url_hash_key"
+DETAIL:  Key (url_hash)=(c3d5101911129611136c6036366bf75ae31e37a7ce90809d984e9d1d5590c836) already exists.
+
+2025-09-15 17:56:11,005 - worker - ERROR - Error processing article https://news.google.com/rss/articles/CBMiggFBVV95cUxPSURUMzFMZXJyR1Ywazk4bTJ1TkowY2RBclNFdk41T2tMNXBHaXFqbGM1RzUxTWkyb2QwLXh5TWZMRzdBQ2lQUlhLN1ZUNTRwLVZRdktaVzY0SUR1VDJxZDFOeDFnUGFVVUd0QlhxUFpTbFBMLWlQOE1LRkZGWjhEQzBB?oc=5: duplicate key value violates unique constraint "raw_url_hash_key"
+DETAIL:  Key (url_hash)=(c3d5101911129611136c6036366bf75ae31e37a7ce90809d984e9d1d5590c836) already exists.
+
+2025-09-15 17:56:11,500 - pg_client_new - ERROR - Failed to update article 9962: duplicate key value violates unique constraint "raw_url_hash_key"
+DETAIL:  Key (url_hash)=(28464595cddfa0027e7011a270d99076a27e7d3893e62d18b2146379ec1065b7) already exists.
+
+2025-09-15 17:56:11,526 - worker - ERROR - Error processing article https://news.google.com/rss/articles/CBMilwFBVV95cUxOSVdZRm9qOFBvUVpZb3hiS0xuOEswQ1U5TjFqS1gzc2tneFJPc0VZM1U2RDNGRVI0WlA1d2hOa19FZzlIRHA0NTJRN0NIMWpfQ2NaSmZMLU1HM2tiVlVnU1VXLTN2U1RsZUU4S1RjLTVmTU1CWkwwdzgtUXVLTldFMGU1bklWUlVpdkVleVd6amFoYlBJbnNR?oc=5: duplicate key value violates unique constraint "raw_url_hash_key"
+DETAIL:  Key (url_hash)=(28464595cddfa0027e7011a270d99076a27e7d3893e62d18b2146379ec1065b7) already exists.
+
+2025-09-15 17:56:11,619 - parser.extract - INFO - Extracted article: Google News... (41801 words, status: stored)
+2025-09-15 17:56:12,040 - parser.extract - INFO - Extracted article: Google News... (41801 words, status: stored)
+2025-09-15 17:56:12,562 - parser.extract - INFO - Extracted article: Famed San Francisco chef arrested in string of ban... (484 words, status: stored)
+2025-09-15 17:56:12,845 - parser.extract - INFO - Extracted article: Use DraftKings promo code for NFL picks on Monday ... (841 words, status: stored)
+2025-09-15 17:56:12,941 - parser.extract - INFO - Extracted article: Use BetMGM bonus code CBSSPORTS to get $150 for NF... (739 words, status: stored)
+2025-09-15 17:56:13,569 - parser.extract - INFO - Extracted article: Google News... (41803 words, status: stored)
+2025-09-15 17:56:13,672 - parser.extract - INFO - Extracted article: Sidney Crosby trade rumors: Penguins great insists... (555 words, status: stored)
+2025-09-15 17:56:13,740 - parser.extract - INFO - Extracted article: Monday Night Football player props: AI predictions... (541 words, status: stored)
+2025-09-15 17:56:13,893 - pg_client_new - ERROR - Failed to update article 9970: duplicate key value violates unique constraint "raw_url_hash_key"
+DETAIL:  Key (url_hash)=(6e744d4bfa2a1a71416fc94221fe4126943a79cdddd8e155e45046fd73d43297) already exists.
+
+2025-09-15 17:56:13,894 - worker - ERROR - Error processing article https://news.google.com/rss/articles/CBMimAFBVV95cUxQLWZwX3d3VXM5ZFVvY0ZXRTRINjlFYmZNQVNqbkFwUng5b2ZkZDVpUkVtdHNtNEdaUnVKRDAxZHpDNmVSWnZtdTA1UHFpUDJVX0UzNlcxeHlZUXRrVFRXWkZqa0hIcGNMTGp3LUI1V2xxVi02SkFvVk8wbGJ6LXRZbzN1MG9lTTNDcDljR096UENpX1dXdDZ0cQ?oc=5: duplicate key value violates unique constraint "raw_url_hash_key"
+DETAIL:  Key (url_hash)=(6e744d4bfa2a1a71416fc94221fe4126943a79cdddd8e155e45046fd73d43297) already exists.
+
+2025-09-15 17:56:14,442 - parser.extract - INFO - Extracted article: Google News... (41801 words, status: stored)
+2025-09-15 17:56:14,801 - parser.extract - INFO - Extracted article: Texans vs. Buccaneers prediction, odds, time: 2025... (663 words, status: stored)
+2025-09-15 17:56:15,231 - parser.extract - INFO - Extracted article: Google News... (41803 words, status: stored)
+2025-09-15 17:56:15,285 - parser.extract - INFO - Extracted article: Trump establishes Memphis safety task force to fig... (11 words, status: partial)
+2025-09-15 17:56:15,414 - parser.extract - INFO - Extracted article: Use FanDuel promo code for Buccaneers vs. Texans, ... (628 words, status: stored)
+2025-09-15 17:56:15,691 - pg_client_new - ERROR - Failed to update article 9975: duplicate key value violates unique constraint "raw_url_hash_key"
+DETAIL:  Key (url_hash)=(94ec8439b755470949089c3098d3f22573cc0cf20295e78c0dacd38106cbdbce) already exists.
+
+2025-09-15 17:56:15,715 - worker - ERROR - Error processing article https://news.google.com/rss/articles/CBMioAFBVV95cUxNYXo2eVZmV1NtR2dLdkZ5YUthWTlQeVJMdm9wZXIxaWp1c1d2WnJxTUM5OXo1Yi0zOU1hdDZLelgxN1hRNkZPWVF1QTlYZ0RWNEhjLWdlNHZSZi1zSUFtOUlUYVo1TGZrLUl6MXlvX191YjhzOEgzYkI5TldfRFRueHE2SXk5RzVGejNfM1lLdXFxTUtGTURnTm5MUGdOeEhu0gG0AUFVX3lxTE91TFpHZXdlZGZuS25mT2txSnVwckxqUUhqdWxYTFJLc2N4RWU3RDlOaUZISW9oRWtQLWQyUDVma3pqME1vbTAwS1RMMGJEOW41N2FBbDlPRFJEbE5acExta0NveHVWU1NSSWRBdkhPa2Y5ZDJLdXRZTGFncTBRMnNud3dZSXk0YXhCa21QTmNlLU9xTXdER09fd2dTMFktWnhwT0NfNlBOdkVlcFpIN3lseEpvcg?oc=5: duplicate key value violates unique constraint "raw_url_hash_key"
+DETAIL:  Key (url_hash)=(94ec8439b755470949089c3098d3f22573cc0cf20295e78c0dacd38106cbdbce) already exists.
+
+2025-09-15 17:56:15,809 - parser.extract - INFO - Extracted article: Google News... (41805 words, status: stored)
+2025-09-15 17:56:16,181 - parser.extract - INFO - Extracted article: Google News... (41803 words, status: stored)
+2025-09-15 17:56:16,412 - parser.extract - INFO - Extracted article: Champions League: Atletico Madrid are worse than y... (939 words, status: stored)
+2025-09-15 17:56:16,797 - parser.extract - INFO - Extracted article: Google News... (41801 words, status: stored)
+2025-09-15 17:56:17,182 - parser.extract - INFO - Extracted article: Google News... (41805 words, status: stored)
+2025-09-15 17:56:17,249 - net.http - WARNING - Client error (401): https://www.wsj.com/opinion/a-week-that-shook-the-old-order-0bc8fab4
+2025-09-15 17:56:17,249 - pg_client_new - ERROR - Failed to update article 9978: duplicate key value violates unique constraint "raw_url_hash_key"
+DETAIL:  Key (url_hash)=(346f7334c97d758a3a537067b44fc3d6659cf213304016be7f8f204988f11953) already exists.
+
+2025-09-15 17:56:17,250 - worker - ERROR - Error processing article https://news.google.com/rss/articles/CBMivAFBVV95cUxPY2F1NTFwWlJ4Wnd3YXFERGJxLXQxMkdiRUlvS0xjekxFVFhtUlhvMW1tVG96cGYzR3h3WmdBMFBqSjlIcFduRUdqckEyWnZzZ05fU0NldFhxVDVQcDFwdVhCajlCanpmOFJkaFVrMmV0ZGhFaWdiSll0N204M0VUaF9rYm9BdzA5ZnRNZXVpeGt1S2hUZGljYnhNUkhkQzdNQkJSNWR1d2VLVmlpM3YzTElFa1IyckxWNGtpQQ?oc=5: duplicate key value violates unique constraint "raw_url_hash_key"
+DETAIL:  Key (url_hash)=(346f7334c97d758a3a537067b44fc3d6659cf213304016be7f8f204988f11953) already exists.
+
+2025-09-15 17:56:17,526 - pg_client_new - ERROR - Failed to update article 9977: duplicate key value violates unique constraint "raw_url_hash_key"
+DETAIL:  Key (url_hash)=(07c2c8327cd29913b5f829092c0c78b771a182b3550ddd3a1b333084b8b0f55b) already exists.
+
+2025-09-15 17:56:17,542 - net.http - WARNING - Client error (401): https://www.wsj.com/articles/shoe-companies-warn-of-price-increases-as-tariff-costs-kick-in-49d02c19?mod=pls_whats_news_us_business_f
+2025-09-15 17:56:17,542 - worker - ERROR - Error processing article https://news.google.com/rss/articles/CBMipwFBVV95cUxOVFBWdzU3N3J4UXgtbngyT3pnSE8yOTFTT3FWMGNucUE4dHJKZzl3TC0zVHJUbmhWNHpsLTlPODdPVV9Ldnl6bWNrd1I2SF9fVzg1YUppQnJCazdTWmNLbFdIc2FDTkJCSld6M0otUDg0QUtpU3JmTmVvVVZkU0VLMGxMQkFUQk53QXVyNzZZZ3QtZEc4TVAyVDlpcWp4amRuVm9pRjF2c9IBrAFBVV95cUxQT3ZhUHVvQUx6aVNLOFFibTVReXlyMDFGZ096bU9NRjNPV0pORHN0ZnZKM21sY3BKWnhjVnJJaVB5a1QzdGJpN2FZMjZPWFlNUnJZekx2dTdhUXlPU2s1YXNjdFdRYlBMTklMd2dUMHVUYkJHSGh2T2tlOVJlSnpvLV9wcnJBVkxmcFc2eG9VbmhkVy1FNzh3eDhwUUQ5SldqNkpUSDlUNXpBcF90?oc=5: duplicate key value violates unique constraint "raw_url_hash_key"
+DETAIL:  Key (url_hash)=(07c2c8327cd29913b5f829092c0c78b771a182b3550ddd3a1b333084b8b0f55b) already exists.
+
+2025-09-15 17:56:17,641 - net.http - WARNING - Client error (401): https://www.wsj.com/opinion/charlie-kirks-assassination-unleashes-the-antisocial-media-a469c85d
+2025-09-15 17:56:17,648 - parser.extract - INFO - Extracted article: Google News... (41801 words, status: stored)
+2025-09-15 17:56:17,732 - parser.extract - INFO - Extracted article: What's wrong with Notre Dame's defense? Coach Marc... (579 words, status: stored)
+2025-09-15 17:56:17,733 - net.http - WARNING - Client error (401): https://www.wsj.com/opinion/the-brazilian-way-of-lawfare-gets-bolsonaro-cefd48ba
+2025-09-15 17:56:17,734 - net.http - WARNING - Client error (401): https://www.wsj.com/tech/tesla-stock-elon-musk-1-billion-ca78b00c?mod=pls_whats_news_us_business_f
+2025-09-15 17:56:17,734 - net.http - WARNING - Client error (401): https://www.wsj.com/world/americas/u-s-strikes-second-alleged-drug-boat-from-venezuela-president-trump-says-0c835ade
+2025-09-15 17:56:17,824 - parser.extract - INFO - Extracted article: Colorado mom and influencer says you can save mone... (829 words, status: stored)
+2025-09-15 17:56:17,913 - parser.extract - INFO - Extracted article: Why 'The Golazo Show' is the smartest way to watch... (1682 words, status: stored)
+2025-09-15 17:56:17,919 - net.http - WARNING - Client error (401): https://www.wsj.com/finance/regulation/trump-calls-for-ending-quarterly-earnings-reports-71e3afaa?mod=pls_whats_news_us_business_f
+2025-09-15 17:56:18,090 - pg_client_new - ERROR - Failed to update article 9979: duplicate key value violates unique constraint "raw_url_hash_key"
+DETAIL:  Key (url_hash)=(a70e4c28c173f62641d7dd99244193766b68c1f1089bd0ad2cd2634c33515a52) already exists.
+
+2025-09-15 17:56:18,091 - worker - ERROR - Error processing article https://news.google.com/rss/articles/CBMisgFBVV95cUxQb2lLRjRqaHhWZG1jUnBpMUpJb3pZSnYzLWxuQko4ZXRYXzJETnpQcDN6c3kzT19POHdGRksxaUZFQWtkOVRsdUxaMTdRRUdnOTh5Q09OVWY2RVlYTF9Pb1NNd2RYbGRiZnlZVXp2TVFGbW5ja0w3YjN4X1JUdTRiS1FqVnpNZEl0WGpwOS1LQ2ZPbzJydGJUczdvbTNqLWR6b2pWZWtNOXdRN3paSjVvbWdn?oc=5: duplicate key value violates unique constraint "raw_url_hash_key"
+DETAIL:  Key (url_hash)=(a70e4c28c173f62641d7dd99244193766b68c1f1089bd0ad2cd2634c33515a52) already exists.
+
+2025-09-15 17:56:18,147 - net.http - WARNING - Client error (401): https://www.wsj.com/business/tiktok-deal-us-china-framework-5f406292
+2025-09-15 17:56:18,199 - pg_client_new - ERROR - Failed to update article 9980: duplicate key value violates unique constraint "raw_url_hash_key"
+DETAIL:  Key (url_hash)=(553c8a4da6fb578de1b1fd50639ebacb6f29e857b11b859e68a6a5bdf120e342) already exists.
+
+2025-09-15 17:56:18,199 - worker - ERROR - Error processing article https://www.cbsnews.com/news/colorado-mom-influencer-save-money-skiing-snowboarding-children/: duplicate key value violates unique constraint "raw_url_hash_key"
+DETAIL:  Key (url_hash)=(553c8a4da6fb578de1b1fd50639ebacb6f29e857b11b859e68a6a5bdf120e342) already exists.
+
+2025-09-15 17:56:18,261 - worker - INFO - Processing complete: 30/50 successful, 0 duplicates, 19 errors
+2025-09-15 18:01:09,116 - __main__ - INFO - Initializing database connection
+2025-09-15 18:01:10,047 - pg_client_new - INFO - DB pool initialized
+2025-09-15 18:01:10,047 - __main__ - INFO - Starting article processing
+2025-09-15 18:01:10,047 - worker - INFO - Starting article processing
+2025-09-15 18:01:10,159 - worker - INFO - Processing 50 pending articles
+2025-09-15 18:01:11,153 - net.http - WARNING - Client error (401): https://www.wsj.com/business/tiktok-deal-us-china-framework-5f406292?mod=pls_whats_news_us_business_f
+2025-09-15 18:01:11,154 - net.http - WARNING - Client error (401): https://www.wsj.com/opinion/wisconsins-school-scholarship-veto-6ca0e3e0
+2025-09-15 18:01:11,155 - net.http - WARNING - Client error (401): https://www.wsj.com/world/visa-temple-india-balaji-trump-modi-5d17efd0
+2025-09-15 18:01:11,167 - net.http - WARNING - Client error (401): https://www.wsj.com/articles/this-podcast-is-11-months-old-it-just-hired-a-president-to-manage-ad-revenue-6d4551fc?mod=pls_whats_news_us_business_f
+2025-09-15 18:01:11,168 - net.http - WARNING - Client error (401): https://www.wsj.com/world/uk/boe-expected-to-leave-key-rate-on-hold-but-slow-quantitative-tightening-5d29bd6c
+2025-09-15 18:01:11,169 - net.http - WARNING - Client error (401): https://www.wsj.com/business/deals/corteva-a-50-billion-seed-and-pesticide-maker-is-exploring-a-breakup-2c5c9be1?mod=pls_whats_news_us_business_f
+2025-09-15 18:01:11,169 - net.http - WARNING - Client error (401): https://www.wsj.com/opinion/a-tariff-lesson-for-coffee-drinkers-brazil-trade-trump-24e595c7
+2025-09-15 18:01:11,170 - net.http - WARNING - Client error (401): https://www.wsj.com/opinion/russia-sanctions-bills-congress-vladimir-putin-donald-trump-ukraine-51e38089
+2025-09-15 18:01:11,170 - net.http - WARNING - Client error (401): https://www.wsj.com/business/energy-oil/exxons-new-ally-in-fight-with-activists-its-own-retail-investors-759c0a8a?mod=pls_whats_news_us_business_f
+2025-09-15 18:01:11,197 - net.http - WARNING - Client error (401): https://www.wsj.com/world/middle-east/rubio-seeks-to-move-beyond-israeli-strike-in-qatar-that-sparked-diplomatic-row-24c27cbc
+2025-09-15 18:01:12,471 - net.http - WARNING - Client error (401): https://www.wsj.com/business/deals/activist-ancora-pressures-railroad-operator-csx-to-explore-deal-51df0dda?mod=pls_whats_news_us_business_f
+2025-09-15 18:01:12,472 - net.http - WARNING - Client error (401): https://www.wsj.com/world/middle-east/strike-on-qatar-leaves-rubio-with-delicate-diplomatic-task-in-israel-8ee0fd08
+2025-09-15 18:01:12,472 - net.http - WARNING - Client error (401): https://www.wsj.com/world/india/modis-strategy-for-mending-ties-with-trump-a-stiff-upper-lip-f99f9110
+2025-09-15 18:01:12,485 - net.http - WARNING - Client error (401): https://www.wsj.com/opinion/pray-for-tyler-robinsons-family-32b6364a
+2025-09-15 18:01:12,487 - net.http - WARNING - Client error (401): https://www.wsj.com/opinion/how-charlie-kirk-changed-american-politics-e9884765
+2025-09-15 18:01:12,491 - net.http - WARNING - Client error (401): https://www.wsj.com/business/deals/cvc-strikes-1-5-billion-deal-for-godaddy-rival-namecheap-a38fd014?mod=pls_whats_news_us_business_f
+2025-09-15 18:01:12,497 - net.http - WARNING - Client error (401): https://www.wsj.com/opinion/stablecoins-money-market-funds-and-the-s-l-crisis-d1fe6af5
+2025-09-15 18:01:12,505 - net.http - WARNING - Client error (401): https://www.wsj.com/business/deals/tv-station-owner-sinclair-proposes-merger-with-tegna-4bd3bb86?mod=pls_whats_news_us_business_f
+2025-09-15 18:01:12,529 - net.http - WARNING - Client error (401): https://www.wsj.com/world/middle-east/how-israels-audacious-qatar-strike-left-trump-little-time-to-object-c2369608
+2025-09-15 18:01:12,532 - net.http - WARNING - Client error (401): https://www.wsj.com/opinion/tyler-robinson-and-americas-lost-boys-16e1a64f
+2025-09-15 18:01:13,445 - net.http - WARNING - Client error (401): https://www.wsj.com/world/middle-east/netanyahu-doubles-down-on-elusive-goal-conquering-hamass-last-stronghold-9c510042
+2025-09-15 18:01:13,468 - net.http - WARNING - Client error (401): https://www.wsj.com/opinion/why-the-fbi-is-a-charlie-kirk-sideshow-82bf4b22
+2025-09-15 18:01:13,469 - net.http - WARNING - Client error (401): https://www.wsj.com/opinion/get-ready-for-trumpgpt-7881b34c
+2025-09-15 18:01:13,470 - net.http - WARNING - Client error (401): https://www.wsj.com/business/retail/big-brands-play-down-their-americanness-abroad-a7e6db52?mod=pls_whats_news_us_business_f
+2025-09-15 18:01:13,478 - net.http - WARNING - Client error (401): https://www.wsj.com/business/deals/peabody-terminates-planned-acquisition-with-anglo-american-3b13b250?mod=pls_whats_news_us_business_f
+2025-09-15 18:01:13,479 - net.http - WARNING - Client error (401): https://www.wsj.com/world/middle-east/israel-is-winning-the-war-but-losing-the-world-bf7ddcb2
+2025-09-15 18:01:13,492 - net.http - WARNING - Client error (401): https://www.wsj.com/opinion/overruling-smith-would-be-a-supreme-mistake-religious-liberty-3b01812c
+2025-09-15 18:01:13,502 - net.http - WARNING - Client error (401): https://www.wsj.com/business/retail/if-pepsi-wants-to-win-it-has-to-play-cokes-game-c70762e4?mod=pls_whats_news_us_business_f
+2025-09-15 18:01:13,508 - net.http - WARNING - Client error (401): https://www.wsj.com/business/retail/sue-kesey-springfield-creamery-dead-46793124?mod=pls_whats_news_us_business_f
+2025-09-15 18:01:13,527 - net.http - WARNING - Client error (401): https://www.wsj.com/world/middle-east/israel-is-straining-its-hard-won-ties-in-the-gulf-e3f03bd2
+2025-09-15 18:01:14,548 - net.http - WARNING - Client error (401): https://www.wsj.com/world/asia/confusion-anger-relief-korean-engineer-tells-of-week-in-u-s-ice-detention-8a61a170
+2025-09-15 18:01:14,548 - net.http - WARNING - Client error (401): https://www.wsj.com/opinion/progressive-politics-backfire-employment-teenager-03b6eae2
+2025-09-15 18:01:14,549 - net.http - WARNING - Client error (401): https://www.wsj.com/opinion/now-buttigieg-is-selling-the-harris-story-about-biden-62697f62
+2025-09-15 18:01:14,550 - net.http - WARNING - Client error (401): https://www.wsj.com/business/retail/pepsico-ceos-tall-order-win-over-investor-calling-for-strategy-reset-95378d30?mod=pls_whats_news_us_business_f
+2025-09-15 18:01:14,550 - net.http - WARNING - Client error (401): https://www.wsj.com/opinion/put-vladimir-putins-frozen-assets-to-good-use-sanctions-0cd8826d
+2025-09-15 18:01:14,551 - net.http - WARNING - Client error (401): https://www.wsj.com/business/retail/amazon-prime-free-shipping-purge-235f7b85?mod=pls_whats_news_us_business_f
+2025-09-15 18:01:14,553 - net.http - WARNING - Client error (401): https://www.wsj.com/world/asia/nepal-gets-first-female-leader-after-protest-turmoil-d8bf2bb0
+2025-09-15 18:01:14,607 - net.http - WARNING - Client error (401): https://www.wsj.com/world/asia/south-koreans-are-freed-in-georgia-after-hyundai-immigration-raid-6da45736
+2025-09-15 18:01:14,617 - net.http - WARNING - Client error (401): https://www.wsj.com/business/earnings/cvc-capital-partners-confident-in-outlook-after-results-match-views-c05e2c18?mod=pls_whats_news_us_business_f
+2025-09-15 18:01:14,622 - net.http - WARNING - Client error (401): https://www.wsj.com/business/earnings/nvidia-nvda-q2-earnings-report-2026-2939143b?mod=pls_whats_news_us_business_f
+2025-09-15 18:01:15,479 - net.http - WARNING - Client error (401): https://www.wsj.com/business/earnings/alcon-shares-fall-after-guidance-trim-on-u-s-trade-tariff-hit-443b2e23?mod=pls_whats_news_us_business_f
+2025-09-15 18:01:15,481 - net.http - WARNING - Client error (401): https://www.wsj.com/world/asia/nepali-army-deploys-to-restore-order-after-violent-protests-f859254e
+2025-09-15 18:01:15,482 - net.http - WARNING - Client error (401): https://www.wsj.com/world/asia/return-of-south-korean-detainees-in-georgia-delayed-seoul-says-6128287a
+2025-09-15 18:01:15,487 - net.http - WARNING - Client error (401): https://www.wsj.com/opinion/the-courage-america-needs-now-2a7b053c
+2025-09-15 18:01:15,489 - net.http - WARNING - Client error (401): https://www.wsj.com/opinion/dont-let-your-voice-get-softer-abf81a41
+2025-09-15 18:01:15,528 - net.http - WARNING - Client error (401): https://www.wsj.com/business/earnings/home-depot-hd-q2-earnings-report-2025-a4f71152?mod=pls_whats_news_us_business_f
+2025-09-15 18:01:15,532 - net.http - WARNING - Client error (401): https://www.wsj.com/world/uk/british-ambassador-to-washington-removed-over-epstein-emails-9428d3ff
+2025-09-15 18:01:15,535 - net.http - WARNING - Client error (401): https://www.wsj.com/business/earnings/aviva-sticks-with-outlook-after-profit-jump-91e31efe?mod=pls_whats_news_us_business_f
+2025-09-15 18:01:15,540 - net.http - WARNING - Client error (401): https://www.wsj.com/world/uk/its-e-bike-mayhem-in-london-as-strike-shuts-down-tube-bcbb544a
+2025-09-15 18:01:15,557 - net.http - WARNING - Client error (401): https://www.wsj.com/opinion/pepperand-salt-84caa8ff
+2025-09-15 18:01:15,605 - worker - INFO - Processing complete: 0/50 successful, 0 duplicates, 50 errors
+2025-09-15 18:06:25,830 - __main__ - INFO - Initializing database connection
+2025-09-15 18:06:26,780 - pg_client_new - INFO - DB pool initialized
+2025-09-15 18:09:44,556 - __main__ - INFO - Initializing database connection
+2025-09-15 18:09:45,477 - pg_client_new - INFO - DB pool initialized
+2025-09-15 18:09:45,477 - __main__ - INFO - Starting article processing
+2025-09-15 18:09:45,479 - worker - INFO - Starting article processing
+2025-09-15 18:09:45,598 - worker - INFO - Processing 50 pending articles
+2025-09-15 18:09:46,692 - net.http - WARNING - Client error (401): https://www.wsj.com/business/autos/jeep-cherokee-stellantis-strategy-2d4aeee6?mod=pls_whats_news_us_business_f
+2025-09-15 18:09:46,695 - net.http - WARNING - Client error (401): https://www.wsj.com/world/uk/is-the-u-k-a-canary-in-the-coal-mine-for-a-heavily-indebted-world-a1d904f0
+2025-09-15 18:09:46,698 - net.http - WARNING - Client error (401): https://www.wsj.com/opinion/russias-alarming-drone-incursion-into-poland-81362a60
+2025-09-15 18:09:46,700 - net.http - WARNING - Client error (401): https://www.wsj.com/business/autos/a-strange-gas-pumping-defect-is-making-100-000-corvettes-go-up-in-flames-61d86797?mod=pls_whats_news_us_business_f
+2025-09-15 18:09:46,701 - net.http - WARNING - Client error (401): https://www.wsj.com/world/uk/u-k-ambassador-to-u-s-facing-calls-to-quit-after-epstein-disclosures-6220311e
+2025-09-15 18:09:46,707 - net.http - WARNING - Client error (401): https://www.wsj.com/world/uk/after-18-months-prince-harry-and-king-charles-meet-in-person-8007cbc5
+2025-09-15 18:09:46,708 - net.http - WARNING - Client error (401): https://www.wsj.com/business/autos/why-hyundai-raid-wont-crush-the-korean-carmaker-0a4a0e4a?mod=pls_whats_news_us_business_f
+2025-09-15 18:09:46,708 - net.http - WARNING - Client error (401): https://www.wsj.com/business/autos/ev-sports-cars-sound-mercedes-porsche-ferrari-bmw-24cb5774?mod=pls_whats_news_us_business_f
+2025-09-15 18:09:46,709 - net.http - WARNING - Client error (401): https://www.wsj.com/opinion/charlie-kirks-assassination-unleashes-the-antisocial-media-a469c85d?mod=pls_whats_news_us_business_f
+2025-09-15 18:09:47,099 - net.http - WARNING - Client error (401): https://www.wsj.com/business/autos/tesla-robyn-denholm-musk-pay-package-248b1150?mod=pls_whats_news_us_business_f
+2025-09-15 18:09:47,975 - net.http - WARNING - Client error (401): https://www.wsj.com/opinion/the-u-s-alliance-with-seoul-could-go-south-korea-north-china-9933b928
+2025-09-15 18:09:47,976 - net.http - WARNING - Client error (401): https://www.wsj.com/opinion/charlie-kirk-gave-me-purpose-by-4e6e754a?mod=pls_whats_news_us_business_f
+2025-09-15 18:09:47,986 - net.http - WARNING - Client error (401): https://www.wsj.com/opinion/south-korea-deportation-georgia-hyundai-plant-lee-jae-myung-donald-trump-32818ea0
+2025-09-15 18:09:47,988 - net.http - WARNING - Client error (401): https://www.wsj.com/opinion/dont-watch-the-charlie-kirk-murder-video-0ab6ed85?mod=pls_whats_news_us_business_f
+2025-09-15 18:09:47,989 - net.http - WARNING - Client error (401): https://www.wsj.com/world/americas/argentine-president-milei-calls-his-sister-the-boss-now-shes-a-liability-accd2ff2
+2025-09-15 18:09:47,990 - net.http - WARNING - Client error (401): https://www.wsj.com/opinion/why-the-fbi-is-a-charlie-kirk-sideshow-82bf4b22?mod=pls_whats_news_us_business_f
+2025-09-15 18:09:47,994 - net.http - WARNING - Client error (401): https://www.wsj.com/world/americas/brazils-top-court-in-convicting-ex-president-again-changes-historys-course-d84ecb0a
+2025-09-15 18:09:48,016 - net.http - WARNING - Client error (401): https://www.wsj.com/opinion/two-cheers-for-the-renewable-fuel-standard-ethanol-gas-fuel-940d32b3?mod=pls_whats_news_us_business_f
+2025-09-15 18:09:48,052 - net.http - WARNING - Client error (401): https://www.wsj.com/world/americas/brazil-supreme-court-majority-votes-to-convict-bolsonaro-for-alleged-coup-attempt-8cc6f1fd
+2025-09-15 18:09:48,057 - net.http - WARNING - Client error (401): https://www.wsj.com/opinion/the-ai-driven-assembly-line-b6e2a563?mod=pls_whats_news_us_business_f
+2025-09-15 18:09:48,804 - net.http - WARNING - Client error (401): https://www.wsj.com/world/americas/canada-to-champion-mining-energy-and-port-projects-in-economic-revamp-b89a9db7
+2025-09-15 18:09:48,806 - net.http - WARNING - Client error (401): https://www.wsj.com/business/energy-oil/rushing-to-meet-ais-energy-needs-oil-field-servicers-865e94e1?mod=pls_whats_news_us_business_f
+2025-09-15 18:09:48,810 - net.http - WARNING - Client error (401): https://www.wsj.com/business/energy-oil/opec-keeps-oil-demand-view-unchanged-as-it-continues-to-boost-output-d69aac2b?mod=pls_whats_news_us_business_f
+2025-09-15 18:09:48,825 - net.http - WARNING - Client error (401): https://www.wsj.com/world/europe/fitch-downgrades-frances-credit-rating-dd4ad0ed
+2025-09-15 18:09:48,826 - net.http - WARNING - Client error (401): https://www.wsj.com/business/energy-oil/iea-further-lifts-oil-supply-view-pointing-to-larger-surplus-ahead-4ebf7e7f?mod=pls_whats_news_us_business_f
+2025-09-15 18:09:48,830 - net.http - WARNING - Client error (401): https://www.wsj.com/world/americas/denials-and-defiance-shape-venezuelas-response-to-u-s-threats-on-drugs-abeb1078
+2025-09-15 18:09:48,854 - net.http - WARNING - Client error (401): https://www.wsj.com/business/energy-oil/opec-to-boost-oil-output-further-despite-supply-glut-concerns-32c98430?mod=pls_whats_news_us_business_f
+2025-09-15 18:09:48,856 - net.http - WARNING - Client error (401): https://www.wsj.com/world/europe/a-u-s-icon-loses-out-to-european-rival-in-rush-for-air-defenses-83305576
+2025-09-15 18:09:48,858 - net.http - WARNING - Client error (401): https://www.wsj.com/business/energy-oil/oil-giant-saudi-arabia-is-emerging-as-a-solar-power-e0652a56?mod=pls_whats_news_us_business_f
+2025-09-15 18:09:48,862 - net.http - WARNING - Client error (401): https://www.wsj.com/world/europe/nato-launches-mission-to-bolster-eastern-flanks-defenses-1499e958
+2025-09-15 18:09:49,438 - net.http - WARNING - Client error (401): https://www.wsj.com/world/europe/u-k-targets-russia-with-new-sanctions-on-oil-fleet-defense-suppliers-837209e0
+2025-09-15 18:09:49,443 - net.http - WARNING - Client error (401): https://www.wsj.com/business/airlines/what-you-need-to-know-about-fume-events-on-airplanes-e79138c6?mod=pls_whats_news_us_business_f
+2025-09-15 18:09:49,465 - net.http - WARNING - Client error (401): https://www.wsj.com/world/europe/military-drones-could-be-defense-industrys-big-bubble-rheinmetalls-ceo-says-ca19adf7
+2025-09-15 18:09:49,480 - net.http - WARNING - Client error (401): https://www.wsj.com/business/airlines/air-travel-toxic-fumes-64839d6e?mod=pls_whats_news_us_business_f
+2025-09-15 18:09:49,489 - net.http - WARNING - Client error (401): https://www.wsj.com/business/airlines/how-the-journal-analyzed-more-than-one-million-faa-reports-7e7e043a?mod=pls_whats_news_us_business_f
+2025-09-15 18:09:49,490 - net.http - WARNING - Client error (401): https://www.wsj.com/world/china/us-china-submarine-fleets-nuclear-2ef36d54
+2025-09-15 18:09:49,491 - net.http - WARNING - Client error (401): https://www.wsj.com/business/airlines/spirit-airlines-is-struggling-and-rivals-smell-blood-67d6cf23?mod=pls_whats_news_us_business_f
+2025-09-15 18:09:49,495 - net.http - WARNING - Client error (401): https://www.wsj.com/business/airlines/air-canada-flight-attendants-reject-tentative-deal-wage-dispute-heads-to-mediation-63014751?mod=pls_whats_news_us_business_f
+2025-09-15 18:09:49,497 - net.http - WARNING - Client error (401): https://www.wsj.com/world/china/the-american-farmers-china-is-using-as-a-trade-war-bargaining-chip-134c2cda
+2025-09-15 18:09:49,500 - net.http - WARNING - Client error (401): https://www.wsj.com/world/china/china-new-trade-talk-strategy-49fb1f1a
+2025-09-15 18:09:50,524 - net.http - WARNING - Client error (401): https://www.wsj.com/articles/the-chocolate-company-where-prices-change-every-three-months-d49a8e51?mod=pls_whats_news_us_business_f
+2025-09-15 18:09:50,530 - net.http - WARNING - Client error (401): https://www.wsj.com/articles/for-this-tractor-manufacturer-tariffs-are-making-competition-even-stiffer-6a913e22?mod=pls_whats_news_us_business_f
+2025-09-15 18:09:50,906 - net.http - WARNING - Client error (401): https://www.wsj.com/world/china/china-taiwan-military-naval-air-sites-4a02c450
+2025-09-15 18:09:50,908 - net.http - WARNING - Client error (401): https://www.wsj.com/world/africa/worlds-biggest-animal-migration-great-nile-b67e3c0b
+2025-09-15 18:09:50,909 - net.http - WARNING - Client error (401): https://www.wsj.com/articles/new-u-s-accounting-rule-to-establish-how-companies-record-environmental-credits-c77bfedf?mod=pls_whats_news_us_business_f
+2025-09-15 18:09:50,917 - net.http - WARNING - Client error (401): https://www.wsj.com/articles/lyft-bets-on-robotaxis-to-drive-revenue-growth-51e4ff36?mod=pls_whats_news_us_business_f
+2025-09-15 18:09:50,926 - net.http - WARNING - Client error (401): https://www.wsj.com/world/china/china-military-parade-message-ff1a13ef
+2025-09-15 18:09:50,926 - net.http - WARNING - Client error (401): https://www.wsj.com/world/africa/terrorism-court-kenya-protesters-7349e793
+2025-09-15 18:09:50,939 - net.http - WARNING - Client error (401): https://www.wsj.com/world/africa/u-n-accuses-rwanda-backed-rebels-of-slaughtering-children-other-civilians-in-congo-0d073edb
+2025-09-15 18:09:50,953 - net.http - WARNING - Client error (401): https://www.wsj.com/business/c-suite/ceo-pay-growth-structure-63b91e62?mod=pls_whats_news_us_business_f
+2025-09-15 18:09:51,353 - worker - INFO - Processing complete: 0/50 successful, 0 duplicates, 50 errors
+2025-09-15 18:13:08,110 - __main__ - INFO - Initializing database connection
+2025-09-15 18:13:09,832 - pg_client_new - INFO - DB pool initialized
+2025-09-15 18:13:09,832 - __main__ - INFO - Generating system report
+2025-09-15 18:13:12,829 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 400 Bad Request"
+2025-09-15 18:13:12,830 - report_generator - ERROR - GPT-5 analysis failed: Error code: 400 - {'error': {'message': "Unsupported parameter: 'max_tokens' is not supported with this model. Use 'max_completion_tokens' instead.", 'type': 'invalid_request_error', 'param': 'max_tokens', 'code': 'unsupported_parameter'}}
+2025-09-15 18:13:12,831 - report_generator - ERROR - Failed to send enhanced Telegram report: TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID must be set
+2025-09-15 18:13:12,832 - __main__ - ERROR - Failed to send enhanced Telegram report: TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID must be set
+2025-09-15 18:13:12,832 - __main__ - ERROR - Failed to send basic Telegram report: TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID must be set
+2025-09-15 18:13:25,386 - __main__ - INFO - Initializing database connection
+2025-09-15 18:13:27,060 - pg_client_new - INFO - DB pool initialized
+2025-09-15 18:13:27,060 - __main__ - INFO - Generating system report
+2025-09-15 18:13:29,229 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 401 Unauthorized"
+2025-09-15 18:13:29,230 - report_generator - ERROR - GPT-5 analysis failed: Error code: 401 - {'error': {'message': 'Incorrect API key provided: test. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}
+2025-09-15 18:13:29,230 - report_generator - ERROR - Failed to send enhanced Telegram report: TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID must be set
+2025-09-15 18:13:29,231 - __main__ - ERROR - Failed to send enhanced Telegram report: TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID must be set
+2025-09-15 18:13:29,231 - __main__ - ERROR - Failed to send basic Telegram report: TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID must be set
