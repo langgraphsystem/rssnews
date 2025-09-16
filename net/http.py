@@ -284,8 +284,7 @@ class HttpClient:
         
         # Set user agent
         user_agent = user_agent or (
-            "Mozilla/5.0 (compatible; RSSNewsBot/1.0; "
-            "+https://github.com/newsaggregator/rss-parser)"
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36"
         )
         self.session.headers.update({
             'User-Agent': user_agent,

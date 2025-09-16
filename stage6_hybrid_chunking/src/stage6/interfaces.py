@@ -132,7 +132,7 @@ def refine_boundaries(chunks: List[Dict], meta: Dict) -> List[Dict]:
                 'max_offset': settings.chunking.max_offset,
             }
             # Execute per-chunk refine
-            result: LLMRefinementResult | None = await client.send_refinement_request(
+            result: LLMRefinementResult | None = await client.refine_chunk(
                 chunk_text=c.get('text', ''),
                 chunk_metadata={
                     'chunk_index': int(c.get('chunk_index', idx)),
@@ -140,7 +140,7 @@ def refine_boundaries(chunks: List[Dict], meta: Dict) -> List[Dict]:
                     'char_end': int(c.get('char_end', 0)),
                     'semantic_type': c.get('semantic_type', 'body')
                 },
-                prompt_type='base'
+                article_metadata=meta_local
             )
             if result is None:
                 c.setdefault('llm_action', 'noop')
@@ -162,7 +162,7 @@ def refine_boundaries(chunks: List[Dict], meta: Dict) -> List[Dict]:
                 c['semantic_type'] = result.semantic_type
             return c
         except Exception as e:
-            logger.warning("stage6.llm.refine.error", err=str(e))
+            logger.warning(f"stage6.llm.refine.error: {e}", exc_info=True)
             c.setdefault('llm_action', 'noop')
             c.setdefault('llm_confidence', 0.0)
             c.setdefault('llm_reason', 'error')
@@ -242,7 +242,7 @@ def refine_boundaries(chunks: List[Dict], meta: Dict) -> List[Dict]:
                 refined = applied
         except Exception as e:
             logger.warning("stage6.apply_edits.failed", err=str(e))
-    logger.info("stage6.llm.refine.done", refined=sum(1 for c in refined if c.get('llm_action') != 'noop'))
+    logger.info(f"stage6.llm.refine.done, refined={sum(1 for c in refined if c.get('llm_action') != 'noop')}")
     return refined
 
 

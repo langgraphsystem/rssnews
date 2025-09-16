@@ -199,8 +199,22 @@ def extract_all(html: str, url: str, final_url: str = None,
 def _get_best_value(candidates: List[Any]) -> str:
     """Get the best non-empty value from candidates"""
     for candidate in candidates:
-        if candidate and str(candidate).strip():
-            return str(candidate).strip()
+        if not candidate:
+            continue
+        
+        # If candidate is a list, take the first item.
+        if isinstance(candidate, list):
+            if not candidate:
+                continue
+            val = candidate[0]
+        else:
+            val = candidate
+        
+        # Now, val is not a list. Convert to string and check.
+        s_val = str(val).strip()
+        if s_val:
+            return s_val
+            
     return ''
 
 def _get_best_date(candidates: List[Any]) -> Optional[datetime]:

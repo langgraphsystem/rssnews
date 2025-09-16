@@ -5,11 +5,7 @@ from functools import lru_cache
 from typing import Dict, List, Optional, Set
 
 # Pydantic v2 moved BaseSettings to pydantic-settings.
-try:
-    from pydantic_settings import BaseSettings  # type: ignore
-except Exception:
-    # Fallback for environments pinned to pydantic<2
-    from pydantic import BaseSettings  # type: ignore
+from pydantic_settings import BaseSettings  # type: ignore
 from pydantic import Field, validator
 from pydantic.types import PositiveInt, SecretStr
 
