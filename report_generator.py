@@ -335,12 +335,12 @@ async def generate_gpt5_analysis(stats: Dict[str, Any], period_hours: int) -> st
         system_prompt = "Ты - опытный аналитик IT-систем, специализирующийся на RSS агрегаторах и обработке новостей."
 
         response = await client.chat.completions.create(
-            model="gpt-4o",  # Use gpt-4o instead of gpt-5 for better compatibility
+            model="gpt-5",  # GPT-5 with Chat Completions API
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": analysis_prompt}
             ],
-            max_tokens=500,
+            max_completion_tokens=500,
             temperature=0.7
         )
 
@@ -360,7 +360,7 @@ async def generate_gpt5_analysis(stats: Dict[str, Any], period_hours: int) -> st
             logger.error("Failed to extract text from chat completions response")
             analysis = "Анализ сгенерирован, но не удалось извлечь текст из ответа"
 
-        return f"🤖 **GPT-4o Анализ:**\n{analysis}"
+        return f"🤖 **GPT-5 Анализ:**\n{analysis}"
 
     except Exception as e:
         logger.error(f"GPT-5 analysis failed: {e}")

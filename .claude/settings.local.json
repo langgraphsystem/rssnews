@@ -32,7 +32,9 @@
       "Bash(railway service:*)",
       "Bash(railway project:*)",
       "Bash(railway:*)",
-      "Bash(git restore:*)"
+      "Bash(git restore:*)",
+      "WebFetch(domain:platform.openai.com)",
+      "WebFetch(domain:openai.com)"
     ],
     "deny": [],
     "ask": []
