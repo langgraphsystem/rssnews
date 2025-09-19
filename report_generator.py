@@ -329,42 +329,61 @@ async def generate_gpt5_analysis(stats: Dict[str, Any], period_hours: int) -> st
 Отвечай коротко и по делу, используй эмодзи для наглядности.
 """
 
-        client = AsyncOpenAI(api_key=api_key)
+        client = AsyncOpenAI(api_key=api_key, timeout=90.0)
 
-        # GPT-5 o1 models use chat completions, not responses API
+        # Using GPT-5 model with Responses API for better performance
         system_prompt = "Ты - опытный аналитик IT-систем, специализирующийся на RSS агрегаторах и обработке новостей."
 
-        response = await client.chat.completions.create(
-            model="gpt-5",  # GPT-5 with Chat Completions API
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": analysis_prompt}
-            ],
-            max_completion_tokens=500,
-            temperature=0.7
-        )
+        # Retry logic with exponential backoff using Responses API
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                response = await client.responses.create(
+                    model="gpt-5",  # GPT-5 model with Responses API
+                    instructions=system_prompt,
+                    input=analysis_prompt,
+                    store=True  # Enable stateful context for better performance
+                )
+                break  # Success, exit retry loop
+            except Exception as e:
+                if attempt == max_retries - 1:
+                    raise e  # Last attempt, re-raise exception
+                wait_time = 2 ** attempt  # Exponential backoff
+                logger.warning(f"GPT-5 Responses API attempt {attempt + 1} failed: {e}. Retrying in {wait_time}s...")
+                await asyncio.sleep(wait_time)
 
-        # Извлекаем текст из Chat Completions API
-        logger.info(f"GPT response type: {type(response)}")
+        # Извлекаем текст из Responses API
+        logger.info(f"GPT-5 Responses API response type: {type(response)}")
 
         analysis = None
 
-        # Стандартное извлечение из chat completions
-        if hasattr(response, 'choices') and response.choices:
-            choice = response.choices[0]
-            if hasattr(choice, 'message') and hasattr(choice.message, 'content'):
-                analysis = choice.message.content.strip()
-                logger.info(f"GPT analysis extracted from chat completions: {len(analysis)} chars")
+        # Извлечение из Responses API с помощью output_text helper
+        if hasattr(response, 'output_text'):
+            analysis = response.output_text.strip()
+            logger.info(f"GPT analysis extracted from Responses API: {len(analysis)} chars")
+
+        # Альтернативное извлечение из output array
+        elif hasattr(response, 'output') and response.output:
+            for item in response.output:
+                if hasattr(item, 'type') and item.type == 'message':
+                    if hasattr(item, 'content') and item.content:
+                        for content_item in item.content:
+                            if hasattr(content_item, 'type') and content_item.type == 'output_text':
+                                analysis = content_item.text.strip()
+                                logger.info(f"GPT analysis extracted from output array: {len(analysis)} chars")
+                                break
+                    if analysis:
+                        break
 
         if not analysis:
-            logger.error("Failed to extract text from chat completions response")
+            logger.error("Failed to extract text from Responses API response")
             analysis = "Анализ сгенерирован, но не удалось извлечь текст из ответа"
 
         return f"🤖 **GPT-5 Анализ:**\n{analysis}"
 
     except Exception as e:
         logger.error(f"GPT-5 analysis failed: {e}")
-        return f"⚠️ *GPT анализ недоступен:* {str(e)[:100]}"
+        return f"⚠️ *GPT-5 анализ недоступен:* {str(e)[:100]}"
 
 
 def send_telegram_report(report: str, format: str = "html") -> None:
