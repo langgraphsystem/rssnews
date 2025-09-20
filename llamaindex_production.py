@@ -58,9 +58,41 @@ from sqlalchemy import create_engine
 from pinecone import Pinecone
 
 # Import components from llamaindex_components
-from llamaindex_components import CostTracker, PerformanceMonitor, LegacyModeManager, QueryCache
+# Fallback lightweight shims if components unavailable at import time
+class CostTracker:  # type: ignore
+    def add_cost(self, *args, **kwargs):
+        pass
+
+class PerformanceMonitor:  # type: ignore
+    def start_timer(self, name: str) -> str:
+        return "t"
+    def end_timer(self, timer_id: str) -> float:
+        return 0.0
+
+class LegacyModeManager:  # type: ignore
+    def is_legacy_enabled(self, component: str) -> bool:
+        return False
+
+class QueryCache:  # type: ignore
+    def __init__(self, ttl_minutes: int = 15, max_size: int = 1000):
+        self._c = {}
+    def get(self, key):
+        return None
+    def set(self, key, value):
+        self._c[key] = value
 
 logger = logging.getLogger(__name__)
+
+try:
+    from llamaindex_components import (
+        CostTracker,
+        PerformanceMonitor,
+        LegacyModeManager,
+        QueryCache,
+    )
+except ImportError:
+    logger.info("LlamaIndex components not found, using lightweight shims.")
+    pass
 
 
 class LanguageRoute(str, Enum):
