@@ -34,7 +34,14 @@
       "Bash(railway:*)",
       "Bash(git restore:*)",
       "WebFetch(domain:platform.openai.com)",
-      "WebFetch(domain:openai.com)"
+      "WebFetch(domain:openai.com)",
+      "Bash(echo:*)",
+      "Bash(copy \".env.example\" \".env\")",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:community.openai.com)",
+      "WebFetch(domain:api.github.com)",
+      "WebFetch(domain:docs.llamaindex.ai)",
+      "WebFetch(domain:developers.llamaindex.ai)"
     ],
     "deny": [],
     "ask": []

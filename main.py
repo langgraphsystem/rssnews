@@ -130,6 +130,12 @@ def main():
     p_report.add_argument("--period-hours", type=int, default=8, help="Report period in hours (default: 8)")
     p_report.add_argument("--format", choices=["markdown", "html"], default="html", help="Report format (default: html)")
 
+    # LlamaIndex commands
+    try:
+        from llamaindex_cli import add_llamaindex_commands
+        add_llamaindex_commands(sub)
+    except ImportError:
+        logger.warning("LlamaIndex CLI not available - install dependencies or check llamaindex_cli.py")
 
     args = ap.parse_args()
     
@@ -721,6 +727,31 @@ def main():
                 logger.error(f"Report generation failed: {e}")
                 print(f"✗ Report failed: {e}")
             return
+
+        # Handle LlamaIndex commands
+        if args.cmd.startswith("llamaindex-"):
+            try:
+                from llamaindex_cli import handle_llamaindex_commands
+                import asyncio
+
+                # Run async LlamaIndex commands
+                try:
+                    result = asyncio.run(handle_llamaindex_commands(args))
+                except RuntimeError:
+                    # Fallback if event loop is already running
+                    loop = asyncio.get_event_loop()
+                    result = loop.run_until_complete(handle_llamaindex_commands(args))
+
+                return result
+
+            except ImportError:
+                logger.error("LlamaIndex CLI not available")
+                print("❌ LlamaIndex not installed. Install with: pip install llama-index")
+                return 1
+            except Exception as e:
+                logger.error(f"LlamaIndex command failed: {e}")
+                print(f"❌ LlamaIndex error: {e}")
+                return 1
 
     except KeyboardInterrupt:
         logger.info("Interrupted by user")

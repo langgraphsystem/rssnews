@@ -7651,3 +7651,6 @@ DETAIL:  Key (url_hash)=(553c8a4da6fb578de1b1fd50639ebacb6f29e857b11b859e68a6a5b
 2025-09-15 18:13:29,230 - report_generator - ERROR - Failed to send enhanced Telegram report: TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID must be set
 2025-09-15 18:13:29,231 - __main__ - ERROR - Failed to send enhanced Telegram report: TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID must be set
 2025-09-15 18:13:29,231 - __main__ - ERROR - Failed to send basic Telegram report: TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID must be set
+2025-09-19 13:41:16,613 - __main__ - INFO - Initializing database connection
+2025-09-19 13:41:19,033 - pg_client_new - INFO - DB pool initialized
+2025-09-19 13:41:19,033 - __main__ - INFO - Generating system report
