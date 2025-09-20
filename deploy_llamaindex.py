@@ -125,11 +125,12 @@ class ProductionDeployment:
             from openai import AsyncOpenAI
             client = AsyncOpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 
-            # Simple test call
-            response = await client.chat.completions.create(
-                model="gpt-4o-mini",  # Use cheaper model for testing
-                messages=[{"role": "user", "content": "test"}],
-                max_tokens=5
+            # Simple test call using GPT-5
+            response = await client.responses.create(
+                model="gpt-5",
+                instructions="You are a helpful assistant.",
+                input="test",
+                max_completion_tokens=5
             )
 
             checks['openai_api'] = True

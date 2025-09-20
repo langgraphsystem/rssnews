@@ -44,8 +44,8 @@ from llama_index.core.postprocessor import SimilarityPostprocessor
 from llama_index.core.schema import NodeWithScore
 
 # Vector stores
-from llama_index.vector_stores.postgres import PostgresVectorStore
-from llama_index.vector_stores.pinecone import PineconeVectorStore
+from llama_index.vector_stores.postgres import PGVectorStore
+# from llama_index.vector_stores.pinecone import PineconeVectorStore  # Temporarily disabled due to import issues
 
 # LLMs and embeddings
 from llama_index.llms.openai import OpenAI
@@ -146,13 +146,13 @@ class RSSLlamaIndexOrchestrator:
             api_key=self.openai_api_key,
             model="gpt-5",
             temperature=0.3,
-            max_tokens=2000
+            max_completion_tokens=2000
         )
 
-    def _setup_postgres_store(self) -> PostgresVectorStore:
+    def _setup_postgres_store(self) -> PGVectorStore:
         """Setup PostgreSQL vector store for FTS"""
 
-        return PostgresVectorStore.from_params(
+        return PGVectorStore.from_params(
             database=self.pg_dsn.split("/")[-1],
             host=self.pg_dsn.split("@")[1].split(":")[0],
             password=self.pg_dsn.split(":")[2].split("@")[0],
@@ -164,7 +164,7 @@ class RSSLlamaIndexOrchestrator:
             text_search_config="english"
         )
 
-    def _setup_pinecone_stores(self) -> Dict[str, Dict[str, PineconeVectorStore]]:
+    def _setup_pinecone_stores(self) -> Dict[str, Dict[str, Any]]:  # PineconeVectorStore temporarily disabled
         """Setup Pinecone vector stores with namespaces"""
 
         # Initialize Pinecone
@@ -580,7 +580,7 @@ class RSSLlamaIndexOrchestrator:
                 api_key=self.openai_api_key,
                 model="gpt-5",
                 temperature=0.3,
-                max_tokens=config['max_response_tokens']
+                max_completion_tokens=config['max_response_tokens']
             )
 
         # Create response synthesizer with grounding
