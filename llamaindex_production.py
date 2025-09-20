@@ -57,6 +57,8 @@ from llama_index.core.response.pprint_utils import pprint_response
 from sqlalchemy import create_engine
 from pinecone import Pinecone
 
+# Import components from llamaindex_components
+from llamaindex_components import CostTracker, PerformanceMonitor, LegacyModeManager
 
 logger = logging.getLogger(__name__)
 
