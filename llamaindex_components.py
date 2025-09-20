@@ -15,7 +15,7 @@ Contains specialized components:
 import time
 import asyncio
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Any, Optional, Set
 from collections import defaultdict, Counter
 import statistics
@@ -234,7 +234,6 @@ class FreshnessBoostProcessor(BaseNodePostprocessor):
     ) -> List[NodeWithScore]:
         """Apply freshness boosting"""
 
-        current_time = datetime.now()
         boosted_nodes = []
 
         for node in nodes:
@@ -243,6 +242,11 @@ class FreshnessBoostProcessor(BaseNodePostprocessor):
             try:
                 if published_str:
                     published_at = datetime.fromisoformat(published_str.replace('Z', '+00:00'))
+                    # Ensure timezone compatibility for datetime arithmetic
+                    if published_at.tzinfo is not None:
+                        current_time = datetime.now(timezone.utc)
+                    else:
+                        current_time = datetime.now()
                     age_days = (current_time - published_at).days
 
                     # Calculate boost

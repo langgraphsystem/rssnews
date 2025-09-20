@@ -22,7 +22,7 @@ Routing Rules:
 import os
 import asyncio
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Any, Optional, Union, Literal
 from enum import Enum
 import hashlib
@@ -267,7 +267,15 @@ class RSSLlamaIndexOrchestrator:
 
     def determine_namespace(self, published_at: datetime) -> NamespaceRoute:
         """Determine namespace based on article age"""
-        age_days = (datetime.now() - published_at).days
+        # Ensure timezone compatibility for datetime arithmetic
+        if published_at.tzinfo is not None:
+            # published_at is timezone-aware, use UTC now
+            now = datetime.now(timezone.utc)
+        else:
+            # published_at is naive, use naive now
+            now = datetime.now()
+
+        age_days = (now - published_at).days
 
         if age_days <= 30:
             return NamespaceRoute.HOT
