@@ -40,7 +40,8 @@ from llama_index.core.extractors import (
 from llama_index.core.ingestion import IngestionPipeline
 from llama_index.core.retrievers import VectorIndexRetriever, BaseRetriever
 from llama_index.core.query_engine import RetrieverQueryEngine
-from llama_index.core.postprocessor import SimilarityPostprocessor, BaseNodePostprocessor
+from llama_index.core.postprocessor import SimilarityPostprocessor
+from llama_index.core.postprocessor.types import BaseNodePostprocessor
 from llama_index.core.schema import NodeWithScore
 
 # Vector stores
