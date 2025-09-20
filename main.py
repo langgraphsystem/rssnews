@@ -551,7 +551,7 @@ def main():
                                 return await generate_response_text(
                                     usr_p,
                                     instructions=sys_p,
-                                    model="gpt-5",
+                                    model="gpt-5-nano-2025-08-07",
                                     store=True,
                                     max_output_tokens=4000,
                                     retries=3,

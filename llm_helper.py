@@ -25,7 +25,7 @@ async def generate_response_text(
     input: str | list,
     *,
     instructions: Optional[str] = None,
-    model: str = "gpt-5",
+    model: str = "gpt-5-nano-2025-08-07",
     store: bool = False,
     max_output_tokens: Optional[int] = None,
     timeout: float = 90.0,

@@ -204,10 +204,10 @@ class RSSLlamaIndexOrchestrator:
             model_name="text-embedding-004"
         )
 
-        # Default LLM: OpenAI GPT-5
+        # Default LLM: OpenAI GPT-5 Nano
         Settings.llm = OpenAI(
             api_key=self.openai_api_key,
-            model="gpt-5",
+            model="gpt-5-nano-2025-08-07",
             temperature=0.3,
             max_completion_tokens=2000
         )
@@ -644,7 +644,7 @@ class RSSLlamaIndexOrchestrator:
         else:
             llm = OpenAI(
                 api_key=self.openai_api_key,
-                model="gpt-5",
+                model="gpt-5-nano-2025-08-07",
                 temperature=0.3,
                 max_completion_tokens=config['max_response_tokens']
             )
