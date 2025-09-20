@@ -51,7 +51,7 @@ from llama_index.vector_stores.pinecone import PineconeVectorStore
 # LLMs and embeddings
 from llama_index.llms.openai import OpenAI
 from llama_index.llms.gemini import Gemini
-from llama_index.embeddings.gemini import GeminiEmbedding
+from llama_index.embeddings.google_genai import GoogleGeminiEmbedding
 
 # Additional components
 from llama_index.core.response.pprint_utils import pprint_response
@@ -199,7 +199,7 @@ class RSSLlamaIndexOrchestrator:
         """Configure LlamaIndex global settings"""
 
         # Default embedding model: Gemini (for consistency)
-        Settings.embed_model = GeminiEmbedding(
+        Settings.embed_model = GoogleGeminiEmbedding(
             api_key=self.gemini_api_key,
             model_name="models/gemini-embedding-001"
         )

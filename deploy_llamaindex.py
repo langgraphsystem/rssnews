@@ -130,7 +130,7 @@ class ProductionDeployment:
                 model="gpt-5",
                 instructions="You are a helpful assistant.",
                 input="test",
-                max_output_tokens=5
+                max_output_tokens=16
             )
 
             checks['openai_api'] = True
@@ -142,8 +142,8 @@ class ProductionDeployment:
 
         # Gemini
         try:
-            from llama_index.embeddings.gemini import GeminiEmbedding
-            embed_model = GeminiEmbedding(
+            from llama_index.embeddings.google_genai import GoogleGeminiEmbedding
+            embed_model = GoogleGeminiEmbedding(
                 api_key=os.getenv('GEMINI_API_KEY'),
                 model_name="models/gemini-embedding-001"
             )
