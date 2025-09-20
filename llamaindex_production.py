@@ -40,7 +40,7 @@ from llama_index.core.extractors import (
 from llama_index.core.ingestion import IngestionPipeline
 from llama_index.core.retrievers import VectorIndexRetriever, BaseRetriever
 from llama_index.core.query_engine import RetrieverQueryEngine
-from llama_index.core.postprocessor import SimilarityPostprocessor
+from llama_index.core.postprocessor import SimilarityPostprocessor, BaseNodePostprocessor
 from llama_index.core.schema import NodeWithScore
 
 # Vector stores
@@ -87,6 +87,24 @@ class HybridRetriever(BaseRetriever):  # type: ignore
     def _retrieve(self, query_bundle):
         return []
 
+class DomainDiversificationProcessor(BaseNodePostprocessor):  # type: ignore
+    def __init__(self, *args, **kwargs):
+        super().__init__()
+    def _postprocess_nodes(self, nodes, query_bundle=None):
+        return nodes
+
+class FreshnessBoostProcessor(BaseNodePostprocessor):  # type: ignore
+    def __init__(self, *args, **kwargs):
+        super().__init__()
+    def _postprocess_nodes(self, nodes, query_bundle=None):
+        return nodes
+
+class SemanticReranker(BaseNodePostprocessor):  # type: ignore
+    def __init__(self, *args, **kwargs):
+        super().__init__()
+    def _postprocess_nodes(self, nodes, query_bundle=None):
+        return nodes
+
 logger = logging.getLogger(__name__)
 
 try:
@@ -96,6 +114,9 @@ try:
         LegacyModeManager,
         QueryCache,
         HybridRetriever,
+        DomainDiversificationProcessor,
+        FreshnessBoostProcessor,
+        SemanticReranker,
     )
 except ImportError:
     logger.info("LlamaIndex components not found, using lightweight shims.")
