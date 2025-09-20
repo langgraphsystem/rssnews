@@ -58,7 +58,7 @@ from sqlalchemy import create_engine
 from pinecone import Pinecone
 
 # Import components from llamaindex_components
-from llamaindex_components import CostTracker, PerformanceMonitor, LegacyModeManager
+from llamaindex_components import CostTracker, PerformanceMonitor, LegacyModeManager, QueryCache
 
 logger = logging.getLogger(__name__)
 
