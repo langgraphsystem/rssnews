@@ -13,17 +13,18 @@ import os
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional
 
-from llamaindex_production import (
-    RSSLlamaIndexOrchestrator,
-    OutputPreset,
-    LanguageRoute,
-    LLMProvider
-)
-from llamaindex_components import (
-    LegacyModeManager,
-    PerformanceMonitor,
-    CostTracker
-)
+# Defer heavy imports to runtime to avoid ImportError when
+# LlamaIndex optional dependencies are not installed.
+try:
+    from llamaindex_components import (
+        LegacyModeManager as _LegacyModeManager,
+        PerformanceMonitor as _PerformanceMonitor,
+        CostTracker as _CostTracker,
+    )
+except Exception:
+    _LegacyModeManager = None  # type: ignore
+    _PerformanceMonitor = None  # type: ignore
+    _CostTracker = None  # type: ignore
 from pg_client_new import PgClient
 
 logger = logging.getLogger(__name__)
@@ -43,9 +44,42 @@ class LlamaIndexCLI:
 
     def __init__(self):
         self.orchestrator = None
-        self.legacy_manager = LegacyModeManager()
-        self.performance_monitor = PerformanceMonitor()
-        self.cost_tracker = CostTracker()
+        # Fallback lightweight shims if components unavailable at import time
+        if _LegacyModeManager is None:
+            class _LegacyShim:
+                def is_legacy_enabled(self, _component: str) -> bool:
+                    return False
+                def set_legacy_mode(self, *_args, **_kwargs) -> None:
+                    pass
+                def get_status(self) -> Dict[str, Any]:
+                    return {
+                        'legacy_mode': False,
+                        'legacy_components': {},
+                        'llamaindex_components': {}
+                    }
+            self.legacy_manager = _LegacyShim()
+        else:
+            self.legacy_manager = _LegacyModeManager()
+
+        if _PerformanceMonitor is None:
+            class _PerfShim:
+                def start_timer(self, _name: str) -> str:
+                    return "t"
+                def end_timer(self, _timer_id: str) -> float:
+                    return 0.0
+                def get_stats(self, _name: str) -> Dict[str, Any]:
+                    return {'count': 0, 'mean': 0.0}
+            self.performance_monitor = _PerfShim()
+        else:
+            self.performance_monitor = _PerformanceMonitor()
+
+        if _CostTracker is None:
+            class _CostShim:
+                def add_cost(self, *_args, **_kwargs):
+                    pass
+            self.cost_tracker = _CostShim()
+        else:
+            self.cost_tracker = _CostTracker()
 
     def setup_orchestrator(self) -> bool:
         """Initialize LlamaIndex orchestrator with environment variables"""
@@ -65,6 +99,8 @@ class LlamaIndexCLI:
                 print("Please set them in .env file or environment")
                 return False
 
+            # Lazy import to avoid module import at CLI wiring time
+            from llamaindex_production import RSSLlamaIndexOrchestrator
             self.orchestrator = RSSLlamaIndexOrchestrator(
                 pg_dsn=required_env_vars['PG_DSN'],
                 pinecone_api_key=required_env_vars['PINECONE_API_KEY'],
@@ -177,7 +213,8 @@ class LlamaIndexCLI:
             return self._run_legacy_query(args)
 
         try:
-            # Parse preset
+            # Parse preset (lazy import enums)
+            from llamaindex_production import OutputPreset, LanguageRoute
             preset = OutputPreset(args.preset) if hasattr(args, 'preset') else OutputPreset.QA
 
             # Parse language

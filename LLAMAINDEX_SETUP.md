@@ -162,7 +162,7 @@ python main.py llamaindex-query "AI news this week" --preset digest --max-source
 
 #### **qa** - Вопросы и ответы
 ```bash
-python main.py llamaindex-query "How does GPT-5 compare to GPT-4?" --preset qa
+python main.py llamaindex-query "What improvements does GPT-5 introduce?" --preset qa
 ```
 **Формат**: Краткий ответ + источники, self-check при <3 источников
 

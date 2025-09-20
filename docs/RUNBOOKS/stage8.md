@@ -67,9 +67,9 @@ Based on recent news reports, AI development is advancing rapidly with several k
    Total time: 1247.3ms
 
 📖 Sources:
-   [1] OpenAI Releases GPT-4 Turbo
+   [1] OpenAI Model Updates (GPT-5 Turbo)
        Source: openai.com
-       URL: https://openai.com/gpt4-turbo
+       URL: https://openai.com
    [2] Google Quantum Computing Breakthrough
        Source: googleblog.com
        URL: https://googleblog.com/quantum

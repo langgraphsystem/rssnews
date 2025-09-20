@@ -7654,3 +7654,20 @@ DETAIL:  Key (url_hash)=(553c8a4da6fb578de1b1fd50639ebacb6f29e857b11b859e68a6a5b
 2025-09-19 13:41:16,613 - __main__ - INFO - Initializing database connection
 2025-09-19 13:41:19,033 - pg_client_new - INFO - DB pool initialized
 2025-09-19 13:41:19,033 - __main__ - INFO - Generating system report
+2025-09-19 19:55:59,909 - __main__ - WARNING - LlamaIndex CLI not available - install dependencies or check llamaindex_cli.py
+2025-09-19 19:58:19,205 - __main__ - INFO - Initializing database connection
+2025-09-19 19:58:21,182 - pg_client_new - INFO - DB pool initialized
+2025-09-19 19:59:33,187 - __main__ - INFO - Initializing database connection
+2025-09-19 19:59:35,053 - pg_client_new - INFO - DB pool initialized
+2025-09-19 19:59:54,081 - __main__ - INFO - Initializing database connection
+2025-09-19 19:59:55,818 - pg_client_new - INFO - DB pool initialized
+2025-09-19 20:00:17,627 - __main__ - INFO - Initializing database connection
+2025-09-19 20:00:19,533 - pg_client_new - INFO - DB pool initialized
+2025-09-20 09:06:59,763 - __main__ - INFO - Initializing database connection
+2025-09-20 09:07:01,691 - pg_client_new - INFO - DB pool initialized
+2025-09-20 09:07:01,691 - __main__ - INFO - Generating statistics
+2025-09-20 09:07:10,602 - __main__ - INFO - Initializing database connection
+2025-09-20 09:07:12,416 - pg_client_new - INFO - DB pool initialized
+2025-09-20 09:33:20,813 - __main__ - WARNING - LlamaIndex CLI not available - install dependencies or check llamaindex_cli.py
+2025-09-20 15:36:27,970 - __main__ - INFO - Initializing database connection
+2025-09-20 15:36:29,739 - pg_client_new - INFO - DB pool initialized

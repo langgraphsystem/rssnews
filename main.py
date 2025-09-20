@@ -523,38 +523,20 @@ def main():
 
                         async def _gen_openai(sys_p: str, usr_p: str) -> str:
                             try:
-                                from openai import AsyncOpenAI  # type: ignore
+                                from llm_helper import generate_response_text  # type: ignore
                             except Exception:
-                                return "(OpenAI client not installed)"
-                            api_key = os.getenv("OPENAI_API_KEY")
-                            if not api_key:
-                                return "(OPENAI_API_KEY is not set)"
-                            client = AsyncOpenAI(api_key=api_key)
+                                return "(LLM helper not available)"
                             try:
-                                resp = await client.responses.create(
-                                    model="gpt-5",
+                                return await generate_response_text(
+                                    usr_p,
                                     instructions=sys_p,
-                                    input=usr_p,
+                                    model="gpt-5",
+                                    store=True,
                                     max_output_tokens=4000,
+                                    retries=3,
                                 )
                             except Exception as e:
                                 return f"(LLM call failed: {e})"
-                            # Try to extract text from Responses API
-                            text = getattr(resp, "output_text", None)
-                            if not text:
-                                try:
-                                    # Fallback to .output[0].content[0].text structure
-                                    parts = []
-                                    out = getattr(resp, "output", None) or []
-                                    for item in out:
-                                        for c in getattr(item, "content", []) or []:
-                                            t = getattr(c, "text", None)
-                                            if t:
-                                                parts.append(t)
-                                    text = "\n".join(parts)
-                                except Exception:
-                                    text = None
-                            return (text or "").strip()
 
                         try:
                             answer = asyncio.run(_gen_openai(system_prompt, user_prompt))

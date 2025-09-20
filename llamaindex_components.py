@@ -22,9 +22,9 @@ import statistics
 
 from llama_index.core.base.base_retriever import BaseRetriever
 from llama_index.core.schema import NodeWithScore, QueryBundle
-from llama_index.core.postprocessor.base import BaseNodePostprocessor
-from llama_index.vector_stores.postgres import PostgresVectorStore
-from llama_index.vector_stores.pinecone import PineconeVectorStore
+from llama_index.core.postprocessor.types import BaseNodePostprocessor
+from llama_index.vector_stores.postgres import PGVectorStore
+# from llama_index.vector_stores.pinecone import PineconeVectorStore  # Temporarily disabled
 
 logger = logging.getLogger(__name__)
 
@@ -43,8 +43,8 @@ class HybridRetriever(BaseRetriever):
 
     def __init__(
         self,
-        postgres_store: PostgresVectorStore,
-        pinecone_store: PineconeVectorStore,
+        postgres_store: PGVectorStore,
+        pinecone_store: Any,  # PineconeVectorStore temporarily disabled
         similarity_top_k: int = 24,
         alpha: float = 0.5,  # 0.0=pure vector, 1.0=pure FTS
         language: str = "en",

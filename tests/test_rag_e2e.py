@@ -21,11 +21,11 @@ class MockPgClient:
         self.chunks_data = [
             {
                 'id': 1,
-                'text': 'OpenAI releases GPT-4 Turbo with improved reasoning capabilities and reduced hallucinations. The new model shows significant improvements in mathematical problem solving.',
-                'title_norm': 'OpenAI Releases GPT-4 Turbo',
+                'text': 'OpenAI releases GPT-5 Turbo with improved reasoning capabilities and reduced hallucinations. The new model shows significant improvements in mathematical problem solving.',
+                'title_norm': 'OpenAI Releases GPT-5 Turbo',
                 'source_domain': 'openai.com',
                 'published_at': '2024-01-15T10:00:00Z',
-                'url': 'https://openai.com/gpt4-turbo',
+                'url': 'https://openai.com/gpt5-turbo',
                 'language': 'en',
                 'category': 'technology',
                 'tags_norm': ['ai', 'gpt', 'openai'],
@@ -216,7 +216,7 @@ class TestRAGE2E:
         # Setup LLM client mock
         mock_llm_client = mock.Mock()
         mock_llm_client.refine_chunks_via_llm.return_value = [
-            {'refined_text': 'Based on the latest developments, AI is advancing rapidly with OpenAI releasing GPT-4 Turbo, which features improved reasoning capabilities and reduced hallucinations. Additionally, Google has made breakthrough advances in quantum computing that could further accelerate AI development.'}
+            {'refined_text': 'Based on the latest developments, AI is advancing rapidly with OpenAI releasing GPT-5 Turbo, which features improved reasoning capabilities and reduced hallucinations. Additionally, Google has made breakthrough advances in quantum computing that could further accelerate AI development.'}
         ]
         mock_rag_gemini.return_value = mock_llm_client
         
@@ -234,7 +234,7 @@ class TestRAGE2E:
         assert isinstance(response, RAGResponse)
         assert response.query == "What are the latest AI developments?"
         assert len(response.answer) > 0
-        assert "GPT-4 Turbo" in response.answer
+        assert "GPT-5 Turbo" in response.answer
         
         # Validate chunks were retrieved
         assert len(response.chunks_used) > 0
