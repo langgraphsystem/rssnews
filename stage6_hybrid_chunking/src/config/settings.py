@@ -85,6 +85,42 @@ class GeminiSettings(BaseSettings):
         env_prefix = "GEMINI_"
 
 
+class OllamaSettings(BaseSettings):
+    """Ollama configuration for local Gemma3 model."""
+
+    enabled: bool = Field(
+        default=True,
+        env="OLLAMA_ENABLED",
+        description="Enable Ollama client for chunk processing"
+    )
+    base_url: str = Field(
+        default="http://localhost:11434",
+        env="OLLAMA_BASE_URL",
+        description="Ollama API base URL (local or tunnel)"
+    )
+    model: str = Field(
+        default="gemma3:latest",
+        env="OLLAMA_MODEL",
+        description="Ollama model name"
+    )
+
+    # Request settings
+    temperature: float = Field(default=0.3, ge=0.0, le=2.0)
+    max_tokens: int = Field(default=500, ge=1, le=2048)
+    timeout_seconds: int = Field(default=30, ge=5, le=120)
+
+    # Retry and rate limiting
+    max_retries: int = Field(default=3, ge=1, le=10)
+    requests_per_minute: int = Field(default=60, ge=1, le=300)
+
+    # Circuit breaker settings
+    circuit_breaker_threshold: int = Field(default=5, ge=1, le=20)
+    circuit_breaker_timeout: int = Field(default=60, ge=10, le=300)
+
+    class Config:
+        env_prefix = "OLLAMA_"
+
+
 class ChunkingSettings(BaseSettings):
     """Chunking algorithm configuration."""
     
@@ -215,6 +251,7 @@ class Settings(BaseSettings):
     database: DatabaseSettings = Field(default_factory=DatabaseSettings)
     redis: RedisSettings = Field(default_factory=RedisSettings)
     gemini: GeminiSettings = Field(default_factory=GeminiSettings)
+    ollama: OllamaSettings = Field(default_factory=OllamaSettings)
     chunking: ChunkingSettings = Field(default_factory=ChunkingSettings)
     rate_limit: RateLimitSettings = Field(default_factory=RateLimitSettings)
     features: FeatureFlags = Field(default_factory=FeatureFlags)

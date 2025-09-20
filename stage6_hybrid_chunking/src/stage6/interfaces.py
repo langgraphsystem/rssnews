@@ -110,9 +110,26 @@ def refine_boundaries(chunks: List[Dict], meta: Dict) -> List[Dict]:
 
     routed = router.route_chunks(rc_list, art_meta, batch_context={})
 
-    # Prepare Gemini client
-    from ..llm.gemini_client import GeminiClient, LLMRefinementResult
-    client = GeminiClient(settings)
+    # Prepare LLM client (prioritize Ollama if enabled)
+    client = None
+    if settings.ollama.enabled:
+        try:
+            from ..llm.ollama_client import OllamaGemma3Client
+            client = OllamaGemma3Client(
+                base_url=settings.ollama.base_url,
+                model=settings.ollama.model,
+                timeout=settings.ollama.timeout_seconds,
+                max_retries=settings.ollama.max_retries,
+                requests_per_minute=settings.ollama.requests_per_minute
+            )
+            logger.info("Using Ollama Gemma3 client for chunk refinement")
+        except Exception as e:
+            logger.warning(f"Failed to initialize Ollama client: {e}, falling back to Gemini")
+
+    if client is None:
+        # Fallback to Gemini client
+        from ..llm.gemini_client import GeminiClient, LLMRefinementResult
+        client = GeminiClient(settings)
     refined: List[Dict] = [dict(c) for c in chunks]
 
     async def _refine_one(idx: int, c: Dict, decision) -> Dict:
@@ -131,17 +148,40 @@ def refine_boundaries(chunks: List[Dict], meta: Dict) -> List[Dict]:
                 'target_words': settings.chunking.target_words,
                 'max_offset': settings.chunking.max_offset,
             }
-            # Execute per-chunk refine
-            result: LLMRefinementResult | None = await client.refine_chunk(
-                chunk_text=c.get('text', ''),
-                chunk_metadata={
-                    'chunk_index': int(c.get('chunk_index', idx)),
-                    'char_start': int(c.get('char_start', 0)),
-                    'char_end': int(c.get('char_end', 0)),
-                    'semantic_type': c.get('semantic_type', 'body')
-                },
-                article_metadata=meta_local
-            )
+            # Execute per-chunk refine based on client type
+            if hasattr(client, 'refine_chunk_boundaries'):
+                # Ollama client
+                action, reason, llm_metadata = await client.refine_chunk_boundaries(
+                    chunk_data={
+                        'chunk_index': int(c.get('chunk_index', idx)),
+                        'text': c.get('text', ''),
+                        'char_start': int(c.get('char_start', 0)),
+                        'char_end': int(c.get('char_end', 0)),
+                        'semantic_type': c.get('semantic_type', 'body'),
+                        'word_count': c.get('word_count', len(c.get('text', '').split()))
+                    },
+                    article_metadata=meta_local
+                )
+                # Create result-like object for compatibility
+                result = type('Result', (), {
+                    'action': action,
+                    'confidence': 0.8,  # Default confidence for Ollama
+                    'reason': reason,
+                    'semantic_type': None
+                })()
+            else:
+                # Gemini client
+                from ..llm.gemini_client import LLMRefinementResult
+                result: LLMRefinementResult | None = await client.refine_chunk(
+                    chunk_text=c.get('text', ''),
+                    chunk_metadata={
+                        'chunk_index': int(c.get('chunk_index', idx)),
+                        'char_start': int(c.get('char_start', 0)),
+                        'char_end': int(c.get('char_end', 0)),
+                        'semantic_type': c.get('semantic_type', 'body')
+                    },
+                    article_metadata=meta_local
+                )
             if result is None:
                 c.setdefault('llm_action', 'noop')
                 c.setdefault('llm_confidence', 0.0)
@@ -152,6 +192,10 @@ def refine_boundaries(chunks: List[Dict], meta: Dict) -> List[Dict]:
                 'keep': 'noop',
                 'merge_prev': 'merge_with_prev',
                 'merge_next': 'merge_with_next',
+                'merge_with_prev': 'merge_with_prev',  # Ollama format
+                'merge_with_next': 'merge_with_next',  # Ollama format
+                'noop': 'noop',                        # Ollama format
+                'split': 'noop',                       # Ollama format (not implemented)
                 'drop': 'drop',
             }
             c['llm_action'] = action_map.get(result.action, 'noop')
