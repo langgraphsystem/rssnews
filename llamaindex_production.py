@@ -45,7 +45,7 @@ from llama_index.core.schema import NodeWithScore
 
 # Vector stores
 from llama_index.vector_stores.postgres import PGVectorStore
-# from llama_index.vector_stores.pinecone import PineconeVectorStore  # Temporarily disabled due to import issues
+from llama_index.vector_stores.pinecone import PineconeVectorStore
 
 # LLMs and embeddings
 from llama_index.llms.openai import OpenAI
@@ -55,7 +55,7 @@ from llama_index.embeddings.gemini import GeminiEmbedding
 # Additional components
 from llama_index.core.response.pprint_utils import pprint_response
 from sqlalchemy import create_engine
-import pinecone
+from pinecone import Pinecone
 
 
 logger = logging.getLogger(__name__)
@@ -167,11 +167,8 @@ class RSSLlamaIndexOrchestrator:
     def _setup_pinecone_stores(self) -> Dict[str, Dict[str, Any]]:  # PineconeVectorStore temporarily disabled
         """Setup Pinecone vector stores with namespaces"""
 
-        # Initialize Pinecone
-        pinecone.init(
-            api_key=self.pinecone_api_key,
-            environment=self.pinecone_environment
-        )
+        # Initialize Pinecone with new API
+        pc = Pinecone(api_key=self.pinecone_api_key)
 
         stores = {}
 
@@ -180,10 +177,8 @@ class RSSLlamaIndexOrchestrator:
             stores[lang.value] = {}
             for namespace in NamespaceRoute:
                 stores[lang.value][namespace.value] = PineconeVectorStore(
-                    api_key=self.pinecone_api_key,
-                    index_name=f"{self.pinecone_index}",
-                    namespace=f"{lang.value}_{namespace.value}",
-                    environment=self.pinecone_environment
+                    pinecone_index=pc.Index(self.pinecone_index),
+                    namespace=f"{lang.value}_{namespace.value}"
                 )
 
         return stores

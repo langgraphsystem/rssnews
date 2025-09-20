@@ -157,16 +157,13 @@ class ProductionDeployment:
 
         # Pinecone
         try:
-            import pinecone
-            pinecone.init(
-                api_key=os.getenv('PINECONE_API_KEY'),
-                environment=os.getenv('PINECONE_REGION', 'us-east-1-aws')
-            )
+            from pinecone import Pinecone
+            pc = Pinecone(api_key=os.getenv('PINECONE_API_KEY'))
 
-            indexes = pinecone.list_indexes()
+            indexes = pc.list_indexes()
             target_index = os.getenv('PINECONE_INDEX')
 
-            checks['pinecone_api'] = target_index in indexes
+            checks['pinecone_api'] = target_index in [idx.name for idx in indexes]
 
             if checks['pinecone_api']:
                 print("  ✅ Pinecone API")
