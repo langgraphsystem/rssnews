@@ -130,7 +130,7 @@ class ProductionDeployment:
                 model="gpt-5",
                 instructions="You are a helpful assistant.",
                 input="test",
-                max_completion_tokens=5
+                max_output_tokens=5
             )
 
             checks['openai_api'] = True
