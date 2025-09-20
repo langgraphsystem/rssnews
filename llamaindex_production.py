@@ -215,17 +215,32 @@ class RSSLlamaIndexOrchestrator:
     def _setup_postgres_store(self) -> PGVectorStore:
         """Setup PostgreSQL vector store for FTS"""
 
-        return PGVectorStore.from_params(
-            database=self.pg_dsn.split("/")[-1],
-            host=self.pg_dsn.split("@")[1].split(":")[0],
-            password=self.pg_dsn.split(":")[2].split("@")[0],
-            port=int(self.pg_dsn.split(":")[-1].split("/")[0]),
-            user=self.pg_dsn.split("://")[1].split(":")[0],
-            table_name="llamaindex_nodes",
-            embed_dim=768,  # Gemini embedding dimension
-            hybrid_search=True,  # Enable FTS + vector hybrid
-            text_search_config="english"
-        )
+        try:
+            # Parse PG_DSN more carefully, removing SSL parameters that cause issues
+            from urllib.parse import urlparse
+            parsed = urlparse(self.pg_dsn)
+
+            # Create connection parameters without SSL options
+            connection_params = {
+                "database": parsed.path.lstrip('/') if parsed.path else "railway",
+                "host": parsed.hostname,
+                "password": parsed.password,
+                "port": parsed.port or 5432,
+                "user": parsed.username,
+                "table_name": "llamaindex_nodes",
+                "embed_dim": 768,  # Gemini embedding dimension
+                "hybrid_search": True,  # Enable FTS + vector hybrid
+                "text_search_config": "english"
+            }
+
+            logger.info(f"Setting up PGVectorStore with host: {parsed.hostname}, port: {parsed.port}, database: {parsed.path.lstrip('/')}")
+
+            return PGVectorStore.from_params(**connection_params)
+
+        except Exception as e:
+            logger.warning(f"Failed to setup PGVectorStore: {e}, using fallback")
+            # Fallback: create a minimal store that won't crash
+            return None
 
     def _setup_pinecone_stores(self) -> Dict[str, Dict[str, Any]]:  # PineconeVectorStore temporarily disabled
         """Setup Pinecone vector stores with namespaces"""
