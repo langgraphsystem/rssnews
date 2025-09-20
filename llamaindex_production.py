@@ -38,7 +38,7 @@ from llama_index.core.extractors import (
     TitleExtractor, KeywordExtractor, QuestionsAnsweredExtractor
 )
 from llama_index.core.ingestion import IngestionPipeline
-from llama_index.core.retrievers import VectorIndexRetriever
+from llama_index.core.retrievers import VectorIndexRetriever, BaseRetriever
 from llama_index.core.query_engine import RetrieverQueryEngine
 from llama_index.core.postprocessor import SimilarityPostprocessor
 from llama_index.core.schema import NodeWithScore
@@ -81,6 +81,12 @@ class QueryCache:  # type: ignore
     def set(self, key, value):
         self._c[key] = value
 
+class HybridRetriever(BaseRetriever):  # type: ignore
+    def __init__(self, *args, **kwargs):
+        super().__init__(callback_manager=None)
+    def _retrieve(self, query_bundle):
+        return []
+
 logger = logging.getLogger(__name__)
 
 try:
@@ -89,6 +95,7 @@ try:
         PerformanceMonitor,
         LegacyModeManager,
         QueryCache,
+        HybridRetriever,
     )
 except ImportError:
     logger.info("LlamaIndex components not found, using lightweight shims.")
