@@ -648,14 +648,14 @@ class GeminiClient:
         model = (self.settings.gemini.embedding_model or '').strip()
         base_model = model.split('/')[-1] if model else ''
 
-        # Branch 1: Use google-generativeai client for Gemini embedding models
-        if base_model in {'gemini-embedding-001', 'text-embedding-004'}:
+        # Branch 1: Use google-generativeai client for gemini-embedding-001
+        if base_model == 'gemini-embedding-001':
             try:
                 import google.generativeai as genai  # type: ignore
 
                 genai.configure(api_key=self.api_key)
                 api_model = model if model.startswith('models/') else f'models/{model}'
-                target_dim = 3072 if base_model == 'gemini-embedding-001' else None
+                target_dim = 3072
 
                 # Try batch processing first - more efficient
                 truncated_texts = [t[:2000] for t in texts]  # Limit input length
@@ -667,8 +667,7 @@ class GeminiClient:
                         "content": truncated_texts,
                         "task_type": "RETRIEVAL_DOCUMENT",
                     }
-                    if target_dim is not None:
-                        batch_kwargs["output_dimensionality"] = target_dim
+                    batch_kwargs["output_dimensionality"] = target_dim
 
                     result = genai.embed_content(**batch_kwargs)
 
@@ -723,8 +722,7 @@ class GeminiClient:
                                 "content": t,
                                 "task_type": "RETRIEVAL_DOCUMENT",
                             }
-                            if target_dim is not None:
-                                single_kwargs["output_dimensionality"] = target_dim
+                            single_kwargs["output_dimensionality"] = target_dim
 
                             result = genai.embed_content(**single_kwargs)
 

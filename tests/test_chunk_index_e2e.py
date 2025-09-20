@@ -128,3 +128,4 @@ def test_chunk_index_e2e(monkeypatch):
     # FTS updated and embeddings set for some
     assert any(ch['fts_vector'] for ch in fake._chunks)
     assert any(isinstance(ch['embedding'], list) and ch['embedding'] for ch in fake._chunks)
+

@@ -27,7 +27,7 @@ Stage 8 implements the final retrieval and question-answering layer of the RSS N
 ### Search Methods
 
 - **FTS Search**: Uses PostgreSQL `plainto_tsquery` with BM25 ranking
-- **Embedding Search**: Uses pgvector cosine similarity on text-embedding-004 vectors  
+- **Embedding Search**: Uses pgvector cosine similarity on gemini-embedding-001 vectors  
 - **Hybrid Search**: Weighted combination with normalized scores
 
 ## Usage
@@ -92,7 +92,7 @@ Optional:
 ```bash
 # Model configuration
 export GEMINI_MODEL="gemini-2.5-flash"
-export EMBEDDING_MODEL="text-embedding-004"
+export EMBEDDING_MODEL="gemini-embedding-001"
 
 # Budget controls
 export LLM_DAILY_COST_CAP_USD=50.0
@@ -337,3 +337,4 @@ print(f"Search took {response.total_time_ms:.1f}ms")
 - Database queries use parameterized statements
 - LLM prompts are sanitized and structured
 - Budget guards prevent runaway API costs
+

@@ -355,7 +355,7 @@ COMMENT ON TABLE llamaindex_config IS 'System configuration and feature flags';
 
 COMMENT ON COLUMN llamaindex_nodes.node_id IS 'Unified identifier: {article_id}#{chunk_index}';
 COMMENT ON COLUMN llamaindex_nodes.namespace IS 'Pinecone namespace: hot (recent) or archive (older)';
-COMMENT ON COLUMN llamaindex_nodes.embedding IS 'Gemini text-embedding-004 vector (768 dimensions)';
+COMMENT ON COLUMN llamaindex_nodes.embedding IS 'Gemini gemini-embedding-001 vector';
 COMMENT ON COLUMN llamaindex_nodes.fts_vector IS 'PostgreSQL full-text search vector';
 
 -- Maintenance functions

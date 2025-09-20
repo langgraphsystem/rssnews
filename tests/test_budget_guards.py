@@ -100,3 +100,4 @@ def test_embeddings_budget_guard(monkeypatch):
     # Expect not all chunks got embeddings due to budget cap
     embedded = sum(1 for ch in fake._chunks if ch['embedding'])
     assert embedded < len(fake._chunks)
+

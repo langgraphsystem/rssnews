@@ -69,7 +69,7 @@
 
 ### Pinecone настройка
 - [ ] Namespaces созданы: `en_hot, en_archive, ru_hot, ru_archive`
-- [ ] Dimension: 768 (Gemini text-embedding-004)
+- [ ] Dimension: 768 (Gemini gemini-embedding-001)
 - [ ] Metric: cosine similarity
 - [ ] Подключение тестировано
 
@@ -80,7 +80,7 @@
 
 ### Эмбеддинги
 - [ ] Всегда **Gemini Embeddings** (консистентность)
-- [ ] Модель: `text-embedding-004` (768 dim)
+- [ ] Модель: `gemini-embedding-001` (768 dim)
 - [ ] Batch обработка для экономии
 
 ---
