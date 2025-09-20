@@ -41,7 +41,11 @@
       "WebFetch(domain:community.openai.com)",
       "WebFetch(domain:api.github.com)",
       "WebFetch(domain:docs.llamaindex.ai)",
-      "WebFetch(domain:developers.llamaindex.ai)"
+      "WebFetch(domain:developers.llamaindex.ai)",
+      "Bash(pip show:*)",
+      "Bash(pip index versions:*)",
+      "WebFetch(domain:cookbook.openai.com)",
+      "Bash(git reset:*)"
     ],
     "deny": [],
     "ask": []
