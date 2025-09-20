@@ -644,7 +644,7 @@ class RSSLlamaIndexOrchestrator:
         else:
             llm = OpenAI(
                 api_key=self.openai_api_key,
-                model="gpt-5-nano-2025-08-07",
+                model="gpt-5",
                 temperature=0.3,
                 max_completion_tokens=config['max_response_tokens']
             )

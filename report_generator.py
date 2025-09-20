@@ -333,7 +333,7 @@ async def generate_gpt5_analysis(stats: Dict[str, Any], period_hours: int) -> st
             analysis = await generate_response_text(
                 analysis_prompt,
                 instructions=system_prompt,
-                model="gpt-5-nano-2025-08-07",
+                model="gpt-5",
                 store=True,
                 max_output_tokens=800,
                 retries=3,

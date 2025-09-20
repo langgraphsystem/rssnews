@@ -125,9 +125,9 @@ class ProductionDeployment:
             from openai import AsyncOpenAI
             client = AsyncOpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 
-            # Simple test call using GPT-5 Nano
+            # Simple test call using GPT-5
             response = await client.responses.create(
-                model="gpt-5-nano-2025-08-07",
+                model="gpt-5",
                 instructions="You are a helpful assistant.",
                 input="test",
                 max_output_tokens=5
