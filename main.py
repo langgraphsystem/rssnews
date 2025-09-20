@@ -136,6 +136,27 @@ def main():
         add_llamaindex_commands(sub)
     except ImportError:
         logger.warning("LlamaIndex CLI not available - install dependencies or check llamaindex_cli.py")
+        # Fallback: register stub commands so CLI recognizes them in Railway cron
+        p_ingest = sub.add_parser("llamaindex-ingest", help="[stub] Process articles with LlamaIndex pipeline")
+        p_ingest.add_argument("--limit", type=int, default=100)
+        p_ingest.add_argument("--article-ids", nargs='+', type=int)
+
+        p_query = sub.add_parser("llamaindex-query", help="[stub] Query using LlamaIndex presets")
+        p_query.add_argument("query")
+        p_query.add_argument("--preset", choices=['qa','digest','shorts','ideas'], default='qa')
+        p_query.add_argument("--language", choices=['en','ru'])
+        p_query.add_argument("--max-sources", type=int, default=10)
+        p_query.add_argument("--verbose", action="store_true")
+
+        p_migrate = sub.add_parser("llamaindex-migrate", help="[stub] Migrate data to LlamaIndex format")
+        p_migrate.add_argument("strategy", choices=['fresh','backfill','archive'])
+        p_migrate.add_argument("--limit", type=int, default=1000)
+
+        sub.add_parser("llamaindex-monitor", help="[stub] LlamaIndex monitoring")
+
+        p_legacy = sub.add_parser("llamaindex-legacy", help="[stub] Manage legacy mode")
+        p_legacy.add_argument("action", choices=['enable','disable','status'])
+        p_legacy.add_argument("--components", nargs='+', choices=['chunking','retrieval','synthesis','full'], default=['full'])
 
     args = ap.parse_args()
     
