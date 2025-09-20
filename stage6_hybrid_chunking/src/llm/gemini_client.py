@@ -646,25 +646,31 @@ class GeminiClient:
         if not self.settings.gemini.embedding_model:
             return [[] for _ in texts]
         model = (self.settings.gemini.embedding_model or '').strip()
-        # Branch 1: Use google-generativeai client for gemini-embedding-001
-        if model == 'gemini-embedding-001' or model.endswith('/gemini-embedding-001'):
+        base_model = model.split('/')[-1] if model else ''
+
+        # Branch 1: Use google-generativeai client for Gemini embedding models
+        if base_model in {'gemini-embedding-001', 'text-embedding-004'}:
             try:
                 import google.generativeai as genai  # type: ignore
 
                 genai.configure(api_key=self.api_key)
                 api_model = model if model.startswith('models/') else f'models/{model}'
+                target_dim = 3072 if base_model == 'gemini-embedding-001' else None
 
                 # Try batch processing first - more efficient
                 truncated_texts = [t[:2000] for t in texts]  # Limit input length
 
                 try:
                     # Use batch embedding with proper parameters
-                    result = genai.embed_content(
-                        model=api_model,
-                        content=truncated_texts,
-                        task_type="RETRIEVAL_DOCUMENT",
-                        output_dimensionality=3072  # Full 3072 dimensions for Pinecone
-                    )
+                    batch_kwargs = {
+                        "model": api_model,
+                        "content": truncated_texts,
+                        "task_type": "RETRIEVAL_DOCUMENT",
+                    }
+                    if target_dim is not None:
+                        batch_kwargs["output_dimensionality"] = target_dim
+
+                    result = genai.embed_content(**batch_kwargs)
 
                     logger.info(f"Gemini API response type: {type(result)}")
                     logger.info(f"Gemini API response keys: {list(result.keys()) if isinstance(result, dict) else 'not dict'}")
@@ -712,12 +718,15 @@ class GeminiClient:
                     out: List[List[float]] = []
                     for t in truncated_texts:
                         try:
-                            result = genai.embed_content(
-                                model=api_model,
-                                content=t,
-                                task_type="RETRIEVAL_DOCUMENT",
-                                output_dimensionality=3072
-                            )
+                            single_kwargs = {
+                                "model": api_model,
+                                "content": t,
+                                "task_type": "RETRIEVAL_DOCUMENT",
+                            }
+                            if target_dim is not None:
+                                single_kwargs["output_dimensionality"] = target_dim
+
+                            result = genai.embed_content(**single_kwargs)
 
                             # Extract single embedding
                             if isinstance(result, dict) and 'embedding' in result:
@@ -743,7 +752,7 @@ class GeminiClient:
                 logger.warning("embed_texts_genai_setup_failed", err=str(e))
                 # fall through to HTTP path
 
-        # Branch 2: Direct Generative Language API (e.g., text-embedding-004)
+        # Branch 2: Direct Generative Language API (e.g., gemini-embedding-001)
         try:
             api_model = model if model.startswith('models/') else f'models/{model}'
             base = self.base_url.rstrip('/')

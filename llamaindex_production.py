@@ -201,7 +201,7 @@ class RSSLlamaIndexOrchestrator:
         # Default embedding model: Gemini (for consistency)
         Settings.embed_model = GeminiEmbedding(
             api_key=self.gemini_api_key,
-            model_name="models/text-embedding-001"
+            model_name="models/gemini-embedding-001"
         )
 
         # Default LLM: OpenAI GPT-5 Nano

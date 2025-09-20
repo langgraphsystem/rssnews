@@ -194,7 +194,7 @@ class TestRAGE2E:
         
         # Mock Gemini settings
         self.mock_settings.gemini.model = 'gemini-2.5-flash'
-        self.mock_settings.gemini.embedding_model = 'text-embedding-004'
+        self.mock_settings.gemini.embedding_model = 'gemini-embedding-001'
         self.mock_settings.rate_limit.cost_per_token_input = 0.001
         self.mock_settings.rate_limit.embedding_daily_cost_limit_usd = 10.0
     

@@ -143,7 +143,10 @@ class ProductionDeployment:
         # Gemini
         try:
             from llama_index.embeddings.gemini import GeminiEmbedding
-            embed_model = GeminiEmbedding(api_key=os.getenv('GEMINI_API_KEY'))
+            embed_model = GeminiEmbedding(
+                api_key=os.getenv('GEMINI_API_KEY'),
+                model_name="models/gemini-embedding-001"
+            )
 
             # Test embedding
             result = await embed_model.aget_text_embedding("test")
