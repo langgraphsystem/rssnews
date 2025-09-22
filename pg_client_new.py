@@ -818,15 +818,34 @@ class PgClient:
 
     def update_chunk_embedding(self, chunk_id: int, embedding: List[float]) -> bool:
         """Update embedding vector for single chunk.
-        Handles both pgvector and TEXT column types automatically.
+        Handles both pgvector(3072) and TEXT columns automatically.
         """
         try:
             with self._cursor() as cur:
-                vec_str = '[' + ','.join(str(float(x)) for x in embedding) + ']'
-
-                # Strategy: Try different approaches based on actual column type
+                # Check current column type by trying to insert
                 try:
-                    # Approach 1: Try as plain text/JSON (for TEXT columns)
+                    # Try pgvector first - pad 768 to 3072 if needed
+                    if len(embedding) == 768:
+                        # Pad to 3072 for pgvector compatibility
+                        padded_embedding = embedding + [0.0] * (3072 - 768)
+                        logger.debug(f"Padding embedding from 768 to 3072 dimensions")
+                    else:
+                        padded_embedding = embedding
+
+                    vec_str = '[' + ','.join(str(float(x)) for x in padded_embedding) + ']'
+                    cur.execute(
+                        """
+                        UPDATE article_chunks
+                        SET embedding = %s::vector
+                        WHERE id = %s
+                        """,
+                        (vec_str, chunk_id)
+                    )
+                    return True
+                except Exception as e1:
+                    # Fallback to TEXT storage
+                    logger.debug(f"pgvector failed, using TEXT storage: {e1}")
+                    vec_str = '[' + ','.join(str(float(x)) for x in embedding) + ']'
                     cur.execute(
                         """
                         UPDATE article_chunks
@@ -836,45 +855,6 @@ class PgClient:
                         (vec_str, chunk_id)
                     )
                     return True
-                except Exception as e1:
-                    if "expected" in str(e1) and "dimensions" in str(e1):
-                        # Column is pgvector but wrong dimensions - pad or truncate
-                        logger.warning(f"Vector dimension mismatch for chunk {chunk_id}: {e1}")
-
-                        # Extract expected dimensions from error message
-                        import re
-                        match = re.search(r'expected (\d+) dimensions', str(e1))
-                        if match:
-                            expected_dims = int(match.group(1))
-                            current_dims = len(embedding)
-
-                            if current_dims < expected_dims:
-                                # Pad with zeros
-                                padded_embedding = embedding + [0.0] * (expected_dims - current_dims)
-                                logger.info(f"Padding embedding from {current_dims} to {expected_dims} dimensions")
-                            else:
-                                # Truncate
-                                padded_embedding = embedding[:expected_dims]
-                                logger.info(f"Truncating embedding from {current_dims} to {expected_dims} dimensions")
-
-                            # Retry with adjusted dimensions
-                            padded_vec_str = '[' + ','.join(str(float(x)) for x in padded_embedding) + ']'
-                            cur.execute(
-                                """
-                                UPDATE article_chunks
-                                SET embedding = %s::vector
-                                WHERE id = %s
-                                """,
-                                (padded_vec_str, chunk_id)
-                            )
-                            return True
-                        else:
-                            # Unknown vector error - skip this chunk
-                            logger.error(f"Unknown vector error for chunk {chunk_id}: {e1}")
-                            return False
-                    else:
-                        # Different error - re-raise
-                        raise e1
         except Exception as e:
             logger.error(f"Failed to update embedding for chunk {chunk_id}: {e}")
             return False
@@ -952,58 +932,97 @@ class PgClient:
             return []
 
     def search_chunks_embedding(self, query_vector: List[float], limit: int = 10) -> List[Dict[str, Any]]:
-        """Search chunks using basic cosine similarity (fallback without pgvector)."""
+        """Search chunks using pgvector cosine similarity or fallback to Python."""
         try:
-            import json
             with self._cursor() as cur:
-                # Get all chunks with embeddings and compute similarity in Python
-                cur.execute(
-                    """
-                    SELECT
-                        id, article_id, chunk_index, text,
-                        url, title_norm, source_domain, embedding
-                    FROM article_chunks
-                    WHERE embedding IS NOT NULL
-                    """)
+                # Pad query vector to 3072 if needed for pgvector compatibility
+                if len(query_vector) == 768:
+                    padded_query = query_vector + [0.0] * (3072 - 768)
+                else:
+                    padded_query = query_vector
 
-                results = []
-                for row in cur.fetchall():
-                    try:
-                        embedding_data = row[7]  # embedding column
+                try:
+                    # Try pgvector native search first
+                    query_vec_str = '[' + ','.join(str(float(x)) for x in padded_query) + ']'
+                    cur.execute(
+                        """
+                        SELECT
+                            id, article_id, chunk_index, text,
+                            url, title_norm, source_domain,
+                            1 - (embedding <=> %s::vector) as score
+                        FROM article_chunks
+                        WHERE embedding IS NOT NULL
+                        ORDER BY embedding <=> %s::vector
+                        LIMIT %s
+                        """,
+                        (query_vec_str, query_vec_str, limit)
+                    )
 
-                        # Handle both vector and JSON string formats
-                        if isinstance(embedding_data, str):
-                            # Try to parse as JSON string
-                            try:
-                                stored_vector = json.loads(embedding_data)
-                            except json.JSONDecodeError:
-                                # Try to parse as vector string format [1,2,3]
-                                if embedding_data.startswith('[') and embedding_data.endswith(']'):
-                                    stored_vector = [float(x.strip()) for x in embedding_data[1:-1].split(',')]
-                                else:
-                                    continue
-                        elif isinstance(embedding_data, list):
-                            # Already a list
-                            stored_vector = embedding_data
-                        else:
-                            # Skip unknown formats
+                    results = []
+                    for row in cur.fetchall():
+                        results.append({
+                            'id': row[0], 'article_id': row[1], 'chunk_index': row[2],
+                            'text': row[3], 'url': row[4], 'title_norm': row[5],
+                            'source_domain': row[6], 'score': row[7]
+                        })
+                    return results
+
+                except Exception as e1:
+                    # Fallback to Python-based similarity
+                    logger.debug(f"pgvector search failed, using Python fallback: {e1}")
+                    import json
+
+                    cur.execute(
+                        """
+                        SELECT
+                            id, article_id, chunk_index, text,
+                            url, title_norm, source_domain, embedding
+                        FROM article_chunks
+                        WHERE embedding IS NOT NULL
+                        """)
+
+                    results = []
+                    for row in cur.fetchall():
+                        try:
+                            embedding_data = row[7]  # embedding column
+
+                            # Handle both vector and JSON string formats
+                            if isinstance(embedding_data, str):
+                                # Try to parse as JSON string
+                                try:
+                                    stored_vector = json.loads(embedding_data)
+                                except json.JSONDecodeError:
+                                    # Try to parse as vector string format [1,2,3]
+                                    if embedding_data.startswith('[') and embedding_data.endswith(']'):
+                                        stored_vector = [float(x.strip()) for x in embedding_data[1:-1].split(',')]
+                                    else:
+                                        continue
+                            elif isinstance(embedding_data, list):
+                                # Already a list
+                                stored_vector = embedding_data
+                            else:
+                                # Skip unknown formats
+                                continue
+
+                            # Use original query vector for similarity (not padded)
+                            if len(stored_vector) >= len(query_vector):
+                                # Truncate stored vector to match query if needed
+                                truncated_vector = stored_vector[:len(query_vector)]
+
+                                # Simple cosine similarity
+                                dot_product = sum(a * b for a, b in zip(query_vector, truncated_vector))
+                                norm_a = sum(a * a for a in query_vector) ** 0.5
+                                norm_b = sum(b * b for b in truncated_vector) ** 0.5
+                                similarity = dot_product / (norm_a * norm_b) if norm_a > 0 and norm_b > 0 else 0
+
+                                results.append({
+                                    'id': row[0], 'article_id': row[1], 'chunk_index': row[2],
+                                    'text': row[3], 'url': row[4], 'title_norm': row[5],
+                                    'source_domain': row[6], 'score': similarity
+                                })
+                        except (ValueError, TypeError) as e:
+                            logger.debug(f"Failed to parse embedding for chunk {row[0]}: {e}")
                             continue
-
-                        if len(stored_vector) == len(query_vector):
-                            # Simple cosine similarity
-                            dot_product = sum(a * b for a, b in zip(query_vector, stored_vector))
-                            norm_a = sum(a * a for a in query_vector) ** 0.5
-                            norm_b = sum(b * b for b in stored_vector) ** 0.5
-                            similarity = dot_product / (norm_a * norm_b) if norm_a > 0 and norm_b > 0 else 0
-
-                            results.append({
-                                'id': row[0], 'article_id': row[1], 'chunk_index': row[2],
-                                'text': row[3], 'url': row[4], 'title_norm': row[5],
-                                'source_domain': row[6], 'score': similarity
-                            })
-                    except (ValueError, TypeError) as e:
-                        logger.debug(f"Failed to parse embedding for chunk {row[0]}: {e}")
-                        continue
 
                 # Sort by similarity and limit
                 results.sort(key=lambda x: x['score'], reverse=True)

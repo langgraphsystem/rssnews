@@ -24,6 +24,7 @@ class EmbeddingService:
     """Dedicated service for generating and managing embeddings"""
 
     def __init__(self, db_client: Optional[PgClient] = None):
+        # Single crossover database for all operations
         self.db = db_client or PgClient()
         self.generator = LocalEmbeddingGenerator()
         self.enabled = os.getenv("ENABLE_LOCAL_EMBEDDINGS", "true").lower() == "true"

@@ -501,43 +501,54 @@ def main():
         if args.cmd == "report":
             logger.info("Generating system report")
             try:
-                from report_generator import generate_report, send_telegram_report, send_enhanced_telegram_report
+                # Use new comprehensive system stats reporter
+                from system_stats_reporter import SystemStatsReporter
+                import asyncio
 
-                # Generate basic report for console
-                report = generate_report(
-                    client,
-                    period_hours=args.period_hours,
-                    format=args.format
-                )
+                reporter = SystemStatsReporter()
 
+                # Generate comprehensive report
+                stats = asyncio.run(reporter.collect_full_report())
+
+                # Show console report
+                console_report = reporter.format_report_for_bot(stats)
                 print("=== System Report ===")
-                print(report)
+                print(console_report)
 
                 # Send to Telegram if requested
                 if args.send_telegram:
                     try:
-                        # Use enhanced report with GPT analysis for Telegram
-                        import asyncio
-                        try:
-                            asyncio.run(send_enhanced_telegram_report(client, args.period_hours))
-                        except RuntimeError:
-                            # Fallback if event loop is already running
-                            loop = asyncio.get_event_loop()
-                            loop.run_until_complete(send_enhanced_telegram_report(client, args.period_hours))
-                        print("✓ Enhanced report with GPT analysis sent to Telegram")
+                        success = asyncio.run(reporter.send_to_telegram(console_report))
+                        if success:
+                            print("✅ Report sent to Telegram successfully!")
+                        else:
+                            print("⚠️ Failed to send to Telegram (check credentials)")
                     except Exception as e:
-                        logger.error(f"Failed to send enhanced Telegram report: {e}")
-                        # Fallback to basic report
-                        try:
-                            send_telegram_report(report, format=args.format)
-                            print("✓ Basic report sent to Telegram (GPT analysis failed)")
-                        except Exception as e2:
-                            logger.error(f"Failed to send basic Telegram report: {e2}")
-                            print(f"✗ Telegram send failed: {e}")
+                        logger.error(f"Failed to send Telegram report: {e}")
+                        print(f"❌ Telegram send failed: {e}")
+
+                # Save detailed stats
+                import json
+                with open('system_stats.json', 'w', encoding='utf-8') as f:
+                    json.dump(stats, f, indent=2, ensure_ascii=False)
+                print("💾 Detailed stats saved to system_stats.json")
 
             except Exception as e:
                 logger.error(f"Report generation failed: {e}")
-                print(f"✗ Report failed: {e}")
+                print(f"❌ Report failed: {e}")
+
+                # Fallback to old system
+                try:
+                    from report_generator import generate_report, send_telegram_report
+                    report = generate_report(client, period_hours=args.period_hours, format=args.format)
+                    print("=== Fallback Report ===")
+                    print(report)
+                    if args.send_telegram:
+                        send_telegram_report(report, format=args.format)
+                        print("✓ Fallback report sent to Telegram")
+                except Exception as e2:
+                    logger.error(f"Fallback report also failed: {e2}")
+                    print(f"❌ All reporting systems failed: {e2}")
             return
 
         if args.cmd == "services":

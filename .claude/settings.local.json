@@ -4,8 +4,8 @@
       "Bash(python:*)",
       "Bash(pip install:*)",
       "Bash(powershell:*)",
-      "Bash(set PG_DSN=postgresql://postgres:kVRUPMOdeXVEdUuKihPeJTgzZVIxqbZy@caboose.proxy.rlwy.net:13102/railway)",
-      "Bash(export PG_DSN=\"postgresql://postgres:kVRUPMOdeXVEdUuKihPeJTgzZVIxqbZy@caboose.proxy.rlwy.net:13102/railway\")",
+      "Bash(set PG_DSN=postgres://postgres:ug1Hi~XHEMdMh_Lm~4UfUKtAejqLBGdg@crossover.proxy.rlwy.net:12306/railway)",
+      "Bash(export PG_DSN=\"postgres://postgres:ug1Hi~XHEMdMh_Lm~4UfUKtAejqLBGdg@crossover.proxy.rlwy.net:12306/railway\")",
       "Bash(tree:*)",
       "Bash(pytest:*)",
       "WebSearch",
@@ -77,8 +77,14 @@
       "Bash(set ENABLE_LOCAL_CHUNKING=true)",
       "Bash(set OLLAMA_BASE_URL=http://localhost:11434)",
       "Bash(set OLLAMA_MODEL=qwen2.5-coder:3b)",
+      "Bash(set TELEGRAM_BOT_TOKEN=YOUR_BOT_TOKEN)",
+      "Bash(export TELEGRAM_BOT_TOKEN=\"YOUR_BOT_TOKEN\")",
+      "Bash(set TELEGRAM_CHAT_ID=YOUR_CHAT_ID)",
+      "Bash(export TELEGRAM_CHAT_ID=\"YOUR_CHAT_ID\")",
       "Bash(time curl:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(del test_db.py)",
+      "Bash(del check_embeddings.py)"
     ],
     "deny": [],
     "ask": []
