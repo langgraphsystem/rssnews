@@ -16,7 +16,7 @@ async def test_ollama_health():
 
         async with OllamaGemma3Client(
             base_url="http://localhost:11434",
-            model="gemma3:latest"
+            model="qwen2.5-coder:3b"
         ) as client:
             print("🔍 Testing Ollama health check...")
             health = await client.health_check()
@@ -42,7 +42,7 @@ async def test_ollama_generation():
 
         async with OllamaGemma3Client(
             base_url="http://localhost:11434",
-            model="gemma3:latest"
+            model="qwen2.5-coder:3b"
         ) as client:
             print("🔍 Testing Ollama text generation...")
 
@@ -70,7 +70,7 @@ async def test_chunk_refinement():
 
         async with OllamaGemma3Client(
             base_url="http://localhost:11434",
-            model="gemma3:latest"
+            model="qwen2.5-coder:3b"
         ) as client:
             print("🔍 Testing chunk refinement...")
 

@@ -94,10 +94,6 @@ def main():
         "--detailed", action="store_true", help="Show detailed statistics"
     )
 
-    # Stage 6 chunking command
-    p_chunk = sub.add_parser("chunk", help="Stage 6: deterministic chunking (LLM refine optional)")
-    p_chunk.add_argument("--limit", type=int, default=20, help="Limit of articles to chunk")
-    p_chunk.add_argument("--batch-size", type=int, default=20, help="Batch size for processing")
 
     # Stage 7 indexing command
     p_index = sub.add_parser("index", help="Stage 7: update FTS and embeddings")
@@ -130,33 +126,7 @@ def main():
     p_report.add_argument("--period-hours", type=int, default=8, help="Report period in hours (default: 8)")
     p_report.add_argument("--format", choices=["markdown", "html"], default="html", help="Report format (default: html)")
 
-    # LlamaIndex commands
-    try:
-        from llamaindex_cli import add_llamaindex_commands
-        add_llamaindex_commands(sub)
-    except ImportError:
-        logger.warning("LlamaIndex CLI not available - install dependencies or check llamaindex_cli.py")
-        # Fallback: register stub commands so CLI recognizes them in Railway cron
-        p_ingest = sub.add_parser("llamaindex-ingest", help="[stub] Process articles with LlamaIndex pipeline")
-        p_ingest.add_argument("--limit", type=int, default=100)
-        p_ingest.add_argument("--article-ids", nargs='+', type=int)
-
-        p_query = sub.add_parser("llamaindex-query", help="[stub] Query using LlamaIndex presets")
-        p_query.add_argument("query")
-        p_query.add_argument("--preset", choices=['qa','digest','shorts','ideas'], default='qa')
-        p_query.add_argument("--language", choices=['en','ru'])
-        p_query.add_argument("--max-sources", type=int, default=10)
-        p_query.add_argument("--verbose", action="store_true")
-
-        p_migrate = sub.add_parser("llamaindex-migrate", help="[stub] Migrate data to LlamaIndex format")
-        p_migrate.add_argument("strategy", choices=['fresh','backfill','archive'])
-        p_migrate.add_argument("--limit", type=int, default=1000)
-
-        sub.add_parser("llamaindex-monitor", help="[stub] LlamaIndex monitoring")
-
-        p_legacy = sub.add_parser("llamaindex-legacy", help="[stub] Manage legacy mode")
-        p_legacy.add_argument("action", choices=['enable','disable','status'])
-        p_legacy.add_argument("--components", nargs='+', choices=['chunking','retrieval','synthesis','full'], default=['full'])
+    # LlamaIndex commands removed - using only local LLM chunking
 
     args = ap.parse_args()
     
@@ -280,71 +250,6 @@ def main():
             
             return
 
-        if args.cmd == "chunk":
-            logger.info("Starting Stage 6 chunking")
-            # Lazy import to avoid overhead
-            from chunking_simple import chunk_article
-            from stage6_hybrid_chunking.src.stage6 import interfaces as st6_if
-
-            total_articles = 0
-            total_chunks = 0
-
-            # Fetch ready articles
-            articles = client.get_articles_ready_for_chunking(limit=args.limit)
-            if not articles:
-                print("No articles ready for chunking")
-                return
-
-            for art in articles:
-                article_id = art.get('article_id')
-                clean_text = art.get('clean_text') or ''
-                processing_version = int(art.get('processing_version') or 1)
-
-                # Build meta for denormalization
-                meta = {
-                    'url': art.get('url') or '',
-                    'title_norm': art.get('title_norm') or '',
-                    'source_domain': art.get('source') or '',
-                    'published_at': art.get('published_at'),
-                    'language': art.get('language') or '',
-                    'category': art.get('category'),
-                    'tags_norm': art.get('tags_norm') or [],
-                }
-
-                try:
-                    # Deterministic pass
-                    chunks = chunk_article(clean_text, meta)
-                    # Optional LLM refine (annotations only, no boundary mutation here)
-                    try:
-                        refined = st6_if.refine_boundaries(chunks, {
-                            'title_norm': meta['title_norm'],
-                            'source_domain': meta['source_domain'],
-                            'language': meta['language'],
-                            'published_at': meta['published_at']
-                        })
-                        chunks = refined
-                    except Exception as e:
-                        logger.warning(f"LLM refine skipped: {e}")
-                    # Decorate chunks with denorm fields
-                    for c in chunks:
-                        c.update({
-                            'url': meta['url'],
-                            'title_norm': meta['title_norm'],
-                            'source_domain': meta['source_domain'],
-                            'published_at': meta['published_at'],
-                            'language': meta['language'],
-                            'category': meta['category'],
-                            'tags_norm': meta['tags_norm'],
-                        })
-                    client.upsert_article_chunks(article_id, processing_version, chunks)
-                    client.mark_chunking_completed(article_id, processing_version)
-                    total_articles += 1
-                    total_chunks += len(chunks)
-                except Exception as e:
-                    logger.error(f"Failed chunking for {article_id}: {e}")
-
-            print(f"✓ Chunking complete: articles={total_articles}, chunks={total_chunks}")
-            return
 
         if args.cmd == "index":
             logger.info("Starting Stage 7 indexing (FTS + optional embeddings)")
@@ -519,7 +424,8 @@ def main():
                         print(f"    ↳ {snippet}")
 
                 # Optional: generate LLM answer over top context
-                if args.answer and collapsed:
+                # Respect OPENAI_DISABLED=1 to avoid any external LLM calls
+                if args.answer and collapsed and os.getenv("OPENAI_DISABLED") != "1":
                     try:
                         import asyncio
                         # Prefer OpenAI Responses API if OPENAI_API_KEY is present
@@ -571,6 +477,8 @@ def main():
                             print(f"[{i}] {ch.get('title_norm') or ''} | {ch.get('source_domain') or ''} | {ch.get('url') or ''}")
                     except Exception as e:
                         logger.warning(f"LLM answer skipped: {e}")
+                elif args.answer and os.getenv("OPENAI_DISABLED") == "1":
+                    logger.info("OPENAI_DISABLED=1 — skipping external LLM answer generation")
             except Exception as e:
                 logger.error(f"RAG retrieval failed: {e}")
                 print(f"✗ RAG retrieval failed: {e}")
@@ -732,29 +640,10 @@ def main():
             return
 
         # Handle LlamaIndex commands
+        # LlamaIndex commands removed - using only local LLM chunking
         if args.cmd.startswith("llamaindex-"):
-            try:
-                from llamaindex_cli import handle_llamaindex_commands
-                import asyncio
-
-                # Run async LlamaIndex commands
-                try:
-                    result = asyncio.run(handle_llamaindex_commands(args))
-                except RuntimeError:
-                    # Fallback if event loop is already running
-                    loop = asyncio.get_event_loop()
-                    result = loop.run_until_complete(handle_llamaindex_commands(args))
-
-                return result
-
-            except ImportError:
-                logger.error("LlamaIndex CLI not available")
-                print("❌ LlamaIndex not installed. Install with: pip install llama-index")
-                return 1
-            except Exception as e:
-                logger.error(f"LlamaIndex command failed: {e}")
-                print(f"❌ LlamaIndex error: {e}")
-                return 1
+            print("❌ LlamaIndex commands have been removed. Use 'work' command for local LLM chunking.")
+            return 1
 
     except KeyboardInterrupt:
         logger.info("Interrupted by user")

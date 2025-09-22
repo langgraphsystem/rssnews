@@ -33,6 +33,10 @@ async def generate_response_text(
     previous_response_id: Optional[str] = None,
     extra: Optional[Dict[str, Any]] = None,
 ) -> str:
+    # Hard switch to disable any OpenAI calls from runtime
+    if os.getenv("OPENAI_DISABLED") == "1":
+        raise RuntimeError("OpenAI usage is disabled by OPENAI_DISABLED=1")
+
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         raise RuntimeError("OPENAI_API_KEY is not set")
@@ -81,4 +85,3 @@ async def generate_response_text(
                 break
     assert last_err is not None
     raise last_err
-

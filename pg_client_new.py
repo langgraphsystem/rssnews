@@ -767,9 +767,9 @@ class PgClient:
                     UPDATE articles_index
                     SET chunking_completed = TRUE,
                         ready_for_chunking = FALSE
-                    WHERE COALESCE(article_id, COALESCE(url_hash_v2, url_hash)) = %s
+                    WHERE COALESCE(article_id::text, COALESCE(url_hash_v2, url_hash)) = %s::text
                 """,
-                    (article_id,)
+                    (str(article_id),)
                 )
         except Exception as e:
             logger.error(f"Failed to mark chunking completed for {article_id}: {e}")

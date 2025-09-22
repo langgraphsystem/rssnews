@@ -2,8 +2,10 @@
 Enhanced article worker with new parsing pipeline
 """
 
+import os
 import logging
 import uuid
+import asyncio
 import concurrent.futures
 from typing import Dict, List, Any, Optional
 from datetime import datetime, timezone
@@ -50,19 +52,19 @@ class ArticleWorker:
             'error_details': []
         }
         
-        # Process articles concurrently
-        with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            future_to_article = {
-                executor.submit(self._process_single_article, article): article
-                for article in articles
-            }
-            
-            for future in concurrent.futures.as_completed(future_to_article):
-                article = future_to_article[future]
+        # Process articles concurrently (async)
+
+        async def process_article_batch():
+            tasks = []
+            for article in articles:
+                task = asyncio.create_task(self._process_single_article(article))
+                tasks.append((task, article))
+
+            for task, article in tasks:
                 stats['articles_processed'] += 1
-                
+
                 try:
-                    result = future.result()
+                    result = await task
                     
                     if result['status'] == 'stored':
                         stats['successful'] += 1
@@ -94,10 +96,13 @@ class ArticleWorker:
                         self.db.update_article_status(article['id'], 'error', str(e))
                     except Exception as update_e:
                         logger.error(f"Failed to update error status for article {article['id']}: {update_e}")
-        
+
+        # Run async processing
+        asyncio.run(process_article_batch())
+
         logger.info(f"Processing complete: {stats['successful']}/{stats['articles_processed']} successful, "
                    f"{stats['duplicates']} duplicates, {stats['errors']} errors")
-        
+
         # Log to diagnostics
         self.db.log_diagnostics(
             level='INFO',
@@ -105,11 +110,11 @@ class ArticleWorker:
             message=f"Processed {stats['articles_processed']} articles",
             details={**stats, 'batch_id': str(uuid.uuid4())}
         )
-        
+
         return stats
 
 
-    def _process_single_article(self, article: Dict[str, Any]) -> Dict[str, Any]:
+    async def _process_single_article(self, article: Dict[str, Any]) -> Dict[str, Any]:
         """Process a single article"""
         result = {
             'status': 'error',
@@ -193,6 +198,43 @@ class ArticleWorker:
             
             self.db.update_article(article_id, **article_updates)
             
+            # Smart chunking with local LLM (required) - работает для всех статей с текстом
+            smart_chunks = None
+            if os.getenv("ENABLE_LOCAL_CHUNKING") and parsed_article.full_text and len(parsed_article.full_text.strip()) > 50:
+                from local_llm_chunker import LocalLLMChunker
+                chunker = LocalLLMChunker()
+                smart_chunks = await chunker.create_chunks(
+                    text=parsed_article.full_text,
+                    metadata={
+                        'title': parsed_article.title,
+                        'category': parsed_article.section,
+                        'language': parsed_article.language,
+                        'source': parsed_article.source
+                    }
+                )
+                logger.info(f"Created {len(smart_chunks)} smart chunks for article {article_id}")
+
+                # Save chunks directly to database
+                if smart_chunks:
+                    # Add required metadata to each chunk
+                    for chunk in smart_chunks:
+                        chunk.update({
+                            'url': parsed_article.canonical_url or article_url,
+                            'title_norm': parsed_article.title or '',
+                            'source_domain': parsed_article.source,
+                            'published_at': parsed_article.published_at,
+                            'language': parsed_article.language,
+                            'category': parsed_article.section,
+                            'tags_norm': parsed_article.keywords or [],
+                        })
+
+                    try:
+                        self.db.upsert_article_chunks(str(article_id), 1, smart_chunks)
+                        self.db.mark_chunking_completed(str(article_id), 1)
+                        logger.info(f"Saved {len(smart_chunks)} chunks to database for article {article_id}")
+                    except Exception as e:
+                        logger.error(f"Failed to save chunks for article {article_id}: {e}")
+
             # Add to articles index for deduplication
             if parsed_article.status == 'stored' and parsed_article.text_hash:
                 # Determine readiness for chunking: must have full_text and not be duplicate
