@@ -105,6 +105,12 @@ def canonicalize_url(url: str) -> str:
       - sort + drop tracking query params
       - normalize path (remove trailing slash except root)
     """
+    # Be robust to non-string inputs (e.g., lists from metadata)
+    if isinstance(url, (list, tuple)):
+        url = url[0] if url else ""
+    if url is None:
+        url = ""
+    url = str(url)
     u = urlparse(url.strip())
     scheme = (u.scheme or "http").lower()
     netloc = u.hostname.lower() if u.hostname else ""

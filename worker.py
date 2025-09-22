@@ -172,7 +172,6 @@ class ArticleWorker:
             # Update article with extracted data
             article_updates = {
                 'canonical_url': parsed_article.canonical_url,
-                'url_hash': parsed_article.url_hash,
                 'source': parsed_article.source,
                 'section': parsed_article.section,
                 'title': parsed_article.title or article.get('title', ''),
@@ -196,6 +195,10 @@ class ArticleWorker:
                 'status': parsed_article.status,
                 'error_reason': parsed_article.error_reason
             }
+
+            # Never attempt to change the unique url_hash in-place; it is set on insert.
+            # This avoids UNIQUE violations (raw_url_hash_key) and empty-hash collisions
+            # when extraction fails and returns a blank url_hash.
             
             self.db.update_article(article_id, **article_updates)
             

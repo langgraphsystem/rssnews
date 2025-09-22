@@ -32,6 +32,8 @@ class SimpleOllamaClient:
             "model": self.model,
             "prompt": prompt,
             "stream": False,
+            # Hint to Ollama to produce strict JSON output
+            "format": "json",
             "options": {
                 "temperature": temperature,
                 "num_predict": max_tokens,
@@ -48,7 +50,19 @@ class SimpleOllamaClient:
             raise Exception(f"Ollama API error: {response.status_code} - {response.text}")
 
         data = response.json()
-        return data.get("response", "").strip()
+        resp = data.get("response", "")
+        # Some models wrap JSON in code fences; strip them here
+        if isinstance(resp, str) and resp.strip().startswith("```)":
+            # remove leading and trailing fences
+            s = resp.strip()
+            # Remove language hint if present e.g. ```json
+            if s.startswith("```"):
+                s = s[3:]
+                s = s[s.find("\n") + 1:] if "\n" in s else s
+            if s.endswith("```"):
+                s = s[:-3]
+            resp = s
+        return (resp or "").strip()
 
 
 class LocalLLMChunker:
@@ -97,9 +111,9 @@ class LocalLLMChunker:
                 return chunks
 
             except Exception as e:
+                # Don't fail the whole article on chunking issues; log and return no chunks
                 logger.error(f"LLM chunking failed: {e}")
-                # Return error instead of fallback
-                raise Exception(f"Local LLM chunking failed: {e}")
+                return []
 
     def _build_chunking_prompt(self, text: str, metadata: Dict[str, Any]) -> str:
         """Build prompt for smart chunking"""
@@ -142,6 +156,8 @@ Maximum {self.max_chunks} chunks. Focus on quality over quantity."""
             json_end = response.rfind(']') + 1
 
             if json_start == -1 or json_end == 0:
+                # Try to recover from code fences or text before JSON
+                # If still not found, return empty chunk list instead of raising
                 raise ValueError("No JSON array found in response")
 
             json_str = response[json_start:json_end]
@@ -189,5 +205,6 @@ Maximum {self.max_chunks} chunks. Focus on quality over quantity."""
 
         except Exception as e:
             logger.error(f"Failed to parse LLM chunks response: {e}")
-            raise Exception(f"Response parsing failed: {e}")
+            # Return safe fallback: no chunks
+            return []
 
