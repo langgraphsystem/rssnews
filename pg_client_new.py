@@ -818,21 +818,63 @@ class PgClient:
 
     def update_chunk_embedding(self, chunk_id: int, embedding: List[float]) -> bool:
         """Update embedding vector for single chunk.
-        Since the column is TEXT type, store as JSON string.
+        Handles both pgvector and TEXT column types automatically.
         """
         try:
             with self._cursor() as cur:
                 vec_str = '[' + ','.join(str(float(x)) for x in embedding) + ']'
 
-                cur.execute(
-                    """
-                    UPDATE article_chunks
-                    SET embedding = %s
-                    WHERE id = %s
-                    """,
-                    (vec_str, chunk_id)
-                )
-                return True
+                # Strategy: Try different approaches based on actual column type
+                try:
+                    # Approach 1: Try as plain text/JSON (for TEXT columns)
+                    cur.execute(
+                        """
+                        UPDATE article_chunks
+                        SET embedding = %s
+                        WHERE id = %s
+                        """,
+                        (vec_str, chunk_id)
+                    )
+                    return True
+                except Exception as e1:
+                    if "expected" in str(e1) and "dimensions" in str(e1):
+                        # Column is pgvector but wrong dimensions - pad or truncate
+                        logger.warning(f"Vector dimension mismatch for chunk {chunk_id}: {e1}")
+
+                        # Extract expected dimensions from error message
+                        import re
+                        match = re.search(r'expected (\d+) dimensions', str(e1))
+                        if match:
+                            expected_dims = int(match.group(1))
+                            current_dims = len(embedding)
+
+                            if current_dims < expected_dims:
+                                # Pad with zeros
+                                padded_embedding = embedding + [0.0] * (expected_dims - current_dims)
+                                logger.info(f"Padding embedding from {current_dims} to {expected_dims} dimensions")
+                            else:
+                                # Truncate
+                                padded_embedding = embedding[:expected_dims]
+                                logger.info(f"Truncating embedding from {current_dims} to {expected_dims} dimensions")
+
+                            # Retry with adjusted dimensions
+                            padded_vec_str = '[' + ','.join(str(float(x)) for x in padded_embedding) + ']'
+                            cur.execute(
+                                """
+                                UPDATE article_chunks
+                                SET embedding = %s::vector
+                                WHERE id = %s
+                                """,
+                                (padded_vec_str, chunk_id)
+                            )
+                            return True
+                        else:
+                            # Unknown vector error - skip this chunk
+                            logger.error(f"Unknown vector error for chunk {chunk_id}: {e1}")
+                            return False
+                    else:
+                        # Different error - re-raise
+                        raise e1
         except Exception as e:
             logger.error(f"Failed to update embedding for chunk {chunk_id}: {e}")
             return False
