@@ -52,7 +52,7 @@ class SimpleOllamaClient:
         data = response.json()
         resp = data.get("response", "")
         # Some models wrap JSON in code fences; strip them here
-        if isinstance(resp, str) and resp.strip().startswith("```)":
+        if isinstance(resp, str) and resp.strip().startswith("```"):
             # remove leading and trailing fences
             s = resp.strip()
             # Remove language hint if present e.g. ```json
