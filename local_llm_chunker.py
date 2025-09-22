@@ -41,16 +41,30 @@ class SimpleOllamaClient:
             }
         }
 
-        response = await self.client.post(
-            f"{self.base_url}/api/generate",
-            json=payload
-        )
+        try:
+            response = await self.client.post(
+                f"{self.base_url}/api/generate",
+                json=payload
+            )
+        except Exception as e:
+            raise Exception(f"Ollama request failed ({e.__class__.__name__}): {e}") from e
 
         if response.status_code != 200:
-            raise Exception(f"Ollama API error: {response.status_code} - {response.text}")
+            body_snippet = (response.text or "")
+            body_snippet = body_snippet.replace("\n", " ")[:300]
+            raise Exception(f"Ollama API error {response.status_code}: {body_snippet}")
 
-        data = response.json()
-        resp = data.get("response", "")
+        try:
+            data = response.json()
+        except Exception as e:
+            body_snippet = (response.text or "")
+            body_snippet = body_snippet.replace("\n", " ")[:300]
+            raise Exception(f"Invalid JSON from Ollama ({e.__class__.__name__}): {e}; body={body_snippet}") from e
+
+        if isinstance(data, dict) and data.get("error"):
+            raise Exception(f"Ollama error: {data.get('error')}")
+
+        resp = data.get("response", "") if isinstance(data, dict) else ""
         # Some models wrap JSON in code fences; strip them here
         if isinstance(resp, str) and resp.strip().startswith("```"):
             # remove leading and trailing fences
@@ -62,7 +76,12 @@ class SimpleOllamaClient:
             if s.endswith("```"):
                 s = s[:-3]
             resp = s
-        return (resp or "").strip()
+
+        resp = (resp or "").strip()
+        if not resp:
+            raise ValueError("Empty response from LLM")
+
+        return resp
 
 
 class LocalLLMChunker:
@@ -111,8 +130,8 @@ class LocalLLMChunker:
                 return chunks
 
             except Exception as e:
-                # Don't fail the whole article on chunking issues; log and return no chunks
-                logger.error(f"LLM chunking failed: {e}")
+                # Don't fail the whole article on chunking issues; log with traceback and return no chunks
+                logger.exception("LLM chunking failed")
                 return []
 
     def _build_chunking_prompt(self, text: str, metadata: Dict[str, Any]) -> str:
@@ -204,7 +223,14 @@ Maximum {self.max_chunks} chunks. Focus on quality over quantity."""
             return chunks
 
         except Exception as e:
-            logger.error(f"Failed to parse LLM chunks response: {e}")
+            # Include a small snippet of raw LLM text for debugging
+            raw_snippet = (response or "")
+            try:
+                raw_snippet = raw_snippet.replace("\n", " ")
+            except Exception:
+                pass
+            raw_snippet = str(raw_snippet)[:300]
+            logger.error(f"Failed to parse LLM chunks response: {e}; raw={raw_snippet}")
             # Return safe fallback: no chunks
             return []
 
