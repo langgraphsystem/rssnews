@@ -191,21 +191,40 @@ Maximum {self.max_chunks} chunks. Focus on quality over quantity."""
         """Parse LLM response into chunk objects"""
 
         try:
-            # Try to extract JSON from response
-            json_start = response.find('[')
-            json_end = response.rfind(']') + 1
+            # Try to find any JSON structure in the response
+            chunks_data = None
 
-            if json_start == -1 or json_end == 0:
-                # Try to recover from code fences or text before JSON
-                # If still not found, return empty chunk list instead of raising
-                raise ValueError("No JSON array found in response")
+            # First try object format with "chunks" key: {"chunks": [...]}
+            json_start = response.find('{')
+            json_end = response.rfind('}') + 1
 
-            json_str = response[json_start:json_end]
-            chunks_data = json.loads(json_str)
+            if json_start != -1 and json_end > json_start:
+                try:
+                    json_str = response[json_start:json_end]
+                    data = json.loads(json_str)
+                    if isinstance(data, dict) and 'chunks' in data and isinstance(data['chunks'], list):
+                        chunks_data = data['chunks']
+                        logger.debug("Parsed object format with 'chunks' key")
+                except json.JSONDecodeError:
+                    pass
 
-            # Accept either a list or an object with 'chunks' key
-            if isinstance(chunks_data, dict) and 'chunks' in chunks_data and isinstance(chunks_data['chunks'], list):
-                chunks_data = chunks_data['chunks']
+            # If object format failed, try array format: [...]
+            if chunks_data is None:
+                json_start = response.find('[')
+                json_end = response.rfind(']') + 1
+
+                if json_start != -1 and json_end > json_start:
+                    try:
+                        json_str = response[json_start:json_end]
+                        data = json.loads(json_str)
+                        if isinstance(data, list):
+                            chunks_data = data
+                            logger.debug("Parsed array format")
+                    except json.JSONDecodeError:
+                        pass
+
+            if chunks_data is None:
+                raise ValueError("No valid JSON array or object with 'chunks' found in response")
             if not isinstance(chunks_data, list):
                 raise ValueError("Expected JSON array or object with 'chunks' list")
 
