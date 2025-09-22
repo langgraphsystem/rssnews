@@ -77,6 +77,9 @@ def main():
     p_work.add_argument(
         "--worker-id", help="Worker identifier", default="worker-1"
     )
+    p_work.add_argument(
+        "--simplified", action="store_true", help="Use simplified worker (no chunking/FTS/embeddings)"
+    )
 
     # Retry queue management
     p_flush = sub.add_parser("flush-queue", help="Process retry queue")
@@ -125,6 +128,23 @@ def main():
     p_report.add_argument("--send-telegram", action="store_true", help="Send report to Telegram")
     p_report.add_argument("--period-hours", type=int, default=8, help="Report period in hours (default: 8)")
     p_report.add_argument("--format", choices=["markdown", "html"], default="html", help="Report format (default: html)")
+
+    # Services command
+    p_services = sub.add_parser("services", help="Manage processing services (chunking, FTS, embeddings)")
+    p_services.add_argument("action", choices=["start", "run-once", "status"], help="Service action")
+    p_services.add_argument(
+        "--services", nargs="*", choices=["chunking", "fts", "embedding"],
+        help="Specific services to run (for run-once)"
+    )
+    p_services.add_argument(
+        "--chunking-interval", type=int, default=30, help="Chunking service interval"
+    )
+    p_services.add_argument(
+        "--fts-interval", type=int, default=60, help="FTS service interval"
+    )
+    p_services.add_argument(
+        "--embedding-interval", type=int, default=45, help="Embedding service interval"
+    )
 
     # LlamaIndex commands removed - using only local LLM chunking
 
@@ -189,27 +209,40 @@ def main():
 
         if args.cmd == "work":
             logger.info("Starting article processing")
-            worker = ArticleWorker(
-                client,
-                batch_size=args.batch_size,
-                max_workers=args.workers
-            )
-            
+
+            if args.simplified:
+                # Use simplified worker without chunking/FTS/embeddings
+                from worker_simplified import SimplifiedArticleWorker
+                worker = SimplifiedArticleWorker(
+                    client,
+                    batch_size=args.batch_size,
+                    max_workers=args.workers
+                )
+                print("Using simplified worker (no chunking/FTS/embeddings)")
+            else:
+                # Use full worker with chunking/FTS/embeddings
+                worker = ArticleWorker(
+                    client,
+                    batch_size=args.batch_size,
+                    max_workers=args.workers
+                )
+                print("Using full worker (with chunking/FTS/embeddings)")
+
             try:
                 stats = worker.process_pending_articles()
-                
+
                 print(f"✓ Processing complete:")
                 print(f"  Articles processed: {stats['articles_processed']}")
                 print(f"  Successful: {stats['successful']}")
                 print(f"  Duplicates: {stats['duplicates']}")
                 print(f"  Partial: {stats['partial']}")
                 print(f"  Errors: {stats['errors']}")
-                
+
                 if stats['error_details']:
                     print("\nErrors:")
                     for error in stats['error_details'][:5]:  # Show first 5 errors
                         print(f"  - {error['url']}: {error['error']}")
-                        
+
             finally:
                 worker.close()
             return
@@ -505,6 +538,57 @@ def main():
             except Exception as e:
                 logger.error(f"Report generation failed: {e}")
                 print(f"✗ Report failed: {e}")
+            return
+
+        if args.cmd == "services":
+            logger.info("Managing processing services")
+            try:
+                from services.service_manager import ServiceManager
+
+                # Initialize service manager
+                manager = ServiceManager(client)
+
+                # Update intervals if provided
+                if args.chunking_interval:
+                    manager.service_configs['chunking']['interval'] = args.chunking_interval
+                if args.fts_interval:
+                    manager.service_configs['fts']['interval'] = args.fts_interval
+                if args.embedding_interval:
+                    manager.service_configs['embedding']['interval'] = args.embedding_interval
+
+                if args.action == "start":
+                    # Start all services continuously
+                    print("Starting RSS News services...")
+                    try:
+                        import asyncio
+                        asyncio.run(manager.start_all_services())
+                    except KeyboardInterrupt:
+                        logger.info("Services stopped by user")
+                    finally:
+                        manager.stop_all_services()
+
+                elif args.action == "run-once":
+                    # Run services once
+                    import asyncio
+                    results = asyncio.run(manager.run_single_pass(args.services))
+                    print("Service execution results:")
+                    for service_name, result in results.items():
+                        print(f"  {service_name}: {result}")
+
+                elif args.action == "status":
+                    # Get service status
+                    import asyncio
+                    status = asyncio.run(manager.get_service_status())
+                    print("Service status:")
+                    print(f"  Manager running: {status['service_manager_running']}")
+                    for service_name, service_status in status['services'].items():
+                        print(f"  {service_name}:")
+                        for key, value in service_status.items():
+                            print(f"    {key}: {value}")
+
+            except Exception as e:
+                logger.error(f"Services command failed: {e}")
+                print(f"✗ Services error: {e}")
             return
 
         # Handle LlamaIndex commands (removed)

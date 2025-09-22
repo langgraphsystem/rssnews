@@ -1016,3 +1016,88 @@ class PgClient:
         except Exception as e:
             logger.error(f"Hybrid search failed for query '{query}': {e}")
             return []
+
+    def get_chunks_needing_fts_update(self, limit: int = 100) -> List[int]:
+        """Get chunk IDs that need FTS vector updates."""
+        try:
+            with self._cursor() as cur:
+                cur.execute("""
+                    SELECT id FROM article_chunks
+                    WHERE fts_vector IS NULL
+                    ORDER BY id
+                    LIMIT %s
+                """, (limit,))
+                return [row[0] for row in cur.fetchall()]
+        except Exception as e:
+            logger.error(f"Failed to get chunks needing FTS update: {e}")
+            return []
+
+    def get_chunks_needing_embeddings(self, limit: int = 50) -> List[Dict[str, Any]]:
+        """Get chunks that need embeddings."""
+        try:
+            with self._cursor() as cur:
+                cur.execute("""
+                    SELECT id, text FROM article_chunks
+                    WHERE embedding IS NULL OR embedding = ''
+                    ORDER BY id
+                    LIMIT %s
+                """, (limit,))
+                cols = [d[0] for d in cur.description]
+                return [dict(zip(cols, row)) for row in cur.fetchall()]
+        except Exception as e:
+            logger.error(f"Failed to get chunks needing embeddings: {e}")
+            return []
+
+    def get_all_chunks_for_embedding(self) -> List[Dict[str, Any]]:
+        """Get all chunks for embedding rebuild."""
+        try:
+            with self._cursor() as cur:
+                cur.execute("SELECT id, text FROM article_chunks ORDER BY id")
+                cols = [d[0] for d in cur.description]
+                return [dict(zip(cols, row)) for row in cur.fetchall()]
+        except Exception as e:
+            logger.error(f"Failed to get all chunks for embedding: {e}")
+            return []
+
+    def search_chunks_by_similarity(self, query_embedding: List[float],
+                                   limit: int = 10, similarity_threshold: float = 0.7) -> List[Dict[str, Any]]:
+        """Search chunks by embedding similarity using cosine similarity."""
+        try:
+            import json
+            with self._cursor() as cur:
+                # Get all chunks with embeddings and compute similarity in Python
+                cur.execute("""
+                    SELECT
+                        id, article_id, chunk_index, text,
+                        url, title_norm, source_domain, embedding
+                    FROM article_chunks
+                    WHERE embedding IS NOT NULL AND embedding != ''
+                """)
+
+                results = []
+                for row in cur.fetchall():
+                    try:
+                        stored_vector = json.loads(row[7])  # embedding column
+                        if len(stored_vector) == len(query_embedding):
+                            # Simple cosine similarity
+                            dot_product = sum(a * b for a, b in zip(query_embedding, stored_vector))
+                            norm_a = sum(a * a for a in query_embedding) ** 0.5
+                            norm_b = sum(b * b for b in stored_vector) ** 0.5
+                            similarity = dot_product / (norm_a * norm_b) if norm_a > 0 and norm_b > 0 else 0
+
+                            if similarity >= similarity_threshold:
+                                results.append({
+                                    'id': row[0], 'article_id': row[1], 'chunk_index': row[2],
+                                    'text': row[3], 'url': row[4], 'title_norm': row[5],
+                                    'source_domain': row[6], 'similarity': similarity
+                                })
+                    except (json.JSONDecodeError, ValueError):
+                        continue
+
+                # Sort by similarity and limit
+                results.sort(key=lambda x: x['similarity'], reverse=True)
+                return results[:limit]
+
+        except Exception as e:
+            logger.error(f"Similarity search failed: {e}")
+            return []

@@ -79,3 +79,23 @@ SPORTS_KEYS = {
     "olympics",
     "grand slam",
 }
+
+
+def load_config():
+    """Load configuration from environment variables and constants"""
+    return {
+        'tz': TZ,
+        'fresh_days_limit': FRESH_DAYS_LIMIT,
+        'max_items_per_feed_per_poll': MAX_ITEMS_PER_FEED_PER_POLL,
+        'pending_batch_size': PENDING_BATCH_SIZE,
+        'lock_ttl_minutes': LOCK_TTL_MINUTES,
+        'clean_text_sheets_limit': CLEAN_TEXT_SHEETS_LIMIT,
+        'spreadsheet_id': SPREADSHEET_ID,
+        'spreadsheet_title': SPREADSHEET_TITLE,
+        'service_account_json': SERVICE_ACCOUNT_JSON,
+        'fulltext_dir': FULLTEXT_DIR,
+        'tracking_params': TRACKING_PARAMS,
+        'remove_path_suffixes': REMOVE_PATH_SUFFIXES,
+        'politics_keys': POLITICS_KEYS,
+        'sports_keys': SPORTS_KEYS,
+    }
