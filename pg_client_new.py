@@ -822,9 +822,11 @@ class PgClient:
         """
         try:
             with self._cursor() as cur:
-                # Try pgvector format first
+                vec_str = '[' + ','.join(str(float(x)) for x in embedding) + ']'
+
+                # Try different approaches based on column type
                 try:
-                    vec_str = '[' + ','.join(str(float(x)) for x in embedding) + ']'
+                    # First try: assume vector column with correct dimensions
                     cur.execute(
                         """
                         UPDATE article_chunks
@@ -834,18 +836,32 @@ class PgClient:
                         (vec_str, chunk_id)
                     )
                     return True
-                except Exception:
-                    # Fallback to JSON string format
-                    vec_str = '[' + ','.join(str(float(x)) for x in embedding) + ']'
-                    cur.execute(
-                        """
-                        UPDATE article_chunks
-                        SET embedding = %s
-                        WHERE id = %s
-                        """,
-                        (vec_str, chunk_id)
-                    )
-                    return True
+                except Exception as e1:
+                    if "expected" in str(e1) and "dimensions" in str(e1):
+                        # Column expects different dimensions - try text/json format
+                        try:
+                            cur.execute(
+                                """
+                                UPDATE article_chunks
+                                SET embedding = %s::text
+                                WHERE id = %s
+                                """,
+                                (vec_str, chunk_id)
+                            )
+                            return True
+                        except Exception as e2:
+                            # Last resort: plain string
+                            cur.execute(
+                                """
+                                UPDATE article_chunks
+                                SET embedding = %s
+                                WHERE id = %s
+                                """,
+                                (vec_str, chunk_id)
+                            )
+                            return True
+                    else:
+                        raise e1
         except Exception as e:
             logger.error(f"Failed to update embedding for chunk {chunk_id}: {e}")
             return False
