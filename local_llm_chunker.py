@@ -7,6 +7,7 @@ import json
 import logging
 import asyncio
 import httpx
+import re
 from typing import List, Dict, Any, Optional
 
 logger = logging.getLogger(__name__)
@@ -27,61 +28,81 @@ class SimpleOllamaClient:
         await self.client.aclose()
 
     async def generate(self, prompt: str, max_tokens: int = 2000, temperature: float = 0.1) -> str:
-        """Generate text using Ollama API"""
-        payload = {
-            "model": self.model,
-            "prompt": prompt,
-            "stream": False,
-            # Hint to Ollama to produce strict JSON output
-            "format": "json",
-            "options": {
-                "temperature": temperature,
-                "num_predict": max_tokens,
-                "top_p": 0.9
+        """Generate text using Ollama API with retry fallback.
+
+        Strategy:
+        1) Try with format=json (strict JSON output)
+        2) If it fails or is empty, retry without format hint
+        """
+
+        attempts = [
+            {"format": "json"},
+            {"format": None},
+        ]
+
+        last_error: Optional[Exception] = None
+        for attempt in attempts:
+            payload = {
+                "model": self.model,
+                "prompt": prompt,
+                "stream": False,
+                "options": {
+                    "temperature": temperature,
+                    "num_predict": max_tokens,
+                    "top_p": 0.9,
+                },
             }
-        }
+            if attempt.get("format"):
+                payload["format"] = attempt["format"]
 
-        try:
-            response = await self.client.post(
-                f"{self.base_url}/api/generate",
-                json=payload
-            )
-        except Exception as e:
-            raise Exception(f"Ollama request failed ({e.__class__.__name__}): {e}") from e
+            try:
+                response = await self.client.post(
+                    f"{self.base_url}/api/generate",
+                    json=payload,
+                )
+            except Exception as e:
+                last_error = Exception(f"Ollama request failed ({e.__class__.__name__}): {e}")
+                continue
 
-        if response.status_code != 200:
-            body_snippet = (response.text or "")
-            body_snippet = body_snippet.replace("\n", " ")[:300]
-            raise Exception(f"Ollama API error {response.status_code}: {body_snippet}")
+            if response.status_code != 200:
+                body_snippet = (response.text or "").replace("\n", " ")[:300]
+                last_error = Exception(f"Ollama API error {response.status_code}: {body_snippet}")
+                continue
 
-        try:
-            data = response.json()
-        except Exception as e:
-            body_snippet = (response.text or "")
-            body_snippet = body_snippet.replace("\n", " ")[:300]
-            raise Exception(f"Invalid JSON from Ollama ({e.__class__.__name__}): {e}; body={body_snippet}") from e
+            try:
+                data = response.json()
+            except Exception as e:
+                body_snippet = (response.text or "").replace("\n", " ")[:300]
+                last_error = Exception(
+                    f"Invalid JSON from Ollama ({e.__class__.__name__}): {e}; body={body_snippet}"
+                )
+                continue
 
-        if isinstance(data, dict) and data.get("error"):
-            raise Exception(f"Ollama error: {data.get('error')}")
+            if isinstance(data, dict) and data.get("error"):
+                last_error = Exception(f"Ollama error: {data.get('error')}")
+                continue
 
-        resp = data.get("response", "") if isinstance(data, dict) else ""
-        # Some models wrap JSON in code fences; strip them here
-        if isinstance(resp, str) and resp.strip().startswith("```"):
-            # remove leading and trailing fences
-            s = resp.strip()
-            # Remove language hint if present e.g. ```json
-            if s.startswith("```"):
-                s = s[3:]
-                s = s[s.find("\n") + 1:] if "\n" in s else s
-            if s.endswith("```"):
-                s = s[:-3]
-            resp = s
+            resp = data.get("response", "") if isinstance(data, dict) else ""
+            # Some models wrap JSON in code fences; strip them here
+            if isinstance(resp, str) and resp.strip().startswith("```"):
+                s = resp.strip()
+                if s.startswith("```"):
+                    s = s[3:]
+                    s = s[s.find("\n") + 1:] if "\n" in s else s
+                if s.endswith("```"):
+                    s = s[:-3]
+                resp = s
 
-        resp = (resp or "").strip()
-        if not resp:
-            raise ValueError("Empty response from LLM")
+            resp = (resp or "").strip()
+            if resp:
+                return resp
+            else:
+                last_error = ValueError("Empty response from LLM")
 
-        return resp
+        # If all attempts failed, raise the last error
+        if last_error:
+            raise last_error
+        raise RuntimeError("LLM generation failed for unknown reasons")
 
 
 class LocalLLMChunker:
@@ -130,9 +151,9 @@ class LocalLLMChunker:
                 return chunks
 
             except Exception as e:
-                # Don't fail the whole article on chunking issues; log with traceback and return no chunks
-                logger.exception("LLM chunking failed")
-                return []
+                # Log and use robust fallback chunking instead of returning empty
+                logger.exception("LLM chunking failed; using fallback chunking")
+                return self._fallback_chunking(text, metadata)
 
     def _build_chunking_prompt(self, text: str, metadata: Dict[str, Any]) -> str:
         """Build prompt for smart chunking"""
@@ -182,8 +203,11 @@ Maximum {self.max_chunks} chunks. Focus on quality over quantity."""
             json_str = response[json_start:json_end]
             chunks_data = json.loads(json_str)
 
+            # Accept either a list or an object with 'chunks' key
+            if isinstance(chunks_data, dict) and 'chunks' in chunks_data and isinstance(chunks_data['chunks'], list):
+                chunks_data = chunks_data['chunks']
             if not isinstance(chunks_data, list):
-                raise ValueError("Expected JSON array")
+                raise ValueError("Expected JSON array or object with 'chunks' list")
 
             chunks = []
             char_offset = 0
@@ -192,7 +216,11 @@ Maximum {self.max_chunks} chunks. Focus on quality over quantity."""
                 if i >= self.max_chunks:
                     break
 
-                text_chunk = chunk_data.get('text', '').strip()
+                # tolerate array of strings
+                if isinstance(chunk_data, str):
+                    chunk_data = { 'text': chunk_data }
+
+                text_chunk = (chunk_data.get('text') or '').strip()
                 if not text_chunk or len(text_chunk) < 20:
                     continue
 
@@ -231,6 +259,66 @@ Maximum {self.max_chunks} chunks. Focus on quality over quantity."""
                 pass
             raw_snippet = str(raw_snippet)[:300]
             logger.error(f"Failed to parse LLM chunks response: {e}; raw={raw_snippet}")
-            # Return safe fallback: no chunks
+            # Fallback to local chunking
+            return self._fallback_chunking(original_text, {})
+
+    def _fallback_chunking(self, text: str, metadata: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Simple paragraph-based fallback chunking to avoid zero chunks.
+
+        - Splits by blank lines, then groups paragraphs to ~target_words per chunk
+        - Caps number of chunks to max_chunks
+        - Assigns low boundary confidence and type 'body'
+        """
+        try:
+            paragraphs = [p.strip() for p in re.split(r"\n\s*\n+", text) if p and len(p.strip()) > 0]
+            if not paragraphs:
+                return []
+
+            chunks: List[Dict[str, Any]] = []
+            current: List[str] = []
+            current_words = 0
+            char_offset = 0
+
+            def flush_chunk():
+                nonlocal char_offset
+                if not current:
+                    return
+                chunk_text = "\n\n".join(current).strip()
+                # find approximate positions
+                start = text.find(chunk_text[:50], char_offset)
+                if start == -1:
+                    start = char_offset
+                end = start + len(chunk_text)
+                char_offset = end
+                chunks.append({
+                    'chunk_index': len(chunks),
+                    'text': chunk_text,
+                    'word_count_chunk': len(chunk_text.split()),
+                    'char_start': start,
+                    'char_end': end,
+                    'semantic_type': 'body',
+                    'boundary_confidence': 0.4,
+                    'llm_topic': '',
+                    'chunking_method': 'fallback_paragraphs',
+                })
+
+            for para in paragraphs:
+                w = len(para.split())
+                if current_words + w > max(50, self.target_words):
+                    flush_chunk()
+                    current = [para]
+                    current_words = w
+                else:
+                    current.append(para)
+                    current_words += w
+
+                if len(chunks) >= self.max_chunks:
+                    break
+
+            if current and len(chunks) < self.max_chunks:
+                flush_chunk()
+
+            return chunks[: self.max_chunks]
+        except Exception:
             return []
 
