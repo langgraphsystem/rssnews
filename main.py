@@ -267,85 +267,8 @@ def main():
             except Exception as e:
                 logger.error(f"FTS update failed: {e}")
 
-            # 2) Try embeddings if configured (PG vector or Pinecone)
+            # 2) Embeddings step removed: external APIs disabled; keep only FTS update
             emb_count = 0
-            try:
-                from stage6_hybrid_chunking.src.config.settings import get_settings  # lazy import
-                from stage6_hybrid_chunking.src.llm.gemini_client import GeminiClient
-                # Optional Pinecone integration
-                from stage6_hybrid_chunking.src.vector.pinecone_client import PineconeClient
-                settings = get_settings()
-
-                logger.info(f"Checking embedding settings: has_model={bool(settings.gemini.embedding_model)}")
-                if settings.gemini.embedding_model:
-                    logger.info(f"Embedding model configured: {settings.gemini.embedding_model}")
-                    texts = [row.get('text', '') for row in chunks]
-                    # Budget guard: rough token estimate -> cost cap
-                    budget_cap = settings.rate_limit.embedding_daily_cost_limit_usd
-                    logger.info(f"Budget cap: ${budget_cap}, cost per token: ${settings.rate_limit.cost_per_token_input}")
-                    est_cost = 0.0
-                    selected = []
-                    for t, row in zip(texts, chunks):
-                        tokens = max(1, len(t) // 4)
-                        cost = tokens * settings.rate_limit.cost_per_token_input
-                        if est_cost + cost > budget_cap:
-                            logger.info(f"Budget exceeded at chunk {row['id']}: cost {est_cost + cost} > cap {budget_cap}")
-                            continue
-                        est_cost += cost
-                        selected.append((t, row))
-                    logger.info(f"Selected {len(selected)}/{len(chunks)} chunks for embedding (estimated cost: ${est_cost})")
-                    if selected:
-                        import asyncio
-                        async def _do_embed(pairs):
-                            gc = GeminiClient(settings)
-                            try:
-                                vecs = await gc.embed_texts([p[0] for p in pairs])
-                            finally:
-                                await gc.close()
-                            return vecs
-                        try:
-                            vectors = asyncio.run(_do_embed(selected))
-                        except RuntimeError:
-                            # Fallback if an event loop is already running
-                            loop = asyncio.get_event_loop()
-                            vectors = loop.run_until_complete(_do_embed(selected))
-                        # If Pinecone configured, upsert there; otherwise fall back to PG update
-                        pnc = PineconeClient()
-                        used_pinecone = False
-                        logger.info(f"Pinecone enabled: {pnc.enabled}, vectors generated: {len(vectors)}")
-                        if pnc.enabled and pnc.connect():
-                            logger.info("Pinecone connection successful")
-                            payload = []
-                            for i, ((t, row), vec) in enumerate(zip(selected, vectors)):
-                                logger.info(f"Vector {i}: type={type(vec)}, len={len(vec) if hasattr(vec, '__len__') else 'N/A'}, sample={vec[:3] if vec and hasattr(vec, '__len__') and len(vec) > 0 else vec}")
-                                if vec and isinstance(vec, list) and len(vec) > 0:
-                                    payload.append({
-                                        'id': str(row['id']),
-                                        'values': vec,
-                                        'metadata': {
-                                            'article_id': str(row.get('article_id') or ''),
-                                            'chunk_index': int(row.get('chunk_index') or 0),
-                                            'language': row.get('language') or ''
-                                        }
-                                    })
-                                else:
-                                    logger.warning(f"Skipping invalid vector {i} for chunk {row['id']}: {vec}")
-                            logger.info(f"Prepared {len(payload)} vectors for Pinecone upsert")
-                            if payload:
-                                emb_count = pnc.upsert(payload)
-                                used_pinecone = emb_count > 0
-                                logger.info(f"Pinecone upsert result: {emb_count} vectors")
-                        else:
-                            logger.info("Pinecone connection failed or not enabled")
-                        if not used_pinecone:
-                            # Fallback: store in Postgres column if available
-                            for (t, row), vec in zip(selected, vectors):
-                                if vec:
-                                    ok = client.update_chunk_embedding(row['id'], vec)
-                                    if ok:
-                                        emb_count += 1
-            except Exception as e:
-                logger.warning(f"Embedding step skipped/failed: {e}")
 
             print(f"✓ Indexing complete: fts_updated={fts_updated}, considered={len(ids)}, embeddings_updated={emb_count}")
             return
@@ -423,62 +346,7 @@ def main():
                     if snippet:
                         print(f"    ↳ {snippet}")
 
-                # Optional: generate LLM answer over top context
-                # Respect OPENAI_DISABLED=1 to avoid any external LLM calls
-                if args.answer and collapsed and os.getenv("OPENAI_DISABLED") != "1":
-                    try:
-                        import asyncio
-                        # Prefer OpenAI Responses API if OPENAI_API_KEY is present
-                        # Build context up to max chars
-                        ctx = []
-                        total = 0
-                        for idx, ch in enumerate(collapsed, 1):
-                            piece = f"[{idx}] {ch.get('title_norm') or ''}\n{(ch.get('text') or '')}\nSource: {ch.get('source_domain') or ''} | {ch.get('url') or ''}\n\n"
-                            if total + len(piece) > args.max_context:
-                                break
-                            ctx.append(piece)
-                            total += len(piece)
-                        context_text = '\n'.join(ctx)
-                        lang = args.answer_lang.lower()
-                        # Split на system + user
-                        if lang.startswith('ru'):
-                            system_prompt = "Отвечай кратко на русском. Используй только факты из контекста. Добавляй сноски [n] к фактам."
-                            user_prompt = f"Вопрос: {args.query}\n\nКонтекст:\n{context_text}\n\nОтвет:"
-                        else:
-                            system_prompt = "Answer concisely in English. Use only facts from the context. Add [n] citations to facts."
-                            user_prompt = f"Question: {args.query}\n\nContext:\n{context_text}\n\nAnswer:"
-
-                        async def _gen_openai(sys_p: str, usr_p: str) -> str:
-                            try:
-                                from llm_helper import generate_response_text  # type: ignore
-                            except Exception:
-                                return "(LLM helper not available)"
-                            try:
-                                return await generate_response_text(
-                                    usr_p,
-                                    instructions=sys_p,
-                                    model="gpt-5-nano-2025-08-07",
-                                    store=True,
-                                    max_output_tokens=4000,
-                                    retries=3,
-                                )
-                            except Exception as e:
-                                return f"(LLM call failed: {e})"
-
-                        try:
-                            answer = asyncio.run(_gen_openai(system_prompt, user_prompt))
-                        except RuntimeError:
-                            loop = asyncio.get_event_loop()
-                            answer = loop.run_until_complete(_gen_openai(system_prompt, user_prompt))
-                        print("\n=== LLM Answer ===")
-                        print(answer.strip() or "(пустой ответ)")
-                        print("\nSources:")
-                        for i, ch in enumerate(collapsed, 1):
-                            print(f"[{i}] {ch.get('title_norm') or ''} | {ch.get('source_domain') or ''} | {ch.get('url') or ''}")
-                    except Exception as e:
-                        logger.warning(f"LLM answer skipped: {e}")
-                elif args.answer and os.getenv("OPENAI_DISABLED") == "1":
-                    logger.info("OPENAI_DISABLED=1 — skipping external LLM answer generation")
+                # External LLM answer generation removed in production cleanup
             except Exception as e:
                 logger.error(f"RAG retrieval failed: {e}")
                 print(f"✗ RAG retrieval failed: {e}")
@@ -639,10 +507,9 @@ def main():
                 print(f"✗ Report failed: {e}")
             return
 
-        # Handle LlamaIndex commands
-        # LlamaIndex commands removed - using only local LLM chunking
+        # Handle LlamaIndex commands (removed)
         if args.cmd.startswith("llamaindex-"):
-            print("❌ LlamaIndex commands have been removed. Use 'work' command for local LLM chunking.")
+            print("❌ LlamaIndex commands are not supported.")
             return 1
 
     except KeyboardInterrupt:
