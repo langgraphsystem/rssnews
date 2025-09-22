@@ -1,0 +1,5 @@
+[tools]
+# Pin Python to 3.12 to ensure wheels exist for all deps (asyncpg 0.29.0).
+# Railpack/mise will pick this up during build.
+python = "3.12"
+
