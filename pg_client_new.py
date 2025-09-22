@@ -818,20 +818,34 @@ class PgClient:
 
     def update_chunk_embedding(self, chunk_id: int, embedding: List[float]) -> bool:
         """Update embedding vector for single chunk.
-        Stores as JSON string until pgvector is available.
+        Works with both pgvector and JSON string formats.
         """
         try:
-            vec_str = '[' + ','.join(str(float(x)) for x in embedding) + ']'
             with self._cursor() as cur:
-                cur.execute(
-                    """
-                    UPDATE article_chunks
-                    SET embedding = %s
-                    WHERE id = %s
-                    """,
-                    (vec_str, chunk_id)
-                )
-                return True
+                # Try pgvector format first
+                try:
+                    vec_str = '[' + ','.join(str(float(x)) for x in embedding) + ']'
+                    cur.execute(
+                        """
+                        UPDATE article_chunks
+                        SET embedding = %s::vector
+                        WHERE id = %s
+                        """,
+                        (vec_str, chunk_id)
+                    )
+                    return True
+                except Exception:
+                    # Fallback to JSON string format
+                    vec_str = '[' + ','.join(str(float(x)) for x in embedding) + ']'
+                    cur.execute(
+                        """
+                        UPDATE article_chunks
+                        SET embedding = %s
+                        WHERE id = %s
+                        """,
+                        (vec_str, chunk_id)
+                    )
+                    return True
         except Exception as e:
             logger.error(f"Failed to update embedding for chunk {chunk_id}: {e}")
             return False
@@ -920,13 +934,32 @@ class PgClient:
                         id, article_id, chunk_index, text,
                         url, title_norm, source_domain, embedding
                     FROM article_chunks
-                    WHERE embedding IS NOT NULL AND embedding != ''
+                    WHERE embedding IS NOT NULL
                     """)
 
                 results = []
                 for row in cur.fetchall():
                     try:
-                        stored_vector = json.loads(row[7])  # embedding column
+                        embedding_data = row[7]  # embedding column
+
+                        # Handle both vector and JSON string formats
+                        if isinstance(embedding_data, str):
+                            # Try to parse as JSON string
+                            try:
+                                stored_vector = json.loads(embedding_data)
+                            except json.JSONDecodeError:
+                                # Try to parse as vector string format [1,2,3]
+                                if embedding_data.startswith('[') and embedding_data.endswith(']'):
+                                    stored_vector = [float(x.strip()) for x in embedding_data[1:-1].split(',')]
+                                else:
+                                    continue
+                        elif isinstance(embedding_data, list):
+                            # Already a list
+                            stored_vector = embedding_data
+                        else:
+                            # Skip unknown formats
+                            continue
+
                         if len(stored_vector) == len(query_vector):
                             # Simple cosine similarity
                             dot_product = sum(a * b for a, b in zip(query_vector, stored_vector))
@@ -939,7 +972,8 @@ class PgClient:
                                 'text': row[3], 'url': row[4], 'title_norm': row[5],
                                 'source_domain': row[6], 'score': similarity
                             })
-                    except (json.JSONDecodeError, ValueError):
+                    except (ValueError, TypeError) as e:
+                        logger.debug(f"Failed to parse embedding for chunk {row[0]}: {e}")
                         continue
 
                 # Sort by similarity and limit
@@ -1038,7 +1072,7 @@ class PgClient:
             with self._cursor() as cur:
                 cur.execute("""
                     SELECT id, text FROM article_chunks
-                    WHERE embedding IS NULL OR embedding = ''
+                    WHERE embedding IS NULL
                     ORDER BY id
                     LIMIT %s
                 """, (limit,))
@@ -1071,13 +1105,32 @@ class PgClient:
                         id, article_id, chunk_index, text,
                         url, title_norm, source_domain, embedding
                     FROM article_chunks
-                    WHERE embedding IS NOT NULL AND embedding != ''
+                    WHERE embedding IS NOT NULL
                 """)
 
                 results = []
                 for row in cur.fetchall():
                     try:
-                        stored_vector = json.loads(row[7])  # embedding column
+                        embedding_data = row[7]  # embedding column
+
+                        # Handle both vector and JSON string formats
+                        if isinstance(embedding_data, str):
+                            # Try to parse as JSON string
+                            try:
+                                stored_vector = json.loads(embedding_data)
+                            except json.JSONDecodeError:
+                                # Try to parse as vector string format [1,2,3]
+                                if embedding_data.startswith('[') and embedding_data.endswith(']'):
+                                    stored_vector = [float(x.strip()) for x in embedding_data[1:-1].split(',')]
+                                else:
+                                    continue
+                        elif isinstance(embedding_data, list):
+                            # Already a list
+                            stored_vector = embedding_data
+                        else:
+                            # Skip unknown formats
+                            continue
+
                         if len(stored_vector) == len(query_embedding):
                             # Simple cosine similarity
                             dot_product = sum(a * b for a, b in zip(query_embedding, stored_vector))
@@ -1091,7 +1144,8 @@ class PgClient:
                                     'text': row[3], 'url': row[4], 'title_norm': row[5],
                                     'source_domain': row[6], 'similarity': similarity
                                 })
-                    except (json.JSONDecodeError, ValueError):
+                    except (ValueError, TypeError) as e:
+                        logger.debug(f"Failed to parse embedding for chunk {row[0]}: {e}")
                         continue
 
                 # Sort by similarity and limit
