@@ -235,8 +235,6 @@ class SystemStatsReporter:
     async def generate_llm_insights(self, stats: Dict[str, Any]) -> str:
         """Generate LLM-powered insights from statistics"""
         try:
-            import httpx
-
             prompt = f"""Analyze these RSS News system statistics and provide key insights:
 
 FEEDS: {stats.get('feeds', {})}
@@ -254,6 +252,7 @@ Provide a concise analysis covering:
 Keep response under 200 words."""
 
             # Direct HTTP call to Ollama
+            import httpx
             async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.post(
                     'http://localhost:11434/api/generate',
