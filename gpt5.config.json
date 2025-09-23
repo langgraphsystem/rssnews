@@ -1,0 +1,21 @@
+{
+  "version": "1.0",
+  "models": [
+    { "id": "gpt-5",       "supports_reasoning_effort": true  },
+    { "id": "gpt-5-mini",  "supports_reasoning_effort": true },
+    { "id": "gpt-5-nano",  "supports_reasoning_effort": false }
+  ],
+  "routing": { "qa": "gpt-5", "code": "gpt-5", "chat": "gpt-5-mini", "bulk": "gpt-5-nano" },
+  "presets": {
+    "deterministic": { "max_output_tokens": 512 },
+    "creative":      { "max_output_tokens": 1024 }
+  },
+  "request_template": {
+    "model": "{{model_id}}",
+    "input": [{"role":"user","content":[{"type":"input_text","text":"{{message}}"}]}],
+    "max_output_tokens": "{{max_output_tokens}}",
+    "reasoning": "{{reasoning_or_null}}",
+    "text": {"verbosity": "low"},
+    "stream": "{{stream_bool}}"
+  }
+}

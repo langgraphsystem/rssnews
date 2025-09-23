@@ -233,49 +233,40 @@ class SystemStatsReporter:
             return {'error': str(e)}
 
     async def generate_llm_insights(self, stats: Dict[str, Any]) -> str:
-        """Generate LLM-powered insights from statistics"""
+        """Generate GPT-5 powered insights from statistics"""
         try:
-            prompt = f"""Analyze these RSS News system statistics and provide key insights:
+            prompt = f"""Проанализируй только эту статистику и ответь:
 
+1. Какие главные проблемы ты видишь.
+2. Какие метрики указывают на наибольшую критичность.
+3. Что делать в первую очередь, чтобы исправить ситуацию.
+4. Какие рекомендации для поддержания стабильности и предотвращения таких проблем в будущем.
+
+СТАТИСТИКА RSS СИСТЕМЫ:
 FEEDS: {stats.get('feeds', {})}
 ARTICLES: {stats.get('articles', {})}
 CHUNKS: {stats.get('chunks', {})}
 EMBEDDINGS: {stats.get('embeddings', {})}
 SERVICES: {stats.get('services', {})}
 
-Provide a concise analysis covering:
-1. System health status
-2. Processing efficiency
-3. Potential issues or bottlenecks
-4. Recommendations for optimization
+Ответь кратко и по делу."""
 
-Keep response under 200 words."""
+            # Use GPT-5 Responses API
+            from gpt5_service_new import GPT5Service
 
-            # Direct HTTP call to Ollama
-            import httpx
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.post(
-                    'http://localhost:11434/api/generate',
-                    json={
-                        'model': 'qwen2.5-coder:3b',
-                        'prompt': prompt,
-                        'stream': False,
-                        'options': {
-                            'temperature': 0.3,
-                            'num_predict': 250
-                        }
-                    }
-                )
+            service = GPT5Service()
+            response = service.send(
+                message=prompt,
+                model_id="gpt-5-mini",  # Cost-effective for analysis
+                reasoning_effort="minimal",  # Fast analysis
+                preset="deterministic"  # Uses low verbosity
+            )
 
-                if response.status_code == 200:
-                    result = response.json()
-                    return result.get('response', 'No response generated').strip()
-                else:
-                    return f"LLM service unavailable (HTTP {response.status_code})"
+            return response.strip() if response else "GPT-5 анализ недоступен"
 
         except Exception as e:
-            logger.error(f"Failed to generate LLM insights: {e}")
-            return f"LLM analysis unavailable: {str(e)}"
+            logger.error(f"Failed to generate GPT-5 insights: {e}")
+            return f"GPT-5 анализ недоступен: {str(e)}"
 
     async def collect_full_report(self) -> Dict[str, Any]:
         """Collect comprehensive system report"""
