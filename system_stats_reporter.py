@@ -10,8 +10,9 @@ from datetime import datetime, timedelta
 from typing import Dict, Any, List
 import logging
 
-# Set environment
-os.environ['PG_DSN'] = 'postgres://postgres:ug1Hi~XHEMdMh_Lm~4UfUKtAejqLBGdg@crossover.proxy.rlwy.net:12306/railway'
+# Load environment from .env file
+from dotenv import load_dotenv
+load_dotenv()
 
 from pg_client_new import PgClient
 from services.service_manager import ServiceManager
