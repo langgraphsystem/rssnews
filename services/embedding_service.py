@@ -29,7 +29,7 @@ class EmbeddingService:
         self.generator = LocalEmbeddingGenerator()
         self.enabled = os.getenv("ENABLE_LOCAL_EMBEDDINGS", "true").lower() == "true"
 
-    async def process_pending_embeddings(self, batch_size: int = 100000) -> Dict[str, Any]:
+    async def process_pending_embeddings(self, batch_size: int = 1500) -> Dict[str, Any]:
         """Process chunks that need embeddings"""
         if not self.enabled:
             logger.info("Embedding service disabled")
