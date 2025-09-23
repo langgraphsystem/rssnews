@@ -1,0 +1,99 @@
+{
+  "timestamp": "2025-09-22T20:32:16.206853",
+  "feeds": {
+    "total_feeds": 118,
+    "active_feeds": 118,
+    "healthy_feeds": 118,
+    "top_sources": [
+      {
+        "domain": "theguardian.com",
+        "count": 2880
+      },
+      {
+        "domain": "nytimes.com",
+        "count": 1955
+      },
+      {
+        "domain": "go.com",
+        "count": 1489
+      },
+      {
+        "domain": "cbssports.com",
+        "count": 1443
+      },
+      {
+        "domain": "google.com",
+        "count": 1361
+      }
+    ]
+  },
+  "articles": {
+    "total_articles": 12339,
+    "recent_24h": 495,
+    "status_counts": {
+      "False": 12232,
+      "True": 107
+    },
+    "top_sources": [
+      {
+        "domain": "theguardian.com",
+        "count": 1080
+      },
+      {
+        "domain": "google.com",
+        "count": 864
+      },
+      {
+        "domain": "cbssports.com",
+        "count": 688
+      },
+      {
+        "domain": "go.com",
+        "count": 625
+      },
+      {
+        "domain": "nytimes.com",
+        "count": 615
+      }
+    ]
+  },
+  "chunks": {
+    "total_chunks": 154581,
+    "recent_24h": 2729,
+    "processing_stages": {
+      "complete": 3168,
+      "needs_fts": 117613,
+      "needs_embedding": 33800
+    },
+    "avg_chunks_per_article": 13.15
+  },
+  "embeddings": {
+    "embedded_chunks": 3168,
+    "pending_embeddings": 151413,
+    "recent_24h": 0,
+    "vector_dimensions": 3072,
+    "completion_rate": 2.05
+  },
+  "services": {
+    "service_manager_running": false,
+    "services": {
+      "chunking": {
+        "enabled": true,
+        "interval": 30,
+        "connectivity": true
+      },
+      "fts": {
+        "enabled": true,
+        "interval": 60,
+        "connectivity": true
+      },
+      "embedding": {
+        "enabled": true,
+        "interval": 45,
+        "connectivity": true
+      }
+    },
+    "llm_connectivity": true
+  },
+  "llm_insights": "1) Главные проблемы\n- Эмбеддинги практически не выполнены: только 2.05% завершено, 151,413 чанков в очереди.\n- Сервис-менеджер не запущен (service_manager_running: False) — вероятная причина остановки фоновых процессов.\n- Нет новых эмбеддингов за последние 24ч (recent_24h: 0) при большом inflow статей/чанков.\n- Большая очередь FTS/эмбеддингов: 117,613 помечено needs_fts и 33,800 needs_embedding — блокировка индексации/поиска.\n\n2) Метрики критичности\n- pending_embeddings = 151,413 (ключевой показатель обратной работы).\n- completion_rate = 2.05% и recent_24h embeddings = 0 (показывает стагнацию).\n- service_manager_running = False (оперативная причина).\n- needs_fts = 117,613 (влияние на полнотекстовый поиск/доступность контента).\n\n3) Первое, что делать\n- Запустить/перезапустить сервис-менеджер и проверить логи запуска — восстановить управление задачами.\n- После старта принудительно запустить/распараллелить workers для embedding и fts (пакетная обработка), чтобы разгрузить очередь.\n- Проверить лимиты/ключи LLM/эмбеддингового сервиса и подключение к внешнему провайдеру; убедиться, что нет ошибок аутентификации или rate-limit.\n\n4) Рекомендации для стабильности\n- Внедрить мониторинг и alerting на: pending_embeddings, completion_rate, recent_24h embeddings, service_manager_running.\n- Автоматический перезапуск сервис-менеджера и критичных воркеров при падении (health checks, systemd/k8s liveness).\n- Очередь задач: ограничение длины, приоритеты (сначала recent/важные), батчинг и экспоненциальное backoff для ошибок провайдера.\n- Масштабирование емкости эмбеддинговых воркеров (авто-скейлинг) и контроль rate-limits провайдера.\n- Регулярные прогон проверки индекса FTS и целост"
+}

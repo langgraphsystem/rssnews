@@ -84,7 +84,21 @@
       "Bash(time curl:*)",
       "Bash(find:*)",
       "Bash(del test_db.py)",
-      "Bash(del check_embeddings.py)"
+      "Bash(del check_embeddings.py)",
+      "Bash(set PG_DSN=postgresql://postgres:kVRUPMOdeXVEdUuKihPeJTgzZVIxqbZy@caboose.proxy.rlwy.net:13102/railway)",
+      "Bash($env:ENABLE_LOCAL_CHUNKING=\"true\")",
+      "Bash($env:OLLAMA_BASE_URL=\"http://localhost:11434\")",
+      "Bash($env:OLLAMA_MODEL=\"qwen2.5-coder:3b\")",
+      "Bash(call .venvScriptsactivate.bat)",
+      "Bash(.venvScriptsactivate)",
+      "Bash(.venv/Scripts/python.exe main.py:*)",
+      "Bash(del GPT5_TEST_REPORT.md)",
+      "Bash(del FINAL_TEST_REPORT.md)",
+      "Bash(del comprehensive_test.py)",
+      "Bash(del test_*.py)",
+      "Bash(del gpt5_batch.jsonl)",
+      "Bash(del test_batch.jsonl)",
+      "Bash(del check_crossover_embeddings.py)"
     ],
     "deny": [],
     "ask": []
