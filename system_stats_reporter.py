@@ -286,6 +286,12 @@ SERVICES: {stats.get('services', {})}
 
         return stats
 
+    def _escape_markdown(self, text: str) -> str:
+        """Escape special markdown characters for Telegram"""
+        if not text:
+            return ""
+        return text.replace('*', '\\*').replace('_', '\\_').replace('[', '\\[').replace(']', '\\]').replace('`', '\\`')
+
     def format_report_for_bot(self, stats: Dict[str, Any]) -> str:
         """Format statistics for bot message"""
         feeds = stats.get('feeds', {})
@@ -321,7 +327,7 @@ SERVICES: {stats.get('services', {})}
 • LLM: {'🟢' if services.get('llm_connectivity') else '🔴'}
 
 🤖 **AI INSIGHTS**
-{stats.get('llm_insights', 'No insights available').replace('*', '\\*').replace('_', '\\_').replace('[', '\\[').replace(']', '\\]').replace('`', '\\`')}
+{self._escape_markdown(stats.get('llm_insights', 'No insights available'))}
 """
         return report
 
