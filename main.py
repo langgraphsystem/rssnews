@@ -127,12 +127,6 @@ def main():
     p_db.add_argument("--sample", type=int, default=None, help="Show last N rows per core table")
     p_db.add_argument("--summary", action="store_true", help="Show summary stats (default if no flags)")
 
-    # Report command
-    p_report = sub.add_parser("report", help="Generate and send system report")
-    p_report.add_argument("--send-telegram", action="store_true", help="Send report to Telegram")
-    p_report.add_argument("--period-hours", type=int, default=8, help="Report period in hours (default: 8)")
-    p_report.add_argument("--format", choices=["markdown", "html"], default="html", help="Report format (default: html)")
-
     # Services command
     p_services = sub.add_parser("services", help="Manage processing services (chunking, FTS, embeddings)")
     p_services.add_argument("action", choices=["start", "run-once", "status"], help="Service action")
@@ -149,6 +143,21 @@ def main():
     p_services.add_argument(
         "--embedding-interval", type=int, default=45, help="Embedding service interval"
     )
+    # New: batch size controls with validation ranges
+    p_services.add_argument(
+        "--chunking-batch", type=int, default=None,
+        help="Chunking batch size (min 10, max 100)"
+    )
+    p_services.add_argument(
+        "--embedding-batch", type=int, default=None,
+        help="Embedding batch size (min 20, max 200)"
+    )
+
+    # Report command
+    p_report = sub.add_parser("report", help="Generate and send system report")
+    p_report.add_argument("--send-telegram", action="store_true", help="Send report to Telegram")
+    p_report.add_argument("--period-hours", type=int, default=8, help="Report period in hours (default: 8)")
+    p_report.add_argument("--format", choices=["markdown", "html"], default="html", help="Report format (default: html)")
 
     # LlamaIndex commands removed - using only local LLM chunking
 
@@ -570,6 +579,16 @@ def main():
                     manager.service_configs['fts']['interval'] = args.fts_interval
                 if args.embedding_interval:
                     manager.service_configs['embedding']['interval'] = args.embedding_interval
+
+                # Validate and apply batch sizes
+                if getattr(args, 'chunking_batch', None) is not None:
+                    if args.chunking_batch < 10 or args.chunking_batch > 100:
+                        raise ValueError("--chunking-batch must be between 10 and 100")
+                    manager.chunking_batch_size = args.chunking_batch
+                if getattr(args, 'embedding_batch', None) is not None:
+                    if args.embedding_batch < 20 or args.embedding_batch > 200:
+                        raise ValueError("--embedding-batch must be between 20 and 200")
+                    manager.embedding_batch_size = args.embedding_batch
 
                 if args.action == "start":
                     # Start all services continuously
