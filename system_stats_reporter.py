@@ -211,15 +211,12 @@ class SystemStatsReporter:
             # Get service status
             status = await self.service_manager.get_service_status()
 
-            # Test LLM connectivity
+            # Test LLM connectivity (basic check)
             llm_status = True
             try:
                 import httpx
-                async with httpx.AsyncClient(timeout=10.0) as client:
-                    response = await client.post(
-                        'http://localhost:11434/api/generate',
-                        json={'model': 'qwen2.5-coder:3b', 'prompt': 'Hello', 'stream': False}
-                    )
+                async with httpx.AsyncClient(timeout=5.0) as client:
+                    response = await client.get('http://localhost:11434/api/tags')
                     llm_status = response.status_code == 200
             except:
                 llm_status = False
@@ -324,7 +321,7 @@ SERVICES: {stats.get('services', {})}
 • LLM: {'🟢' if services.get('llm_connectivity') else '🔴'}
 
 🤖 **AI INSIGHTS**
-{stats.get('llm_insights', 'No insights available')}
+{stats.get('llm_insights', 'No insights available').replace('*', '\\*').replace('_', '\\_').replace('[', '\\[').replace(']', '\\]').replace('`', '\\`')}
 """
         return report
 
