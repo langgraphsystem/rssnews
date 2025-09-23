@@ -150,7 +150,7 @@ def main():
     )
     p_services.add_argument(
         "--embedding-batch", type=int, default=None,
-        help="Embedding batch size (min 20, max 5000)"
+        help="Embedding batch size (min 20, max 200000)"
     )
     p_services.add_argument(
         "--fts-batch", type=int, default=None,
@@ -590,8 +590,8 @@ def main():
                         raise ValueError("--chunking-batch must be between 10 and 100")
                     manager.chunking_batch_size = args.chunking_batch
                 if getattr(args, 'embedding_batch', None) is not None:
-                    if args.embedding_batch < 20 or args.embedding_batch > 5000:
-                        raise ValueError("--embedding-batch must be between 20 and 5000")
+                    if args.embedding_batch < 20 or args.embedding_batch > 200000:
+                        raise ValueError("--embedding-batch must be between 20 and 200000")
                     manager.embedding_batch_size = args.embedding_batch
                 if getattr(args, 'fts_batch', None) is not None:
                     if args.fts_batch < 100 or args.fts_batch > 200000:
