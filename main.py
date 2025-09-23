@@ -152,6 +152,10 @@ def main():
         "--embedding-batch", type=int, default=None,
         help="Embedding batch size (min 20, max 200)"
     )
+    p_services.add_argument(
+        "--fts-batch", type=int, default=None,
+        help="FTS batch size (min 100, max 50000)"
+    )
 
     # Report command
     p_report = sub.add_parser("report", help="Generate and send system report")
@@ -589,6 +593,10 @@ def main():
                     if args.embedding_batch < 20 or args.embedding_batch > 200:
                         raise ValueError("--embedding-batch must be between 20 and 200")
                     manager.embedding_batch_size = args.embedding_batch
+                if getattr(args, 'fts_batch', None) is not None:
+                    if args.fts_batch < 100 or args.fts_batch > 50000:
+                        raise ValueError("--fts-batch must be between 100 and 50000")
+                    manager.fts_batch_size = args.fts_batch
 
                 if args.action == "start":
                     # Start all services continuously

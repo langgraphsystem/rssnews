@@ -24,7 +24,7 @@ class FTSService:
     def __init__(self, db_client: Optional[PgClient] = None):
         self.db = db_client or PgClient()
 
-    async def update_fts_index(self, batch_size: int = 100) -> Dict[str, Any]:
+    async def update_fts_index(self, batch_size: int = 10000) -> Dict[str, Any]:
         """Update FTS vectors for chunks that need indexing"""
         logger.info("Starting FTS indexing service")
 

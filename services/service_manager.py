@@ -32,8 +32,9 @@ class ServiceManager:
         self.running = False
         self.executor = ThreadPoolExecutor(max_workers=4)
         # Default batch sizes (overridable from CLI)
-        # Chunking: 100 articles per pass; Embeddings: 200 chunks per pass
+        # Chunking: 100 articles per pass; FTS: 10000 chunks per pass; Embeddings: 200 chunks per pass
         self.chunking_batch_size: int = 100
+        self.fts_batch_size: int = 10000
         self.embedding_batch_size: int = 200
 
         # Initialize services
@@ -99,7 +100,7 @@ class ServiceManager:
                 if service_name == 'chunking':
                     await service.process_pending_chunks(batch_size=self.chunking_batch_size)
                 elif service_name == 'fts':
-                    await service.update_fts_index()
+                    await service.update_fts_index(batch_size=self.fts_batch_size)
                 elif service_name == 'embedding':
                     await service.process_pending_embeddings(batch_size=self.embedding_batch_size)
 
@@ -135,7 +136,7 @@ class ServiceManager:
                 if service_name == 'chunking':
                     result = await config['service'].process_pending_chunks(batch_size=self.chunking_batch_size)
                 elif service_name == 'fts':
-                    result = await config['service'].update_fts_index()
+                    result = await config['service'].update_fts_index(batch_size=self.fts_batch_size)
                 elif service_name == 'embedding':
                     result = await config['service'].process_pending_embeddings(batch_size=self.embedding_batch_size)
 
