@@ -154,7 +154,7 @@ def main():
     )
     p_services.add_argument(
         "--fts-batch", type=int, default=None,
-        help="FTS batch size (min 100, max 50000)"
+        help="FTS batch size (min 100, max 200000)"
     )
 
     # Report command
@@ -594,8 +594,8 @@ def main():
                         raise ValueError("--embedding-batch must be between 20 and 200")
                     manager.embedding_batch_size = args.embedding_batch
                 if getattr(args, 'fts_batch', None) is not None:
-                    if args.fts_batch < 100 or args.fts_batch > 50000:
-                        raise ValueError("--fts-batch must be between 100 and 50000")
+                    if args.fts_batch < 100 or args.fts_batch > 200000:
+                        raise ValueError("--fts-batch must be between 100 and 200000")
                     manager.fts_batch_size = args.fts_batch
 
                 if args.action == "start":

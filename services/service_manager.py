@@ -32,9 +32,9 @@ class ServiceManager:
         self.running = False
         self.executor = ThreadPoolExecutor(max_workers=4)
         # Default batch sizes (overridable from CLI)
-        # Chunking: 100 articles per pass; FTS: 10000 chunks per pass; Embeddings: 200 chunks per pass
+        # Chunking: 100 articles per pass; FTS: 100000 chunks per pass; Embeddings: 200 chunks per pass
         self.chunking_batch_size: int = 100
-        self.fts_batch_size: int = 10000
+        self.fts_batch_size: int = 100000
         self.embedding_batch_size: int = 200
 
         # Initialize services
