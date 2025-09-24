@@ -30,6 +30,8 @@ from ranking_api import RankingAPI, SearchRequest
 from bot_service.formatters import MessageFormatter
 from bot_service.commands import CommandHandler
 from bot_service.quality_ux import QualityUXHandler
+from bot_service.rate_limiter import rate_limiter, TelegramRateLimiter
+from bot_service.error_handler import TelegramErrorHandler, log_user_action, log_error
 from database.production_db_client import ProductionDBClient
 
 logger = logging.getLogger(__name__)
@@ -75,7 +77,12 @@ class AdvancedRSSBot:
         self.user_sessions = {}  # user_id -> session_data
         self.user_preferences = {}  # user_id -> preferences
 
-        # Rate limiting
+        # Rate limiting and error handling
+        self.rate_limiter = TelegramRateLimiter()
+        self.error_handler = TelegramErrorHandler(
+            bot_token=bot_token,
+            developer_chat_id=os.getenv('TELEGRAM_DEVELOPER_CHAT_ID')
+        )
         self.rate_limits = {}  # user_id -> {'last_request': timestamp, 'count': int}
 
         logger.info("✅ Advanced RSS Bot initialized successfully!")
@@ -112,47 +119,61 @@ class AdvancedRSSBot:
     async def _send_message(self, chat_id: str, text: str,
                            reply_markup: Dict = None,
                            parse_mode: str = "Markdown") -> bool:
-        """Send message to Telegram chat"""
+        """Send message to Telegram chat with rate limiting"""
         try:
             logger.debug(f"📤 Sending message to chat {chat_id}: {text[:100]}...")
 
-            payload = {
-                'chat_id': chat_id,
-                'text': text,
-                'parse_mode': parse_mode,
-                'disable_web_page_preview': True
-            }
+            # Check rate limits before sending
+            if not await self.rate_limiter.acquire(chat_id):
+                logger.warning(f"⏰ Rate limit hit for chat {chat_id}")
+                return False
 
-            if reply_markup:
-                payload['reply_markup'] = json.dumps(reply_markup)
-                logger.debug(f"🔘 Including reply markup: {reply_markup}")
+            async def send_func():
+                payload = {
+                    'chat_id': chat_id,
+                    'text': text,
+                    'parse_mode': parse_mode,
+                    'disable_web_page_preview': True
+                }
 
-            logger.debug(f"📡 API URL: {self.api_base}/sendMessage")
-            logger.debug(f"📦 Payload keys: {list(payload.keys())}")
+                if reply_markup:
+                    payload['reply_markup'] = json.dumps(reply_markup)
+                    logger.debug(f"🔘 Including reply markup: {reply_markup}")
 
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.post(
-                    f"{self.api_base}/sendMessage",
-                    json=payload
-                )
+                logger.debug(f"📡 API URL: {self.api_base}/sendMessage")
+                logger.debug(f"📦 Payload keys: {list(payload.keys())}")
 
-                logger.info(f"📡 Telegram API response: {response.status_code}")
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    response = await client.post(
+                        f"{self.api_base}/sendMessage",
+                        json=payload
+                    )
 
-                if response.status_code == 200:
-                    logger.info("✅ Message sent successfully")
-                    return True
-                else:
-                    logger.error(f"❌ Failed to send message: {response.status_code}")
-                    logger.error(f"🔍 Response: {response.text}")
+                    logger.info(f"📡 Telegram API response: {response.status_code}")
 
-                    # Try to parse error details
-                    try:
-                        error_data = response.json()
-                        logger.error(f"💥 Telegram error: {error_data}")
-                    except:
-                        logger.error("💥 Could not parse error response as JSON")
+                    if response.status_code == 200:
+                        logger.info("✅ Message sent successfully")
+                        return response
+                    else:
+                        logger.error(f"❌ Failed to send message: {response.status_code}")
+                        logger.error(f"🔍 Response: {response.text}")
 
-                    return False
+                        # Try to parse error details
+                        try:
+                            error_data = response.json()
+                            logger.error(f"💥 Telegram error: {error_data}")
+                        except:
+                            logger.error("💥 Could not parse error response as JSON")
+
+                        # Raise exception for rate limiter to handle
+                        if response.status_code == 429:
+                            raise Exception(f"429 Too Many Requests: {response.text}")
+                        else:
+                            raise Exception(f"HTTP {response.status_code}: {response.text}")
+
+            # Use rate limiter's retry mechanism
+            await self.rate_limiter.send_with_retry(send_func)
+            return True
 
         except Exception as e:
             logger.error(f"💥 Exception while sending message: {e}")
@@ -456,7 +477,7 @@ class AdvancedRSSBot:
         return await self._send_message(chat_id, "⚙️ Settings updated")
 
     async def process_message(self, message: Dict[str, Any]) -> bool:
-        """Process incoming message"""
+        """Process incoming message with error handling"""
         try:
             logger.info(f"📨 Processing incoming message: {json.dumps(message, indent=2)}")
 
@@ -468,7 +489,15 @@ class AdvancedRSSBot:
 
             logger.info(f"👤 User {user_id} in chat {chat_id}: '{text}'")
 
-            # Log user interaction
+            # Log user action with structured logging
+            log_user_action(
+                user_id=user_id,
+                chat_id=chat_id,
+                action=text.split()[0] if text else 'message',
+                details=f"Message: {text[:50]}..."
+            )
+
+            # Log user interaction in database
             try:
                 self.db.log_user_interaction(
                     user_id=user_id,
@@ -480,6 +509,7 @@ class AdvancedRSSBot:
                 logger.debug("📊 User interaction logged")
             except Exception as e:
                 logger.warning(f"⚠️ Failed to log user interaction: {e}")
+                log_error(e, user_id, chat_id, 'log_interaction')
 
             if not text:
                 logger.info("📭 Empty message text, skipping")
@@ -569,6 +599,27 @@ class AdvancedRSSBot:
 
         except Exception as e:
             logger.error(f"Message processing failed: {e}")
+            log_error(e, user_id if 'user_id' in locals() else None,
+                     chat_id if 'chat_id' in locals() else None, 'process_message')
+
+            # Use error handler for user notification
+            if 'chat_id' in locals():
+                try:
+                    # Create mock update object for error handler
+                    mock_update = type('Update', (), {
+                        'effective_chat': type('Chat', (), {'id': int(chat_id)})(),
+                        'effective_user': type('User', (), {'id': int(user_id) if 'user_id' in locals() else None})() if 'user_id' in locals() else None,
+                        'effective_message': type('Message', (), {
+                            'text': text if 'text' in locals() else None,
+                            'reply_text': lambda t: self._send_message(chat_id, t)
+                        })()
+                    })()
+
+                    mock_context = type('Context', (), {'error': e})()
+                    await self.error_handler.handle_error(mock_update, mock_context)
+                except:
+                    pass  # Fallback error handling failed, but don't crash
+
             return False
 
     async def process_callback_query(self, callback_query: Dict[str, Any]) -> bool:
