@@ -51,14 +51,15 @@ structlog==24.2.0
 # AI clients
 openai==1.108.2
 
-# Production ranking and deduplication
-datasketch==1.6.4
-numpy==1.26.4
-scikit-learn==1.5.1
+# Production ranking and deduplication (2025 latest)
+datasketch==1.6.5
+numpy==2.3.3
+scikit-learn==1.7.2
 
-# Clustering and ML
-hdbscan==0.8.34
-umap-learn==0.5.6
+# Clustering and ML (2025 latest)
+hdbscan==0.8.38
+umap-learn==0.5.8
 
 # Performance and caching
 diskcache==5.6.3
+redis==5.2.0
