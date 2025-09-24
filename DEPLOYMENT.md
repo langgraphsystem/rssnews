@@ -89,9 +89,9 @@ python system_stats_reporter.py
 
 **Core ML/AI Libraries:**
 - `numpy==2.3.3` (September 2025 release)
-- `scikit-learn==1.7.2` (includes HDBSCAN)
+- `scikit-learn==1.7.2` (includes integrated HDBSCAN)
 - `datasketch==1.6.5` (MinHash deduplication)
-- `hdbscan==0.8.38` (clustering)
+- `hdbscan==0.8.40` (standalone clustering - latest PyPI version)
 - `umap-learn==0.5.8` (dimensionality reduction)
 
 **Production Dependencies:**

@@ -57,7 +57,7 @@ numpy==2.3.3
 scikit-learn==1.7.2
 
 # Clustering and ML (2025 latest)
-hdbscan==0.8.38
+hdbscan==0.8.40
 umap-learn==0.5.8
 
 # Performance and caching
