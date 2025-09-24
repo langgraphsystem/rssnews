@@ -96,7 +96,7 @@ python system_stats_reporter.py
 
 **Production Dependencies:**
 - `openai==1.108.2` (GPT-5 support)
-- `redis==5.2.0` (caching)
+- `redis>=5.0,<6` (caching and queues)
 - `psycopg2-binary==2.9.10` (PostgreSQL)
 
 ## ⚙️ Configuration Management

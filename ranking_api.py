@@ -21,6 +21,7 @@ from ranking_service.deduplication import DeduplicationEngine
 from ranking_service.diversification import MMRDiversifier
 from ranking_service.explainability import ExplainabilityEngine
 from local_embedding_generator import LocalEmbeddingGenerator
+from caching_service import CachingService
 
 logger = logging.getLogger(__name__)
 
@@ -65,6 +66,7 @@ class RankingAPI:
         self.diversifier = MMRDiversifier()
         self.explainer = ExplainabilityEngine()
         self.embedding_generator = LocalEmbeddingGenerator()
+        self.cache = CachingService()
 
         # Load dynamic weights from database
         self._load_scoring_weights()
@@ -235,6 +237,28 @@ class RankingAPI:
                     search_method=request.method
                 )
 
+            # Check cache first (if no offset requested)
+            if request.offset == 0 and not request.explain:
+                cached_results = self.cache.get_cached_search_results(
+                    query_normalized, request.method, request.filters
+                )
+                if cached_results:
+                    response_time = int((time.time() - start_time) * 1000)
+                    logger.info(f"Cache hit for '{request.query}' ({response_time}ms)")
+
+                    # Trim to requested limit
+                    final_results = cached_results[:request.limit]
+
+                    return SearchResponse(
+                        query=request.query,
+                        query_normalized=query_normalized,
+                        total_results=len(cached_results),
+                        results=final_results,
+                        response_time_ms=response_time,
+                        search_method=request.method,
+                        applied_filters={'cached': True}
+                    )
+
             logger.info(f"Search request: '{request.query}' method={request.method} limit={request.limit}")
 
             # Step 1: Retrieve candidates
@@ -299,6 +323,17 @@ class RankingAPI:
                     session_id=request.session_id
                 )
                 self.db.log_search(search_log)
+
+            # Cache results if successful and not offset-based
+            if (request.offset == 0 and not request.explain and
+                len(final_results) > 0 and response_time < 2000):  # Cache fast, successful searches
+                try:
+                    self.cache.cache_search_results(
+                        query_normalized, request.method, request.filters,
+                        final_results[:20]  # Cache up to 20 results
+                    )
+                except Exception as cache_error:
+                    logger.debug(f"Failed to cache results: {cache_error}")
 
             # Prepare response
             response = SearchResponse(
@@ -423,6 +458,11 @@ class RankingAPI:
     def get_system_health(self) -> Dict[str, Any]:
         """Get system health and performance metrics"""
         try:
+            # Check cache first
+            cached_health = self.cache.get_cached_system_health()
+            if cached_health:
+                return cached_health
+
             # Get recent search analytics
             analytics = self.db.get_search_analytics(days=1)
 
@@ -435,14 +475,23 @@ class RankingAPI:
             # Get current configuration
             current_weights = self.db.get_scoring_weights()
 
-            return {
+            # Get cache statistics
+            cache_stats = self.cache.get_cache_stats()
+
+            health_data = {
                 'timestamp': datetime.utcnow().isoformat(),
                 'search_analytics': analytics,
                 'quality_trend': quality_trend[-1] if quality_trend else None,
                 'top_domains': top_domains,
                 'current_weights': current_weights,
+                'cache_stats': cache_stats,
                 'system_status': 'healthy'
             }
+
+            # Cache the health data
+            self.cache.cache_system_health(health_data)
+
+            return health_data
 
         except Exception as e:
             logger.error(f"Failed to get system health: {e}")
@@ -458,7 +507,7 @@ async def main():
     import argparse
 
     parser = argparse.ArgumentParser(description='RSS News Ranking API')
-    parser.add_argument('command', choices=['search', 'ask', 'health', 'weights'],
+    parser.add_argument('command', choices=['search', 'ask', 'health', 'weights', 'cache'],
                        help='Command to run')
     parser.add_argument('--query', type=str, help='Search query')
     parser.add_argument('--method', type=str, default='hybrid',
@@ -466,6 +515,8 @@ async def main():
     parser.add_argument('--limit', type=int, default=10, help='Result limit')
     parser.add_argument('--explain', action='store_true', help='Include explanations')
     parser.add_argument('--user-id', type=str, help='User ID for logging')
+    parser.add_argument('--cache-action', type=str, choices=['stats', 'clear', 'warm'],
+                       help='Cache management action')
 
     args = parser.parse_args()
 
@@ -562,6 +613,48 @@ async def main():
         print(f"\n=== Current Scoring Weights ===")
         for key, value in weights.items():
             print(f"{key}: {value}")
+
+    elif args.command == 'cache':
+        if not args.cache_action:
+            print("Error: --cache-action is required for cache command")
+            print("Available actions: stats, clear, warm")
+            return
+
+        if args.cache_action == 'stats':
+            # Show cache statistics
+            stats = api.cache.get_cache_stats()
+            print(f"\n=== Redis Cache Statistics ===")
+            if stats.get('error'):
+                print(f"Error: {stats['error']}")
+            else:
+                print(f"Redis Version: {stats.get('redis_version', 'unknown')}")
+                print(f"Memory Used: {stats.get('used_memory_human', 'unknown')}")
+                print(f"Connected Clients: {stats.get('connected_clients', 0)}")
+                print(f"Total Keys: {stats.get('total_keys', 0)}")
+                print(f"Cache Hit Ratio: {stats.get('cache_hit_ratio', 0)}%")
+                print(f"Uptime: {stats.get('uptime_seconds', 0)} seconds")
+
+                if stats.get('key_counts_by_type'):
+                    print(f"\nKey Distribution:")
+                    for key_type, count in stats['key_counts_by_type'].items():
+                        print(f"  {key_type}: {count} keys")
+
+        elif args.cache_action == 'clear':
+            # Clear cache
+            count = api.cache.invalidate_cache('*')
+            print(f"🗑️  Cleared {count} cache entries")
+
+        elif args.cache_action == 'warm':
+            # Warm up cache
+            print("🔥 Warming up cache with popular queries...")
+            result = api.cache.warm_cache(api)
+            if result.get('error'):
+                print(f"Error: {result['error']}")
+            else:
+                print(f"✅ Cache warming completed:")
+                print(f"  Searches cached: {result.get('searches', 0)}")
+                print(f"  Trends cached: {result.get('trends', 0)}")
+                print(f"  Health cached: {result.get('health', 0)}")
 
 
 if __name__ == "__main__":
