@@ -102,6 +102,23 @@ Ready to explore the news\\? 🚀"""
 • `/trends` \\- Current trending topics
 • `/quality` \\- System performance metrics
 
+**🗄️ Database Management:**
+• `/dbstats` \\- Database statistics
+• `/dbquery [SQL]` \\- Execute safe queries
+• `/dbclean [type]` \\- Clean old data
+• `/dbbackup` \\- Backup information
+• `/dbtables` \\- Show database tables
+• `/dbconfig [key] [value]` \\- Manage configuration
+
+**🤖 GPT\\-5 Data Analysis:**
+• `/analyze [query] [timeframe]` \\- Deep data analysis
+• `/summarize [topic] [length]` \\- AI\\-powered summaries
+• `/aggregate [metric] [groupby]` \\- Data aggregation
+• `/filter [criteria] [value]` \\- Smart filtering
+• `/insights [topic]` \\- Business insights generation
+• `/sentiment [query]` \\- Sentiment analysis
+• `/topics [scope]` \\- Topic modeling & trends
+
 **⚙️ Settings:**
 • `/settings` \\- Configure search preferences
 • Default: hybrid search, 10 results, explanations on
