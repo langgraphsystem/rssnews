@@ -163,6 +163,10 @@ def main():
     p_report.add_argument("--period-hours", type=int, default=8, help="Report period in hours (default: 8)")
     p_report.add_argument("--format", choices=["markdown", "html"], default="html", help="Report format (default: html)")
 
+    # Bot command
+    p_bot = sub.add_parser("bot", help="Start Telegram bot with 2025 best practices")
+    p_bot.add_argument("--polling", action="store_true", default=True, help="Use polling mode (default)")
+
     # LlamaIndex commands removed - using only local LLM chunking
 
     args = ap.parse_args()
@@ -631,6 +635,71 @@ def main():
             except Exception as e:
                 logger.error(f"Services command failed: {e}")
                 print(f"✗ Services error: {e}")
+            return
+
+        if args.cmd == "bot":
+            logger.info("Starting Telegram bot with 2025 best practices")
+            try:
+                print("🤖 Starting RSS News Telegram Bot...")
+                print("📱 Bot: @rssnewsusabot")
+                print("🚦 2025 Rate Limiting: ✅")
+                print("🚨 Advanced Error Handling: ✅")
+                print("📊 Structured Logging: ✅")
+                print()
+
+                # Import and initialize bot directly
+                import asyncio
+                from bot_service.advanced_bot import AdvancedRSSBot
+                from run_bot import BotRunner
+
+                # Get bot token from environment
+                bot_token = os.getenv('TELEGRAM_BOT_TOKEN')
+                pg_dsn = os.getenv('PG_DSN')
+
+                if not bot_token:
+                    logger.error("❌ TELEGRAM_BOT_TOKEN environment variable not set")
+                    print("❌ TELEGRAM_BOT_TOKEN not found in environment")
+                    return 1
+
+                if not pg_dsn:
+                    logger.error("❌ PG_DSN environment variable not set")
+                    print("❌ PG_DSN not found in environment")
+                    return 1
+
+                print(f"✅ Bot token found")
+                print(f"✅ Database connection found")
+                print()
+
+                # Create async function and run it
+                async def run_bot_async():
+                    # Create and run bot runner
+                    runner = BotRunner(bot_token)
+
+                    # Initialize bot
+                    if not await runner.initialize_bot():
+                        logger.error("❌ Bot initialization failed")
+                        print("❌ Bot initialization failed")
+                        return False
+
+                    print("🔄 Starting polling loop...")
+                    print("📱 Send /help to your bot to test!")
+
+                    # Run polling
+                    await runner.run_polling()
+                    return True
+
+                # Run the async bot function
+                success = asyncio.run(run_bot_async())
+                if not success:
+                    return 1
+
+            except KeyboardInterrupt:
+                logger.info("Bot stopped by user")
+                print("⏹️ Bot stopped")
+            except Exception as e:
+                logger.error(f"Bot failed: {e}")
+                print(f"❌ Bot failed: {e}")
+                return 1
             return
 
         # Handle LlamaIndex commands (removed)
