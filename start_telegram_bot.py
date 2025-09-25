@@ -36,6 +36,7 @@ def main():
     # Check environment variables with fallbacks
     bot_token = os.getenv('TELEGRAM_BOT_TOKEN')
     pg_dsn = os.getenv('PG_DSN')
+    openai_api_key = os.getenv('OPENAI_API_KEY')
 
     # Try alternative environment variable patterns that Railway might use
     if not bot_token:
@@ -62,9 +63,17 @@ def main():
         bot_token = "7477585710:AAG7iuQRm1EZsKoDzDf5yZtqxkaPU7i2frk"  # From railway variables
         pg_dsn = "postgresql://postgres:ug1Hi~XHEMdMh_Lm~4UfUKtAejqLBGdg@crossover.proxy.rlwy.net:12306/railway?sslmode=disable"
 
+    # Add OpenAI API Key fallback for GPT-5 functionality
+    if not openai_api_key:
+        print("🔧 GPT-5 functionality requires OPENAI_API_KEY to be set in Railway dashboard")
+        print("💡 Set OPENAI_API_KEY environment variable in Railway for GPT-5 commands to work")
+        # For now, GPT-5 commands will show error message until API key is properly configured
+        openai_api_key = "NEEDS_TO_BE_SET_IN_RAILWAY_DASHBOARD"
+
     print("🔍 Final environment check:")
     print(f"  TELEGRAM_BOT_TOKEN: {'✅ Set' if bot_token else '❌ Missing'}")
     print(f"  PG_DSN: {'✅ Set' if pg_dsn else '❌ Missing'}")
+    print(f"  OPENAI_API_KEY: {'✅ Set' if openai_api_key else '❌ Missing'}")
     print()
 
     if not bot_token:
@@ -80,6 +89,7 @@ def main():
     # Set the environment variables for child processes
     os.environ['TELEGRAM_BOT_TOKEN'] = bot_token
     os.environ['PG_DSN'] = pg_dsn
+    os.environ['OPENAI_API_KEY'] = openai_api_key
 
     try:
         print("🤖 Starting RSS News Telegram Bot...")
