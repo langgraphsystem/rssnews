@@ -886,7 +886,7 @@ Provide a comprehensive analysis covering:
 
 Format as structured report with emojis and clear sections."""
 
-            from gpt5_service import create_gpt5_service
+            from gpt5_service_new import create_gpt5_service
             gpt5 = create_gpt5_service("gpt-5-mini")
 
             analysis = gpt5.send_analysis(analysis_prompt, max_completion_tokens=1000)
@@ -951,7 +951,7 @@ Requirements:
 - Highlight the most important insights
 - Use clear formatting with emojis"""
 
-            from gpt5_service import create_gpt5_service
+            from gpt5_service_new import create_gpt5_service
             gpt5 = create_gpt5_service("gpt-5")
 
             summary = gpt5.send_chat(summary_prompt, max_completion_tokens=config['tokens'])
@@ -1013,7 +1013,7 @@ Provide:
 
 Format with charts, tables, and visual elements using emojis."""
 
-            from gpt5_service import create_gpt5_service
+            from gpt5_service_new import create_gpt5_service
             gpt5 = create_gpt5_service("gpt-5-mini")
 
             aggregation = gpt5.send_analysis(aggregation_prompt, max_completion_tokens=800)
@@ -1082,7 +1082,7 @@ Tasks:
 
 Return top 10 filtered articles with explanations."""
 
-            from gpt5_service import create_gpt5_service
+            from gpt5_service_new import create_gpt5_service
             gpt5 = create_gpt5_service("gpt-5")
 
             filtered_results = gpt5.send_analysis(filter_prompt, max_completion_tokens=1000)
@@ -1144,7 +1144,7 @@ Provide comprehensive insights covering:
 
 Format as executive briefing with clear sections."""
 
-            from gpt5_service import create_gpt5_service
+            from gpt5_service_new import create_gpt5_service
             gpt5 = create_gpt5_service("gpt-5")
 
             insights = gpt5.send_insights(insights_prompt, max_completion_tokens=1200)
@@ -1208,7 +1208,7 @@ Analyze and provide:
 
 Use emojis and clear formatting."""
 
-            from gpt5_service import create_gpt5_service
+            from gpt5_service_new import create_gpt5_service
             gpt5 = create_gpt5_service("gpt-5-mini")
 
             sentiment_analysis = gpt5.send_sentiment(sentiment_prompt, max_completion_tokens=1000)
@@ -1276,7 +1276,7 @@ Provide comprehensive topic analysis:
 
 Use emojis, percentages, and visual formatting."""
 
-            from gpt5_service import create_gpt5_service
+            from gpt5_service_new import create_gpt5_service
             gpt5 = create_gpt5_service("gpt-5")
 
             topic_analysis = gpt5.send_analysis(topics_prompt, max_completion_tokens=1200)

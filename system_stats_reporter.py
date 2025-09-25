@@ -253,11 +253,7 @@ SERVICES: {stats.get('services', {})}
             from gpt5_service_new import GPT5Service
 
             service = GPT5Service()
-            response = service.send(
-                message=prompt,
-                model_id="gpt-5-mini",  # Cost-effective for analysis
-                max_completion_tokens=500
-            )
+            response = service.send_insights(prompt)
 
             return response.strip() if response else "GPT-5 анализ недоступен"
 
