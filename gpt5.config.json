@@ -1,21 +1,51 @@
 {
-  "version": "1.0",
+  "version": "2.0",
+  "api_version": "2025-08-07",
   "models": [
-    { "id": "gpt-5",       "supports_reasoning_effort": true  },
-    { "id": "gpt-5-mini",  "supports_reasoning_effort": true },
-    { "id": "gpt-5-nano",  "supports_reasoning_effort": false }
+    { "id": "gpt-5", "supports_reasoning_effort": true, "context_length": 400000, "max_output_tokens": 128000 },
+    { "id": "gpt-5-mini", "supports_reasoning_effort": true, "context_length": 400000, "max_output_tokens": 128000 },
+    { "id": "gpt-5-nano", "supports_reasoning_effort": true, "context_length": 400000, "max_output_tokens": 128000 },
+    { "id": "gpt-5-chat", "supports_reasoning_effort": true, "context_length": 400000, "max_output_tokens": 128000 }
   ],
-  "routing": { "qa": "gpt-5", "code": "gpt-5", "chat": "gpt-5-mini", "bulk": "gpt-5-nano" },
+  "routing": {
+    "qa": "gpt-5",
+    "code": "gpt-5",
+    "chat": "gpt-5-mini",
+    "bulk": "gpt-5-nano",
+    "analysis": "gpt-5",
+    "sentiment": "gpt-5-mini",
+    "insights": "gpt-5"
+  },
+  "verbosity_levels": ["low", "medium", "high"],
+  "reasoning_effort_levels": ["minimal", "low", "medium", "high"],
   "presets": {
-    "deterministic": { "max_output_tokens": 512 },
-    "creative":      { "max_output_tokens": 1024 }
+    "deterministic": {
+      "max_output_tokens": 1000,
+      "verbosity": "medium",
+      "reasoning_effort": "minimal"
+    },
+    "creative": {
+      "max_output_tokens": 2000,
+      "verbosity": "high",
+      "reasoning_effort": "medium"
+    },
+    "fast": {
+      "max_output_tokens": 512,
+      "verbosity": "low",
+      "reasoning_effort": "minimal"
+    },
+    "detailed": {
+      "max_output_tokens": 4000,
+      "verbosity": "high",
+      "reasoning_effort": "high"
+    }
   },
   "request_template": {
     "model": "{{model_id}}",
     "input": [{"role":"user","content":[{"type":"input_text","text":"{{message}}"}]}],
     "max_output_tokens": "{{max_output_tokens}}",
     "reasoning": "{{reasoning_or_null}}",
-    "text": {"verbosity": "low"},
+    "text": {"verbosity": "{{verbosity}}"},
     "stream": "{{stream_bool}}"
   }
 }

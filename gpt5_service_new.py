@@ -1,4 +1,4 @@
-"""GPT-5 Service with OpenAI Responses API integration."""
+"""GPT-5 Service with correct OpenAI API integration."""
 
 import json
 import os
@@ -9,7 +9,7 @@ from openai import OpenAI
 
 
 class GPT5Service:
-    """Service for GPT-5 models using OpenAI Responses API."""
+    """Service for GPT-5 models using OpenAI Chat Completions API."""
 
     def __init__(self, config_path: str = "gpt5.config.json") -> None:
         """Initialize service with config and OpenAI client.
@@ -37,34 +37,14 @@ class GPT5Service:
 
         self.client = OpenAI(api_key=api_key)
 
-    def _merge(self, preset_name: str, model_id: str) -> Dict[str, Any]:
-        """Merge preset values with request template.
-
-        Args:
-            preset_name: Name of preset from config
-            model_id: Model identifier
-
-        Returns:
-            Merged configuration dictionary
-
-        Raises:
-            KeyError: If preset not found in config
-        """
-        if preset_name not in self.config["presets"]:
-            raise KeyError(f"Preset '{preset_name}' not found in config")
-
-        preset = self.config["presets"][preset_name].copy()
-        template = self.config["request_template"].copy()
-
-        # Merge preset values into template
-        for key, value in preset.items():
-            if f"{{{{{key}}}}}" in str(template):
-                # Replace placeholder with actual value
-                template = json.loads(
-                    json.dumps(template).replace(f"{{{{{key}}}}}", str(value))
-                )
-
-        return template
+        # Available GPT-5 models and their requirements
+        self.available_models = {
+            "gpt-5": {"endpoint": "chat", "temperature": 1, "supports_reasoning": True},
+            "gpt-5-mini": {"endpoint": "chat", "temperature": 1, "supports_reasoning": False},
+            "gpt-5-nano": {"endpoint": "chat", "temperature": 1, "supports_reasoning": False},
+            "gpt-5-chat-latest": {"endpoint": "chat", "temperature": 1, "supports_reasoning": False},
+            "gpt-5-codex": {"endpoint": "responses", "temperature": 1, "supports_reasoning": False},
+        }
 
     def choose_model(self, task: str) -> str:
         """Choose model ID based on task routing.
@@ -73,200 +53,207 @@ class GPT5Service:
             task: Task type for routing
 
         Returns:
-            Model ID string, defaults to "gpt-5" if task not found
+            Model ID string, defaults to "gpt-5-chat-latest" if task not found
         """
-        return self.config["routing"].get(task, "gpt-5")
+        # Updated routing to use available models
+        routing = {
+            "qa": "gpt-5-chat-latest",
+            "code": "gpt-5-codex",
+            "chat": "gpt-5-chat-latest",
+            "bulk": "gpt-5-nano",
+            "analysis": "gpt-5-chat-latest",
+            "sentiment": "gpt-5-mini",
+            "insights": "gpt-5-chat-latest"
+        }
+        return routing.get(task, "gpt-5-chat-latest")
 
-    def build_request(
+    def send_chat_completion(
         self,
         message: str,
-        model_id: str,
-        preset: str = "deterministic",
-        stream: bool = False,
-        reasoning_effort: Optional[str] = None,
-        response_format: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
-        """Build request payload for Responses API.
-
-        Args:
-            message: User message text
-            model_id: Model identifier
-            preset: Preset name from config
-            stream: Enable streaming
-            reasoning_effort: Reasoning effort level
-            response_format: Custom response format
-
-        Returns:
-            Request payload dictionary
-
-        Raises:
-            KeyError: If preset or model not found
-        """
-        request = self._merge(preset, model_id)
-
-        # Check if model supports reasoning
-        model_info = None
-        for model in self.config["models"]:
-            if model["id"] == model_id:
-                model_info = model
-                break
-
-        if not model_info:
-            raise KeyError(f"Model '{model_id}' not found in config")
-
-        # Replace remaining placeholders
-        request_json = json.dumps(request)
-        request_json = request_json.replace('"{{model_id}}"', f'"{model_id}"')
-        request_json = request_json.replace('"{{message}}"', json.dumps(message))
-        request_json = request_json.replace('"{{stream_bool}}"', str(stream).lower())
-
-        # Handle reasoning parameter
-        if (reasoning_effort is not None and
-            model_info["supports_reasoning_effort"]):
-            reasoning_value = json.dumps({"effort": reasoning_effort})
-        else:
-            reasoning_value = "null"
-
-        request_json = request_json.replace('"{{reasoning_or_null}}"', reasoning_value)
-
-        request = json.loads(request_json)
-
-        # Fix integer types
-        if "max_output_tokens" in request:
-            request["max_output_tokens"] = int(request["max_output_tokens"])
-
-        # Override response format if provided
-        if response_format is not None:
-            request["response_format"] = response_format
-
-        return request
-
-    def send(
-        self,
-        message: str,
-        model_id: str = "gpt-5",
-        preset: str = "deterministic",
-        stream: bool = False,
-        reasoning_effort: Optional[str] = None,
-        response_format: Optional[Dict[str, Any]] = None
-    ) -> Union[str, Dict[str, Any]]:
-        """Send message to OpenAI Responses API.
+        model_id: str = "gpt-5-chat-latest",
+        max_completion_tokens: int = 1000,
+        stream: bool = False
+    ) -> str:
+        """Send message using Chat Completions API.
 
         Args:
             message: User message
             model_id: Model to use
-            preset: Configuration preset
+            max_completion_tokens: Maximum tokens in response
             stream: Enable streaming
-            reasoning_effort: Reasoning effort level
-            response_format: Custom response format
 
         Returns:
-            Response text or JSON depending on response_format
+            Response text
 
         Raises:
             Exception: For API errors with full error details
         """
-        request_payload = self.build_request(
-            message=message,
-            model_id=model_id,
-            preset=preset,
-            stream=stream,
-            reasoning_effort=reasoning_effort,
-            response_format=response_format
-        )
+        if model_id not in self.available_models:
+            raise ValueError(f"Model {model_id} not available. Available: {list(self.available_models.keys())}")
+
+        model_config = self.available_models[model_id]
+
+        if model_config["endpoint"] != "chat":
+            raise ValueError(f"Model {model_id} requires responses endpoint, use send_responses instead")
 
         try:
             if stream:
-                # Remove stream parameter from payload for streaming
-                stream_payload = {k: v for k, v in request_payload.items() if k != 'stream'}
-
                 # Streaming response
-                with self.client.responses.stream(**stream_payload) as response_stream:
-                    full_text = ""
+                stream_response = self.client.chat.completions.create(
+                    model=model_id,
+                    messages=[{"role": "user", "content": message}],
+                    max_completion_tokens=max_completion_tokens,
+                    temperature=model_config["temperature"],
+                    stream=True
+                )
 
-                    for chunk in response_stream:
-                        if hasattr(chunk, 'output_text') and chunk.output_text:
-                            text_chunk = chunk.output_text
-                            print(text_chunk, end='', flush=True)
-                            full_text += text_chunk
+                full_text = ""
+                for chunk in stream_response:
+                    if chunk.choices[0].delta.content:
+                        text_chunk = chunk.choices[0].delta.content
+                        print(text_chunk, end='', flush=True)
+                        full_text += text_chunk
 
-                    print()  # New line after streaming
-                    return full_text
+                print()  # New line after streaming
+                return full_text
             else:
                 # Regular response
-                response = self.client.responses.create(**request_payload)
+                response = self.client.chat.completions.create(
+                    model=model_id,
+                    messages=[{"role": "user", "content": message}],
+                    max_completion_tokens=max_completion_tokens,
+                    temperature=model_config["temperature"]
+                )
 
-                if (response_format and
-                    response_format.get("type") == "json_schema"):
-                    # Return structured JSON
-                    return json.loads(response.output_text)
-                else:
-                    # Return plain text
-                    return response.output_text
+                return response.choices[0].message.content
 
         except Exception as e:
             # Re-raise with full error details
             error_msg = f"OpenAI API error: {type(e).__name__}: {str(e)}"
             raise Exception(error_msg) from e
 
-    def send_qa(self, message: str, **kwargs) -> Union[str, Dict[str, Any]]:
+    def send_responses_api(
+        self,
+        message: str,
+        model_id: str = "gpt-5-codex",
+        reasoning_effort: Optional[str] = None
+    ) -> str:
+        """Send message using Responses API (for gpt-5-codex).
+
+        Args:
+            message: User message
+            model_id: Model to use (must support responses API)
+            reasoning_effort: Reasoning effort level
+
+        Returns:
+            Response text
+
+        Raises:
+            Exception: For API errors with full error details
+        """
+        if model_id not in self.available_models:
+            raise ValueError(f"Model {model_id} not available")
+
+        model_config = self.available_models[model_id]
+
+        if model_config["endpoint"] != "responses":
+            raise ValueError(f"Model {model_id} requires chat completions endpoint, use send_chat_completion instead")
+
+        try:
+            # Build request for responses API
+            request_data = {
+                "model": model_id,
+                "input": message
+            }
+
+            # Add reasoning effort if supported
+            if reasoning_effort and model_config["supports_reasoning"]:
+                request_data["reasoning"] = {"effort": reasoning_effort}
+
+            response = self.client.responses.create(**request_data)
+            return response.output_text
+
+        except Exception as e:
+            error_msg = f"OpenAI Responses API error: {type(e).__name__}: {str(e)}"
+            raise Exception(error_msg) from e
+
+    def send(
+        self,
+        message: str,
+        model_id: str = "gpt-5-chat-latest",
+        max_completion_tokens: int = 1000,
+        stream: bool = False,
+        reasoning_effort: Optional[str] = None
+    ) -> str:
+        """Send message to appropriate GPT-5 API endpoint.
+
+        Args:
+            message: User message
+            model_id: Model to use
+            max_completion_tokens: Maximum tokens in response
+            stream: Enable streaming (only for chat completions)
+            reasoning_effort: Reasoning effort level (only for responses API)
+
+        Returns:
+            Response text
+
+        Raises:
+            Exception: For API errors
+        """
+        if model_id not in self.available_models:
+            # Fallback to available model
+            model_id = "gpt-5-chat-latest"
+
+        model_config = self.available_models[model_id]
+
+        if model_config["endpoint"] == "chat":
+            return self.send_chat_completion(message, model_id, max_completion_tokens, stream)
+        else:
+            return self.send_responses_api(message, model_id, reasoning_effort)
+
+    # Convenience methods with routing
+    def send_qa(self, message: str, **kwargs) -> str:
         """Send QA message using routing."""
         model_id = self.choose_model("qa")
         return self.send(message, model_id=model_id, **kwargs)
 
-    def send_chat(self, message: str, **kwargs) -> Union[str, Dict[str, Any]]:
+    def send_chat(self, message: str, **kwargs) -> str:
         """Send chat message using routing."""
         model_id = self.choose_model("chat")
         return self.send(message, model_id=model_id, **kwargs)
 
-    def send_code(self, message: str, **kwargs) -> Union[str, Dict[str, Any]]:
+    def send_code(self, message: str, **kwargs) -> str:
         """Send code message using routing."""
         model_id = self.choose_model("code")
         return self.send(message, model_id=model_id, **kwargs)
 
-    def send_bulk(self, message: str, **kwargs) -> Union[str, Dict[str, Any]]:
+    def send_bulk(self, message: str, **kwargs) -> str:
         """Send bulk message using routing."""
         model_id = self.choose_model("bulk")
         return self.send(message, model_id=model_id, **kwargs)
 
-    def make_batch_jsonl(
-        self,
-        inputs: List[Dict[str, Any]],
-        outfile: str = "gpt5_batch.jsonl"
-    ) -> None:
-        """Generate JSONL file for batch processing.
+    def send_analysis(self, message: str, **kwargs) -> str:
+        """Send analysis message using routing."""
+        model_id = self.choose_model("analysis")
+        return self.send(message, model_id=model_id, **kwargs)
 
-        Args:
-            inputs: List of input dictionaries with keys:
-                    custom_id, message, model, preset, response_format, reasoning_effort
-            outfile: Output filename
-        """
-        with open(outfile, 'w', encoding='utf-8') as f:
-            for input_data in inputs:
-                custom_id = input_data["custom_id"]
-                message = input_data["message"]
-                model = input_data["model"]
-                preset = input_data.get("preset", "deterministic")
-                response_format = input_data.get("response_format")
-                reasoning_effort = input_data.get("reasoning_effort")
+    def send_sentiment(self, message: str, **kwargs) -> str:
+        """Send sentiment analysis message using routing."""
+        model_id = self.choose_model("sentiment")
+        return self.send(message, model_id=model_id, **kwargs)
 
-                body = self.build_request(
-                    message=message,
-                    model_id=model,
-                    preset=preset,
-                    stream=False,
-                    reasoning_effort=reasoning_effort,
-                    response_format=response_format
-                )
+    def send_insights(self, message: str, **kwargs) -> str:
+        """Send insights message using routing."""
+        model_id = self.choose_model("insights")
+        return self.send(message, model_id=model_id, **kwargs)
 
-                batch_item = {
-                    "custom_id": custom_id,
-                    "method": "POST",
-                    "url": "/v1/responses",
-                    "body": body
-                }
+    def list_available_models(self) -> List[str]:
+        """List all available GPT-5 models."""
+        return list(self.available_models.keys())
 
-                f.write(json.dumps(batch_item) + '\n')
+    def get_model_info(self, model_id: str) -> Dict[str, Any]:
+        """Get information about a specific model."""
+        return self.available_models.get(model_id, {})
 
 
 if __name__ == "__main__":
@@ -276,41 +263,31 @@ if __name__ == "__main__":
 
         try:
             service = GPT5Service()
+            print(f"Available models: {service.list_available_models()}")
+
             response = service.send_chat(message, stream=False)
             print(f"Response: {response}")
 
         except Exception as e:
             print(f"Error: {e}")
             sys.exit(1)
+    else:
+        # Demo: Show available models
+        try:
+            service = GPT5Service()
+            print("🤖 GPT-5 Service Initialized Successfully!")
+            print(f"📋 Available models: {service.list_available_models()}")
 
-    # Demo: Generate batch JSONL
-    try:
-        service = GPT5Service()
+            # Test each model with a simple message
+            test_message = "Say hello in one sentence"
 
-        batch_inputs = [
-            {
-                "custom_id": "demo-1",
-                "message": "What is artificial intelligence?",
-                "model": "gpt-5-mini",
-                "preset": "deterministic"
-            },
-            {
-                "custom_id": "demo-2",
-                "message": "Write a creative story about robots.",
-                "model": "gpt-5",
-                "preset": "creative",
-                "reasoning_effort": "medium"
-            },
-            {
-                "custom_id": "demo-3",
-                "message": "Explain quantum computing in simple terms.",
-                "model": "gpt-5-nano",
-                "preset": "deterministic"
-            }
-        ]
+            for model in service.list_available_models():
+                print(f"\n🧪 Testing {model}...")
+                try:
+                    response = service.send(test_message, model_id=model, max_completion_tokens=50)
+                    print(f"✅ {model}: {response}")
+                except Exception as e:
+                    print(f"❌ {model}: {e}")
 
-        service.make_batch_jsonl(batch_inputs)
-        print("Generated gpt5_batch.jsonl")
-
-    except Exception as e:
-        print(f"Batch generation error: {e}")
+        except Exception as e:
+            print(f"Service initialization error: {e}")
