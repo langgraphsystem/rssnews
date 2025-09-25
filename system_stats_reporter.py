@@ -256,8 +256,7 @@ SERVICES: {stats.get('services', {})}
             response = service.send(
                 message=prompt,
                 model_id="gpt-5-mini",  # Cost-effective for analysis
-                reasoning_effort="minimal",  # Fast analysis
-                preset="deterministic"  # Uses low verbosity
+                max_completion_tokens=500
             )
 
             return response.strip() if response else "GPT-5 анализ недоступен"
