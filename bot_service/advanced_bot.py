@@ -889,7 +889,7 @@ Format as structured report with emojis and clear sections."""
             from gpt5_service import create_gpt5_service
             gpt5 = create_gpt5_service("gpt-5-mini")
 
-            analysis = await gpt5.generate_text(analysis_prompt, max_tokens=1000)
+            analysis = await gpt5.generate_text(analysis_prompt, max_completion_tokens=1000)
 
             if analysis:
                 message = f"🔬 **GPT-5 Analysis: {query.upper()}**\n\n"
@@ -954,7 +954,7 @@ Requirements:
             from gpt5_service import create_gpt5_service
             gpt5 = create_gpt5_service("gpt-5")
 
-            summary = await gpt5.generate_text(summary_prompt, max_tokens=config['tokens'])
+            summary = await gpt5.generate_text(summary_prompt, max_completion_tokens=config['tokens'])
 
             if summary:
                 message = f"📝 **GPT-5 Summary: {topic.upper()}**\n\n"
@@ -1016,7 +1016,7 @@ Format with charts, tables, and visual elements using emojis."""
             from gpt5_service import create_gpt5_service
             gpt5 = create_gpt5_service("gpt-5-mini")
 
-            aggregation = await gpt5.generate_text(aggregation_prompt, max_tokens=800)
+            aggregation = await gpt5.generate_text(aggregation_prompt, max_completion_tokens=800)
 
             if aggregation:
                 message = f"📊 **GPT-5 Aggregation Report**\n\n"
@@ -1085,7 +1085,7 @@ Return top 10 filtered articles with explanations."""
             from gpt5_service import create_gpt5_service
             gpt5 = create_gpt5_service("gpt-5")
 
-            filtered_results = await gpt5.generate_text(filter_prompt, max_tokens=1000)
+            filtered_results = await gpt5.generate_text(filter_prompt, max_completion_tokens=1000)
 
             if filtered_results:
                 message = f"🔍 **GPT-5 Filtered Results**\n\n"
@@ -1147,7 +1147,7 @@ Format as executive briefing with clear sections."""
             from gpt5_service import create_gpt5_service
             gpt5 = create_gpt5_service("gpt-5")
 
-            insights = await gpt5.generate_text(insights_prompt, max_tokens=1200)
+            insights = await gpt5.generate_text(insights_prompt, max_completion_tokens=1200)
 
             if insights:
                 message = f"💡 **GPT-5 Deep Insights: {query.upper()}**\n\n"
@@ -1211,7 +1211,7 @@ Use emojis and clear formatting."""
             from gpt5_service import create_gpt5_service
             gpt5 = create_gpt5_service("gpt-5-mini")
 
-            sentiment_analysis = await gpt5.generate_text(sentiment_prompt, max_tokens=1000)
+            sentiment_analysis = await gpt5.generate_text(sentiment_prompt, max_completion_tokens=1000)
 
             if sentiment_analysis:
                 message = f"😊 **GPT-5 Sentiment Analysis: {query.upper()}**\n\n"
@@ -1279,7 +1279,7 @@ Use emojis, percentages, and visual formatting."""
             from gpt5_service import create_gpt5_service
             gpt5 = create_gpt5_service("gpt-5")
 
-            topic_analysis = await gpt5.generate_text(topics_prompt, max_tokens=1200)
+            topic_analysis = await gpt5.generate_text(topics_prompt, max_completion_tokens=1200)
 
             if topic_analysis:
                 message = f"🏷️ **GPT-5 Topic Analysis**\n\n"
