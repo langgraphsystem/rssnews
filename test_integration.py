@@ -77,7 +77,7 @@ async def test_error_handler():
         from bot_service.error_handler import TelegramErrorHandler, log_user_action, log_error
 
         # Get bot token from environment
-        bot_token = os.getenv('TELEGRAM_BOT_TOKEN', '7477585710:AAG7iuQRm1EZsKoDzDf5yZtqxkaPU7i2frk')
+        bot_token = os.getenv('TELEGRAM_BOT_TOKEN')
 
         # Test error handler initialization
         error_handler = TelegramErrorHandler(bot_token)
@@ -123,10 +123,12 @@ async def test_bot_integration():
         from bot_service.advanced_bot import AdvancedRSSBot
 
         # Get bot token
-        bot_token = os.getenv('TELEGRAM_BOT_TOKEN', '7477585710:AAG7iuQRm1EZsKoDzDf5yZtqxkaPU7i2frk')
+        bot_token = os.getenv('TELEGRAM_BOT_TOKEN')
 
         # Set database connection for testing
-        os.environ['PG_DSN'] = 'postgresql://postgres:ug1Hi~XHEMdMh_Lm~4UfUKtAejqLBGdg@crossover.proxy.rlwy.net:12306/railway?sslmode=disable'
+        if not os.getenv('PG_DSN'):
+            print("❌ PG_DSN не установлен в окружении — пропуск интеграционного теста БД")
+            return False
 
         print("🔧 Initializing advanced bot with 2025 best practices...")
 
@@ -190,7 +192,7 @@ async def test_production_readiness():
         from bot_service.rate_limiter import rate_limiter
         from bot_service.error_handler import TelegramErrorHandler
 
-        bot_token = os.getenv('TELEGRAM_BOT_TOKEN', '7477585710:AAG7iuQRm1EZsKoDzDf5yZtqxkaPU7i2frk')
+        bot_token = os.getenv('TELEGRAM_BOT_TOKEN')
         error_handler = TelegramErrorHandler(bot_token)
 
         print("🔍 Checking production components...")

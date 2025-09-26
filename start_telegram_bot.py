@@ -8,6 +8,7 @@ import os
 import sys
 import asyncio
 import logging
+import argparse
 from datetime import datetime
 
 # Setup logging
@@ -33,6 +34,11 @@ def main():
             print(f"  {key}: {value[:50]}..." if len(str(value)) > 50 else f"  {key}: {value}")
     print()
 
+    # CLI args
+    parser = argparse.ArgumentParser(description="Start RSS News Telegram bot")
+    parser.add_argument("--check", action="store_true", help="Validate environment and exit")
+    args, _ = parser.parse_known_args()
+
     # Check environment variables with fallbacks
     bot_token = os.getenv('TELEGRAM_BOT_TOKEN')
     pg_dsn = os.getenv('PG_DSN')
@@ -56,25 +62,33 @@ def main():
         else:
             print(f"🔍 Missing DB vars - host:{bool(db_host)} user:{bool(db_user)} pass:{bool(db_pass)} name:{bool(db_name)}")
 
-    # Railway fallback - based on what we saw in railway variables command
-    if not bot_token and not pg_dsn:
-        print("🚨 Railway fallback - using known Railway values")
-        # These are the values we confirmed exist in Railway
-        bot_token = "7477585710:AAG7iuQRm1EZsKoDzDf5yZtqxkaPU7i2frk"  # From railway variables
-        pg_dsn = "postgresql://postgres:ug1Hi~XHEMdMh_Lm~4UfUKtAejqLBGdg@crossover.proxy.rlwy.net:12306/railway?sslmode=disable"
+    # No hardcoded fallbacks — must come from Railway env
+    if not bot_token:
+        print("❌ TELEGRAM_BOT_TOKEN не найден в окружении Railway")
+        return 1
+    if not pg_dsn:
+        print("❌ PG_DSN не найден в окружении Railway")
+        return 1
 
-    # Add OpenAI API Key fallback for GPT-5 functionality
+    # Require OpenAI key from Railway env for GPT-5 features
     if not openai_api_key:
-        print("🔧 GPT-5 functionality requires OPENAI_API_KEY to be set in Railway dashboard")
-        print("💡 Set OPENAI_API_KEY environment variable in Railway for GPT-5 commands to work")
-        # For now, GPT-5 commands will show error message until API key is properly configured
-        openai_api_key = "NEEDS_TO_BE_SET_IN_RAILWAY_DASHBOARD"
+        print("❌ OPENAI_API_KEY не найден в окружении Railway (требуется для GPT-5)")
+        return 1
 
     print("🔍 Final environment check:")
     print(f"  TELEGRAM_BOT_TOKEN: {'✅ Set' if bot_token else '❌ Missing'}")
     print(f"  PG_DSN: {'✅ Set' if pg_dsn else '❌ Missing'}")
     print(f"  OPENAI_API_KEY: {'✅ Set' if openai_api_key else '❌ Missing'}")
     print()
+
+    # Health-check mode: only validate env and exit
+    if args.check:
+        if bot_token and pg_dsn and openai_api_key:
+            print("✅ Environment check passed")
+            return 0
+        else:
+            print("❌ Environment check failed — missing variables")
+            return 1
 
     if not bot_token:
         logger.error("❌ TELEGRAM_BOT_TOKEN environment variable not set")

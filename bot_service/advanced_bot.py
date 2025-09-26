@@ -887,15 +887,34 @@ Provide a comprehensive analysis covering:
 Format as structured report with emojis and clear sections."""
 
             from gpt5_service_new import create_gpt5_service
-            gpt5 = create_gpt5_service("gpt-5-mini")
+            # RAILWAY DEBUG: GPT-5 Analysis Command
+            logger.info("🔍 [RAILWAY] Starting GPT-5 analysis command")
+            logger.info(f"🔍 [RAILWAY] Query: {query}")
+            logger.info(f"🔍 [RAILWAY] Analysis prompt length: {len(analysis_prompt)}")
 
-            analysis = gpt5.send_analysis(analysis_prompt, max_completion_tokens=1000)
+            try:
+                logger.info("🔍 [RAILWAY] Creating GPT-5 service...")
+                gpt5 = create_gpt5_service("gpt-5-mini")
+                logger.info("✅ [RAILWAY] GPT-5 service created successfully")
+
+                logger.info("🔍 [RAILWAY] Calling send_analysis...")
+                analysis = gpt5.send_analysis(analysis_prompt, max_completion_tokens=1000)
+                logger.info(f"✅ [RAILWAY] GPT-5 analysis response received, length: {len(analysis) if analysis else 0}")
+
+            except Exception as gpt5_error:
+                logger.error(f"❌ [RAILWAY] GPT-5 analysis error: {str(gpt5_error)}")
+                logger.error(f"❌ [RAILWAY] GPT-5 error type: {type(gpt5_error).__name__}")
+                import traceback
+                logger.error(f"❌ [RAILWAY] GPT-5 traceback:\n{traceback.format_exc()}")
+                analysis = None
 
             if analysis:
+                logger.info(f"✅ [RAILWAY] GPT-5 analysis successful, sending response to user")
                 message = f"🔬 **GPT-5 Analysis: {query.upper()}**\n\n"
                 message += f"📊 **Data:** {len(articles)} articles, {timeframe}\n\n"
                 message += analysis
             else:
+                logger.error(f"❌ [RAILWAY] GPT-5 analysis failed - no response received")
                 message = "❌ GPT-5 analysis failed. Please try again."
 
             return await self._send_message(chat_id, message)
@@ -951,10 +970,29 @@ Requirements:
 - Highlight the most important insights
 - Use clear formatting with emojis"""
 
-            from gpt5_service_new import create_gpt5_service
-            gpt5 = create_gpt5_service("gpt-5")
+            # RAILWAY DEBUG: GPT-5 Summarize Command
+            logger.info("🔍 [RAILWAY] Starting GPT-5 summarize command")
+            logger.info(f"🔍 [RAILWAY] Topic: {topic}")
+            logger.info(f"🔍 [RAILWAY] Length: {length}")
+            logger.info(f"🔍 [RAILWAY] Summary prompt length: {len(summary_prompt)}")
+            logger.info(f"🔍 [RAILWAY] Articles found: {len(articles)}")
 
-            summary = gpt5.send_chat(summary_prompt, max_completion_tokens=config['tokens'])
+            try:
+                logger.info("🔍 [RAILWAY] Creating GPT-5 service for summarize...")
+                from gpt5_service_new import create_gpt5_service
+                gpt5 = create_gpt5_service("gpt-5")
+                logger.info("✅ [RAILWAY] GPT-5 service created for summarize")
+
+                logger.info("🔍 [RAILWAY] Calling send_chat for summarize...")
+                summary = gpt5.send_chat(summary_prompt, max_completion_tokens=config['tokens'])
+                logger.info(f"✅ [RAILWAY] GPT-5 summarize response received, length: {len(summary) if summary else 0}")
+
+            except Exception as gpt5_error:
+                logger.error(f"❌ [RAILWAY] GPT-5 summarize error: {str(gpt5_error)}")
+                logger.error(f"❌ [RAILWAY] GPT-5 error type: {type(gpt5_error).__name__}")
+                import traceback
+                logger.error(f"❌ [RAILWAY] GPT-5 traceback:\n{traceback.format_exc()}")
+                summary = None
 
             if summary:
                 message = f"📝 **GPT-5 Summary: {topic.upper()}**\n\n"
@@ -1013,10 +1051,29 @@ Provide:
 
 Format with charts, tables, and visual elements using emojis."""
 
-            from gpt5_service_new import create_gpt5_service
-            gpt5 = create_gpt5_service("gpt-5-mini")
+            # RAILWAY DEBUG: GPT-5 Aggregate Command
+            logger.info("🔍 [RAILWAY] Starting GPT-5 aggregate command")
+            logger.info(f"🔍 [RAILWAY] Metric: {metric}")
+            logger.info(f"🔍 [RAILWAY] Group by: {groupby}")
+            logger.info(f"🔍 [RAILWAY] Aggregation prompt length: {len(aggregation_prompt)}")
+            logger.info(f"🔍 [RAILWAY] Articles found: {len(articles)}")
 
-            aggregation = gpt5.send_analysis(aggregation_prompt, max_completion_tokens=800)
+            try:
+                logger.info("🔍 [RAILWAY] Creating GPT-5 service for aggregate...")
+                from gpt5_service_new import create_gpt5_service
+                gpt5 = create_gpt5_service("gpt-5-mini")
+                logger.info("✅ [RAILWAY] GPT-5 service created for aggregate")
+
+                logger.info("🔍 [RAILWAY] Calling send_analysis for aggregate...")
+                aggregation = gpt5.send_analysis(aggregation_prompt, max_completion_tokens=800)
+                logger.info(f"✅ [RAILWAY] GPT-5 aggregate response received, length: {len(aggregation) if aggregation else 0}")
+
+            except Exception as gpt5_error:
+                logger.error(f"❌ [RAILWAY] GPT-5 aggregate error: {str(gpt5_error)}")
+                logger.error(f"❌ [RAILWAY] GPT-5 error type: {type(gpt5_error).__name__}")
+                import traceback
+                logger.error(f"❌ [RAILWAY] GPT-5 traceback:\n{traceback.format_exc()}")
+                aggregation = None
 
             if aggregation:
                 message = f"📊 **GPT-5 Aggregation Report**\n\n"
@@ -1082,10 +1139,29 @@ Tasks:
 
 Return top 10 filtered articles with explanations."""
 
-            from gpt5_service_new import create_gpt5_service
-            gpt5 = create_gpt5_service("gpt-5")
+            # RAILWAY DEBUG: GPT-5 Filter Command
+            logger.info("🔍 [RAILWAY] Starting GPT-5 filter command")
+            logger.info(f"🔍 [RAILWAY] Criteria: {criteria}")
+            logger.info(f"🔍 [RAILWAY] Value: {value}")
+            logger.info(f"🔍 [RAILWAY] Filter prompt length: {len(filter_prompt)}")
+            logger.info(f"🔍 [RAILWAY] Articles found: {len(articles)}")
 
-            filtered_results = gpt5.send_analysis(filter_prompt, max_completion_tokens=1000)
+            try:
+                logger.info("🔍 [RAILWAY] Creating GPT-5 service for filter...")
+                from gpt5_service_new import create_gpt5_service
+                gpt5 = create_gpt5_service("gpt-5")
+                logger.info("✅ [RAILWAY] GPT-5 service created for filter")
+
+                logger.info("🔍 [RAILWAY] Calling send_analysis for filter...")
+                filtered_results = gpt5.send_analysis(filter_prompt, max_completion_tokens=1000)
+                logger.info(f"✅ [RAILWAY] GPT-5 filter response received, length: {len(filtered_results) if filtered_results else 0}")
+
+            except Exception as gpt5_error:
+                logger.error(f"❌ [RAILWAY] GPT-5 filter error: {str(gpt5_error)}")
+                logger.error(f"❌ [RAILWAY] GPT-5 error type: {type(gpt5_error).__name__}")
+                import traceback
+                logger.error(f"❌ [RAILWAY] GPT-5 traceback:\n{traceback.format_exc()}")
+                filtered_results = None
 
             if filtered_results:
                 message = f"🔍 **GPT-5 Filtered Results**\n\n"
@@ -1144,10 +1220,28 @@ Provide comprehensive insights covering:
 
 Format as executive briefing with clear sections."""
 
-            from gpt5_service_new import create_gpt5_service
-            gpt5 = create_gpt5_service("gpt-5")
+            # RAILWAY DEBUG: GPT-5 Insights Command
+            logger.info("🔍 [RAILWAY] Starting GPT-5 insights command")
+            logger.info(f"🔍 [RAILWAY] Query: {query}")
+            logger.info(f"🔍 [RAILWAY] Insights prompt length: {len(insights_prompt)}")
+            logger.info(f"🔍 [RAILWAY] Articles found: {len(articles)}")
 
-            insights = gpt5.send_insights(insights_prompt, max_completion_tokens=1200)
+            try:
+                logger.info("🔍 [RAILWAY] Creating GPT-5 service for insights...")
+                from gpt5_service_new import create_gpt5_service
+                gpt5 = create_gpt5_service("gpt-5")
+                logger.info("✅ [RAILWAY] GPT-5 service created for insights")
+
+                logger.info("🔍 [RAILWAY] Calling send_insights for insights...")
+                insights = gpt5.send_insights(insights_prompt, max_completion_tokens=1200)
+                logger.info(f"✅ [RAILWAY] GPT-5 insights response received, length: {len(insights) if insights else 0}")
+
+            except Exception as gpt5_error:
+                logger.error(f"❌ [RAILWAY] GPT-5 insights error: {str(gpt5_error)}")
+                logger.error(f"❌ [RAILWAY] GPT-5 error type: {type(gpt5_error).__name__}")
+                import traceback
+                logger.error(f"❌ [RAILWAY] GPT-5 traceback:\n{traceback.format_exc()}")
+                insights = None
 
             if insights:
                 message = f"💡 **GPT-5 Deep Insights: {query.upper()}**\n\n"
@@ -1208,10 +1302,28 @@ Analyze and provide:
 
 Use emojis and clear formatting."""
 
-            from gpt5_service_new import create_gpt5_service
-            gpt5 = create_gpt5_service("gpt-5-mini")
+            # RAILWAY DEBUG: GPT-5 Sentiment Command
+            logger.info("🔍 [RAILWAY] Starting GPT-5 sentiment command")
+            logger.info(f"🔍 [RAILWAY] Query: {query}")
+            logger.info(f"🔍 [RAILWAY] Sentiment prompt length: {len(sentiment_prompt)}")
+            logger.info(f"🔍 [RAILWAY] Articles found: {len(articles)}")
 
-            sentiment_analysis = gpt5.send_sentiment(sentiment_prompt, max_completion_tokens=1000)
+            try:
+                logger.info("🔍 [RAILWAY] Creating GPT-5 service for sentiment...")
+                from gpt5_service_new import create_gpt5_service
+                gpt5 = create_gpt5_service("gpt-5-mini")
+                logger.info("✅ [RAILWAY] GPT-5 service created for sentiment")
+
+                logger.info("🔍 [RAILWAY] Calling send_sentiment for sentiment...")
+                sentiment_analysis = gpt5.send_sentiment(sentiment_prompt, max_completion_tokens=1000)
+                logger.info(f"✅ [RAILWAY] GPT-5 sentiment response received, length: {len(sentiment_analysis) if sentiment_analysis else 0}")
+
+            except Exception as gpt5_error:
+                logger.error(f"❌ [RAILWAY] GPT-5 sentiment error: {str(gpt5_error)}")
+                logger.error(f"❌ [RAILWAY] GPT-5 error type: {type(gpt5_error).__name__}")
+                import traceback
+                logger.error(f"❌ [RAILWAY] GPT-5 traceback:\n{traceback.format_exc()}")
+                sentiment_analysis = None
 
             if sentiment_analysis:
                 message = f"😊 **GPT-5 Sentiment Analysis: {query.upper()}**\n\n"
@@ -1276,10 +1388,28 @@ Provide comprehensive topic analysis:
 
 Use emojis, percentages, and visual formatting."""
 
-            from gpt5_service_new import create_gpt5_service
-            gpt5 = create_gpt5_service("gpt-5")
+            # RAILWAY DEBUG: GPT-5 Topics Command
+            logger.info("🔍 [RAILWAY] Starting GPT-5 topics command")
+            logger.info(f"🔍 [RAILWAY] Scope: {scope}")
+            logger.info(f"🔍 [RAILWAY] Topics prompt length: {len(topics_prompt)}")
+            logger.info(f"🔍 [RAILWAY] Articles found: {len(articles)}")
 
-            topic_analysis = gpt5.send_analysis(topics_prompt, max_completion_tokens=1200)
+            try:
+                logger.info("🔍 [RAILWAY] Creating GPT-5 service for topics...")
+                from gpt5_service_new import create_gpt5_service
+                gpt5 = create_gpt5_service("gpt-5")
+                logger.info("✅ [RAILWAY] GPT-5 service created for topics")
+
+                logger.info("🔍 [RAILWAY] Calling send_analysis for topics...")
+                topic_analysis = gpt5.send_analysis(topics_prompt, max_completion_tokens=1200)
+                logger.info(f"✅ [RAILWAY] GPT-5 topics response received, length: {len(topic_analysis) if topic_analysis else 0}")
+
+            except Exception as gpt5_error:
+                logger.error(f"❌ [RAILWAY] GPT-5 topics error: {str(gpt5_error)}")
+                logger.error(f"❌ [RAILWAY] GPT-5 error type: {type(gpt5_error).__name__}")
+                import traceback
+                logger.error(f"❌ [RAILWAY] GPT-5 traceback:\n{traceback.format_exc()}")
+                topic_analysis = None
 
             if topic_analysis:
                 message = f"🏷️ **GPT-5 Topic Analysis**\n\n"

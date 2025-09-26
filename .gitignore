@@ -3,6 +3,14 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# Security - API keys and secrets
+*.bat
+!start_bot_template.bat
+.env
+.env.local
+*api_key*
+*secret*
+
 # C extensions
 *.so
 

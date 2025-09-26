@@ -1,0 +1,5 @@
+Command: /aggregate sentiment source 1w
+Timestamp: 2025-09-25 07:56:47.516913
+Response length: 36
+==================================================
+📭 No data available for timeframe 1w

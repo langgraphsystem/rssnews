@@ -1,8 +1,12 @@
 {
   "permissions": {
     "allow": [
-      "Bash(set TELEGRAM_BOT_TOKEN=7477585710:AAG7iuQRm1EZsKoDzDf5yZtqxkaPU7i2frk)",
-      "Bash(set PG_DSN=postgresql://postgres:ug1Hi~XHEMdMh_Lm~4UfUKtAejqLBGdg@crossover.proxy.rlwy.net:12306/railway?sslmode=disable)"
+      "Bash(copy \"gpt5_service_corrected.py\" \"gpt5_service_new.py\")",
+      "Bash(del test_openai_models.py test_gpt5_corrected.py test_simple_gpt5.py gpt5_service_corrected.py test_new_api_key.py test_railway_api_key.py)",
+      "Bash(git rm:*)",
+      "Bash(start_bot_with_gpt5.bat)",
+      "Bash(del start_bot_with_gpt5.bat)",
+      "Bash(del test_gpt5_responses.py gpt5_test_log.txt bot_response_insights.txt)"
     ],
     "deny": [],
     "ask": []

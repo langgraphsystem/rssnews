@@ -182,15 +182,16 @@ class SimpleTelegramBot:
 
 def main():
     # Check environment
-    token = os.getenv('TELEGRAM_BOT_TOKEN', '7477585710:AAG7iuQRm1EZsKoDzDf5yZtqxkaPU7i2frk')
+    token = os.getenv('TELEGRAM_BOT_TOKEN')
 
     if not token:
-        print("❌ TELEGRAM_BOT_TOKEN не установлен")
-        return
+        print("❌ TELEGRAM_BOT_TOKEN не установлен в окружении")
+        print("💡 Установите переменную окружения TELEGRAM_BOT_TOKEN (Railway env)")
+        return 1
 
     print("🤖 ПРОСТОЙ ТЕСТОВЫЙ БОТ")
     print("=" * 40)
-    print(f"🔑 Токен: {token[:20]}...")
+    print(f"🔑 Токен: {'✅ установлен' if token else '❌ отсутствует'}")
     print("💬 Отправь сообщение боту для теста!")
     print("⏹️  Ctrl+C для остановки")
     print()
@@ -202,6 +203,7 @@ def main():
         asyncio.run(bot.run())
     except KeyboardInterrupt:
         print("\\n⏹️ Остановлено пользователем")
+        return 0
 
 if __name__ == "__main__":
     main()

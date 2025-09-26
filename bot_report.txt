@@ -1,23 +1,23 @@
 🤖 **RSS News System Report**
-📅 2025-09-23 19:09
+📅 2025-09-25 21:19
 
 📡 **FEEDS**
 • Active: 118/118
 • Healthy (24h): 118
 
 📰 **ARTICLES**
-• Total: 13,558
-• Recent (24h): 1336
+• Total: 15,583
+• Recent (24h): 1028
 
 🧩 **CHUNKS**
-• Total: 163,076
-• Recent (24h): 8551
-• Avg per article: 12.48
+• Total: 175,913
+• Recent (24h): 5925
+• Avg per article: 11.65
 
 🧠 **EMBEDDINGS**
-• Completed: 104,186
-• Pending: 58,890
-• Completion: 63.89%
+• Completed: 175,822
+• Pending: 91
+• Completion: 99.95%
 • Dimensions: 3072
 
 ⚙️ **SERVICES**
@@ -25,4 +25,4 @@
 • LLM: 🟢
 
 🤖 **AI INSIGHTS**
-GPT-5 анализ недоступен: OpenAI API error: AuthenticationError: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*3eYA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid\_request\_error', 'param': None, 'code': 'invalid\_api\_key'}}
+GPT-5 анализ недоступен: OpenAI Responses API error: AuthenticationError: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*3eYA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid\_request\_error', 'param': None, 'code': 'invalid\_api\_key'}}

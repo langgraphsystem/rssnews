@@ -1,0 +1,5 @@
+Command: /analyze AI trends 3d
+Timestamp: 2025-09-25 07:56:47.469892
+Response length: 48
+==================================================
+📭 No articles found for 'AI' in timeframe trends

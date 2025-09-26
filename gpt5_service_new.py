@@ -90,6 +90,13 @@ class GPT5Service:
         return payload
 
     def _call_responses(self, payload: Dict[str, Any], *, stream: bool = False) -> str:
+        import logging
+        logger = logging.getLogger(__name__)
+
+        logger.info("🔍 [RAILWAY] _call_responses started")
+        logger.info(f"🔍 [RAILWAY] Payload keys: {list(payload.keys())}")
+        logger.info(f"🔍 [RAILWAY] Stream: {stream}")
+
         if stream:
             try:
                 chunks: List[str] = []
@@ -107,9 +114,45 @@ class GPT5Service:
                 raise Exception(f"OpenAI Responses stream error: {type(e).__name__}: {e}") from e
 
         try:
+            logger.info("🔍 [RAILWAY] Calling self.client.responses.create...")
             resp = self.client.responses.create(**payload)
-            return getattr(resp, "output_text", "")
+            logger.info(f"🔍 [RAILWAY] Response received: {type(resp)}")
+            logger.info(f"🔍 [RAILWAY] Response attributes: {dir(resp)}")
+
+            output_text = getattr(resp, "output_text", "")
+            logger.info(f"🔍 [RAILWAY] output_text: '{output_text}' (length: {len(output_text)})")
+
+            # Try alternative attributes if output_text is empty
+            if not output_text:
+                logger.info("🔍 [RAILWAY] output_text is empty, trying alternatives...")
+
+                # Check for other possible attributes
+                for attr in ['text', 'content', 'response', 'message', 'output', 'result']:
+                    if hasattr(resp, attr):
+                        value = getattr(resp, attr)
+                        logger.info(f"🔍 [RAILWAY] Found {attr}: {value} (type: {type(value)})")
+                        if isinstance(value, str) and value:
+                            output_text = value
+                            break
+
+                # Check for choices like in Chat API
+                if hasattr(resp, 'choices') and resp.choices:
+                    logger.info(f"🔍 [RAILWAY] Found choices: {len(resp.choices)}")
+                    choice = resp.choices[0]
+                    logger.info(f"🔍 [RAILWAY] Choice attributes: {dir(choice)}")
+
+                    if hasattr(choice, 'message') and hasattr(choice.message, 'content'):
+                        output_text = choice.message.content
+                        logger.info(f"🔍 [RAILWAY] Using choice.message.content: '{output_text}'")
+
+            logger.info(f"✅ [RAILWAY] Final output_text: '{output_text}' (length: {len(output_text)})")
+            return output_text
+
         except Exception as e:
+            logger.error(f"❌ [RAILWAY] _call_responses error: {str(e)}")
+            logger.error(f"❌ [RAILWAY] Error type: {type(e).__name__}")
+            import traceback
+            logger.error(f"❌ [RAILWAY] _call_responses traceback:\n{traceback.format_exc()}")
             raise Exception(f"OpenAI Responses API error: {type(e).__name__}: {e}") from e
 
     # Sync core used by bot
@@ -165,8 +208,23 @@ class GPT5Service:
         return self.generate_text_sync(message, model_id=model_id, **kwargs)
 
     def send_chat(self, message: str, **kwargs) -> str:
-        model_id = self.choose_model("chat")
-        return self.generate_text_sync(message, model_id=model_id, **kwargs)
+        import logging
+        logger = logging.getLogger(__name__)
+
+        logger.info("🔍 [RAILWAY] send_chat called")
+        logger.info(f"🔍 [RAILWAY] Message length: {len(message)}")
+
+        try:
+            model_id = self.choose_model("chat")
+            logger.info(f"🔍 [RAILWAY] Chosen chat model: {model_id}")
+            result = self.generate_text_sync(message, model_id=model_id, **kwargs)
+            logger.info(f"✅ [RAILWAY] send_chat succeeded, length: {len(result) if result else 0}")
+            return result
+        except Exception as e:
+            logger.error(f"❌ [RAILWAY] send_chat failed: {str(e)}")
+            import traceback
+            logger.error(f"❌ [RAILWAY] send_chat traceback:\n{traceback.format_exc()}")
+            raise
 
     def send_code(self, message: str, **kwargs) -> str:
         model_id = self.choose_model("code")
@@ -177,16 +235,65 @@ class GPT5Service:
         return self.generate_text_sync(message, model_id=model_id, **kwargs)
 
     def send_analysis(self, message: str, **kwargs) -> str:
-        model_id = self.choose_model("analysis")
-        return self.generate_text_sync(message, model_id=model_id, **kwargs)
+        import logging
+        logger = logging.getLogger(__name__)
+
+        logger.info("🔍 [RAILWAY] send_analysis called")
+        logger.info(f"🔍 [RAILWAY] Message length: {len(message)}")
+        logger.info(f"🔍 [RAILWAY] Kwargs: {kwargs}")
+
+        try:
+            model_id = self.choose_model("analysis")
+            logger.info(f"🔍 [RAILWAY] Chosen model: {model_id}")
+
+            result = self.generate_text_sync(message, model_id=model_id, **kwargs)
+            logger.info(f"✅ [RAILWAY] send_analysis succeeded, result length: {len(result) if result else 0}")
+            return result
+
+        except Exception as e:
+            logger.error(f"❌ [RAILWAY] send_analysis failed: {str(e)}")
+            logger.error(f"❌ [RAILWAY] Error type: {type(e).__name__}")
+            import traceback
+            logger.error(f"❌ [RAILWAY] send_analysis traceback:\n{traceback.format_exc()}")
+            raise
 
     def send_sentiment(self, message: str, **kwargs) -> str:
-        model_id = self.choose_model("sentiment")
-        return self.generate_text_sync(message, model_id=model_id, **kwargs)
+        import logging
+        logger = logging.getLogger(__name__)
+
+        logger.info("🔍 [RAILWAY] send_sentiment called")
+        logger.info(f"🔍 [RAILWAY] Message length: {len(message)}")
+
+        try:
+            model_id = self.choose_model("sentiment")
+            logger.info(f"🔍 [RAILWAY] Chosen sentiment model: {model_id}")
+            result = self.generate_text_sync(message, model_id=model_id, **kwargs)
+            logger.info(f"✅ [RAILWAY] send_sentiment succeeded, length: {len(result) if result else 0}")
+            return result
+        except Exception as e:
+            logger.error(f"❌ [RAILWAY] send_sentiment failed: {str(e)}")
+            import traceback
+            logger.error(f"❌ [RAILWAY] send_sentiment traceback:\n{traceback.format_exc()}")
+            raise
 
     def send_insights(self, message: str, **kwargs) -> str:
-        model_id = self.choose_model("insights")
-        return self.generate_text_sync(message, model_id=model_id, **kwargs)
+        import logging
+        logger = logging.getLogger(__name__)
+
+        logger.info("🔍 [RAILWAY] send_insights called")
+        logger.info(f"🔍 [RAILWAY] Message length: {len(message)}")
+
+        try:
+            model_id = self.choose_model("insights")
+            logger.info(f"🔍 [RAILWAY] Chosen insights model: {model_id}")
+            result = self.generate_text_sync(message, model_id=model_id, **kwargs)
+            logger.info(f"✅ [RAILWAY] send_insights succeeded, length: {len(result) if result else 0}")
+            return result
+        except Exception as e:
+            logger.error(f"❌ [RAILWAY] send_insights failed: {str(e)}")
+            import traceback
+            logger.error(f"❌ [RAILWAY] send_insights traceback:\n{traceback.format_exc()}")
+            raise
 
     def list_available_models(self) -> List[str]:
         return list(self.models.keys())
@@ -196,7 +303,36 @@ class GPT5Service:
 
 
 def create_gpt5_service(preferred_model_id: Optional[str] = None) -> GPT5Service:
-    return GPT5Service(preferred_model_id=preferred_model_id, config_path=CONFIG_PATH)
+    """Create GPT-5 service with detailed Railway logging"""
+    import logging
+    logger = logging.getLogger(__name__)
+
+    logger.info(f"🔍 [RAILWAY] create_gpt5_service called with model: {preferred_model_id}")
+
+    # Check environment
+    import os
+    openai_key = os.environ.get('OPENAI_API_KEY')
+    if openai_key:
+        logger.info(f"🔍 [RAILWAY] OPENAI_API_KEY found: {openai_key[:8]}***{openai_key[-4:]}")
+    else:
+        logger.error("❌ [RAILWAY] OPENAI_API_KEY not found in environment!")
+        logger.error("❌ [RAILWAY] Available env vars:")
+        for key in os.environ:
+            if 'OPENAI' in key or 'API' in key:
+                logger.error(f"❌ [RAILWAY] Found env: {key}")
+        raise ValueError("OPENAI_API_KEY not set")
+
+    try:
+        logger.info("🔍 [RAILWAY] Creating GPT5Service instance...")
+        service = GPT5Service(preferred_model_id=preferred_model_id, config_path=CONFIG_PATH)
+        logger.info("✅ [RAILWAY] GPT5Service created successfully")
+        return service
+    except Exception as e:
+        logger.error(f"❌ [RAILWAY] Failed to create GPT5Service: {str(e)}")
+        logger.error(f"❌ [RAILWAY] Error type: {type(e).__name__}")
+        import traceback
+        logger.error(f"❌ [RAILWAY] Traceback:\n{traceback.format_exc()}")
+        raise
 
 
 if __name__ == "__main__":

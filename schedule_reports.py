@@ -9,9 +9,15 @@ import time
 import logging
 from datetime import datetime
 import os
+import sys
 
-# Set environment
-os.environ['PG_DSN'] = 'postgres://postgres:ug1Hi~XHEMdMh_Lm~4UfUKtAejqLBGdg@crossover.proxy.rlwy.net:12306/railway'
+# Read PG_DSN from environment (Railway)
+PG_DSN = os.getenv('PG_DSN')
+if not PG_DSN:
+    print("❌ PG_DSN не установлен в окружении (Railway env)")
+    print("💡 Установите переменную окружения PG_DSN")
+    # Optional: exit early to avoid running without DB
+    sys.exit(1)
 
 from system_stats_reporter import SystemStatsReporter
 

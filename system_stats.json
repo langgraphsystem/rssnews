@@ -1,5 +1,5 @@
 {
-  "timestamp": "2025-09-23T19:09:00.116765",
+  "timestamp": "2025-09-25T21:21:29.466863",
   "feeds": {
     "total_feeds": 118,
     "active_feeds": 118,
@@ -7,72 +7,71 @@
     "top_sources": [
       {
         "domain": "theguardian.com",
-        "count": 3145
+        "count": 3586
       },
       {
         "domain": "nytimes.com",
-        "count": 2127
-      },
-      {
-        "domain": "go.com",
-        "count": 1623
+        "count": 2373
       },
       {
         "domain": "cbssports.com",
-        "count": 1614
+        "count": 1901
+      },
+      {
+        "domain": "go.com",
+        "count": 1893
       },
       {
         "domain": "google.com",
-        "count": 1554
+        "count": 1848
       }
     ]
   },
   "articles": {
-    "total_articles": 13558,
-    "recent_24h": 1336,
+    "total_articles": 15583,
+    "recent_24h": 1028,
     "status_counts": {
-      "False": 13542,
-      "True": 16
+      "False": 15570,
+      "True": 13
     },
     "top_sources": [
       {
         "domain": "theguardian.com",
-        "count": 1240
+        "count": 1200
       },
       {
         "domain": "google.com",
-        "count": 974
+        "count": 876
       },
       {
         "domain": "cbssports.com",
-        "count": 831
+        "count": 782
       },
       {
         "domain": "nytimes.com",
-        "count": 725
+        "count": 674
       },
       {
         "domain": "go.com",
-        "count": 679
+        "count": 660
       }
     ]
   },
   "chunks": {
-    "total_chunks": 163076,
-    "recent_24h": 8551,
+    "total_chunks": 175913,
+    "recent_24h": 5925,
     "processing_stages": {
-      "complete": 104186,
-      "needs_fts": 137,
-      "needs_embedding": 58753
+      "complete": 175822,
+      "needs_fts": 91
     },
-    "avg_chunks_per_article": 12.48
+    "avg_chunks_per_article": 11.65
   },
   "embeddings": {
-    "embedded_chunks": 104186,
-    "pending_embeddings": 58890,
-    "recent_24h": 0,
+    "embedded_chunks": 175913,
+    "pending_embeddings": 0,
+    "recent_24h": 5925,
     "vector_dimensions": 3072,
-    "completion_rate": 63.89
+    "completion_rate": 100.0
   },
   "services": {
     "service_manager_running": false,
@@ -95,5 +94,5 @@
     },
     "llm_connectivity": true
   },
-  "llm_insights": "GPT-5 анализ недоступен: OpenAI API error: AuthenticationError: Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************3eYA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}}"
+  "llm_insights": "1) Главные проблемы\n- Отсутствует оркестрация: service_manager_running=False.\n- Аномалия со статусами статей: True=13 vs False=15570 (крайне низкая доля “успешных”).\n- Небольшой, но существующий хвост FTS: needs_fts=91.\n- Возможная регрессия в чанкинге за 24ч: 5925 чанков на 1028 статей ≈5.8 чанка/статью против среднего 11.65 (изменение качества входящих или настроек).\n- Сильная концентрация на нескольких доменах — риск зависимости/дубликатов.\n\n2) Наиболее критичные метрики\n- service_manager_running=False.\n- ARTICLES.status_counts: True=13 / 15583 (~0.08%).\n- CHUNKS.processing_stages.needs_fts=91 (как индикатор застревания шагов).\n- Падение recent chunks per article: ~5.8 vs 11.65.\n\n3) Что сделать в первую очередь\n- Поднять/перезапустить service manager, включить авто‑рестарт и heartbeat.\n- Диагностировать и исправить логику установки статуса статьи:\n  - Проверить пайплайн “ingest → parse → chunk → fts → embed → publish/ready”.\n  - Сравнить статьи с завершёнными шагами и статусом False; проверить дефолты/миграции БД.\n  - Прогнать backfill/repair, чтобы выставить корректный статус тем, у кого шаги завершены.\n- Очистить FTS‑хвост: вручную докатить 91 запись, убедиться, что новые не застревают.\n- Проверить недавние изменения конфигурации чанкинга (max_tokens/сплиттер); при необходимости откатить.\n- Проверить правила дедупликации и лимиты на источники, чтобы не забивать пайплайн повторяющимися материалами.\n\n4) Рекомендации для стабильности\n- Мониторинг и алерты:\n  - Heartbeat service manager.\n  - Доля статей со статусом True за 24ч ≥ заданного порога (например, 90%).\n  - Backlog’и по FTS/embeddings/очередям < порога.\n  - Время от ingestion до готовности (SLO).\n  - Аномалии chunks_per_article.\n- Оркестрация и отказоустойчивость: watchdog, автоперезапуск, healthchecks, единый оркестратор.\n- Прозрачная диагностика: логировать причину отказа на уровне статьи/шага, трассировка, версии конфигов.\n- Регулярные backfill/repair‑задачи для несогласованных статусов.\n- Управление источниками: квоты на домены, дедуп по URL/контенту, балансировка.\n- Контролируемые изменения конфигурации (фича‑флаги/канареечные деплойments) и интеграционные тесты на смену статуса."
 }
