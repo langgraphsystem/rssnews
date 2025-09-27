@@ -470,6 +470,22 @@ class AdvancedRSSBot:
                     chat_id, user_id, action, data, message_id
                 )
 
+            # Analytics and Quality callbacks
+            elif action == "trends" and data == "refresh":
+                return await self.handle_trends_command(chat_id, user_id)
+
+            elif action == "analytics" and data == "full":
+                try:
+                    analytics = self.db.get_search_analytics(days=7)
+                    message = self.formatter.format_trends(analytics)
+                    return await self._send_message(chat_id, message)
+                except Exception as e:
+                    logger.error(f"Analytics full callback failed: {e}")
+                    return await self._send_message(chat_id, "❌ Failed to load full analytics")
+
+            elif action == "quality" and data in ("detailed", "refresh"):
+                return await self.handle_quality_command(chat_id, user_id)
+
             else:
                 return await self._send_message(chat_id, "❓ Unknown action")
 
