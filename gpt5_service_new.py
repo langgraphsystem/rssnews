@@ -96,7 +96,6 @@ class GPT5Service:
                 test_prompt,
                 model_id=model_id,
                 max_output_tokens=16,
-                temperature=0.0
             )
 
             # Any non-empty response indicates success
@@ -143,7 +142,9 @@ class GPT5Service:
         if max_output_tokens is not None:
             payload["max_output_tokens"] = int(max_output_tokens)
         if temperature is not None:
-            payload["temperature"] = float(temperature)
+            supports_temp = bool(self.models.get(model_id, {}).get("supports_temperature"))
+            if supports_temp:
+                payload["temperature"] = float(temperature)
         if verbosity:
             payload["text"] = {"verbosity": verbosity}
 
