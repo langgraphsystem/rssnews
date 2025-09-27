@@ -23,13 +23,16 @@ class GPT5Service:
 
     def __init__(self, preferred_model_id: Optional[str] = None, config_path: str = CONFIG_PATH) -> None:
         if not os.path.exists(config_path):
-            raise FileNotFoundError(f"Config file not found: {config_path}")
+            raise FileNotFoundError(f"GPT-5 config file not found: {config_path}. Please ensure gpt5.config.json exists with valid model and routing configuration.")
 
         with open(config_path, 'r', encoding='utf-8') as f:
             try:
                 cfg = json.load(f)
             except json.JSONDecodeError as e:
-                raise ValueError(f"Invalid JSON in config file: {e}")
+                raise ValueError(f"Invalid JSON in GPT-5 config file {config_path}: {e}. Please check the JSON syntax.")
+
+        # Validate required config structure
+        self._validate_config(cfg, config_path)
 
         self.config: Dict[str, Any] = cfg
         self.routing: Dict[str, str] = cfg.get("routing", {})
@@ -38,15 +41,72 @@ class GPT5Service:
 
         api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:
-            raise KeyError("OPENAI_API_KEY environment variable not set")
+            raise KeyError("OPENAI_API_KEY environment variable not set. Please set your OpenAI API key.")
 
         self.client = OpenAI(api_key=api_key)
 
         # Default model
         self.default_model_id: str = preferred_model_id or self.routing.get("chat") or next(iter(self.models), "gpt-5")
 
+    def _validate_config(self, cfg: Dict[str, Any], config_path: str) -> None:
+        """Validate configuration structure and required fields"""
+        if not isinstance(cfg, dict):
+            raise ValueError(f"GPT-5 config must be a JSON object, got {type(cfg).__name__}")
+
+        # Check for required models section
+        if "models" not in cfg:
+            raise ValueError(f"GPT-5 config {config_path} missing required 'models' section")
+
+        models = cfg["models"]
+        if not isinstance(models, list) or len(models) == 0:
+            raise ValueError(f"GPT-5 config 'models' must be a non-empty list")
+
+        # Validate each model has required id field
+        for i, model in enumerate(models):
+            if not isinstance(model, dict):
+                raise ValueError(f"GPT-5 config model[{i}] must be an object")
+            if "id" not in model:
+                raise ValueError(f"GPT-5 config model[{i}] missing required 'id' field")
+
+        # Check for routing section
+        if "routing" not in cfg:
+            raise ValueError(f"GPT-5 config {config_path} missing required 'routing' section")
+
+        routing = cfg["routing"]
+        if not isinstance(routing, dict):
+            raise ValueError(f"GPT-5 config 'routing' must be an object")
+
+        # Ensure routing refers to valid models
+        model_ids = {m["id"] for m in models}
+        for task, model_id in routing.items():
+            if model_id not in model_ids:
+                raise ValueError(f"GPT-5 config routing task '{task}' refers to unknown model '{model_id}'")
+
     def choose_model(self, task: str) -> str:
         return self.routing.get(task, self.default_model_id)
+
+    def ping(self, timeout_seconds: int = 10) -> bool:
+        """Ping GPT-5 service to validate API key and connectivity"""
+        try:
+            # Use minimal prompt and token limit for fast ping
+            test_prompt = "ping"
+            model_id = self.choose_model("chat")
+
+            result = self.generate_text_sync(
+                test_prompt,
+                model_id=model_id,
+                max_output_tokens=16,
+                temperature=0.0
+            )
+
+            # Any non-empty response indicates success
+            return bool(result and len(result.strip()) > 0)
+
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"GPT-5 ping failed: {e}")
+            return False
 
     # Build Responses payload per config
     def _build_payload(
@@ -313,7 +373,7 @@ def create_gpt5_service(preferred_model_id: Optional[str] = None) -> GPT5Service
     import os
     openai_key = os.environ.get('OPENAI_API_KEY')
     if openai_key:
-        logger.info(f"🔍 [RAILWAY] OPENAI_API_KEY found: {openai_key[:8]}***{openai_key[-4:]}")
+        logger.info("🔍 [RAILWAY] OPENAI_API_KEY found (value hidden)")
     else:
         logger.error("❌ [RAILWAY] OPENAI_API_KEY not found in environment!")
         logger.error("❌ [RAILWAY] Available env vars:")

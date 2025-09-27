@@ -39,13 +39,40 @@ class BotRunner:
         self.offset = 0
 
     async def initialize_bot(self):
-        """Initialize the bot instance"""
+        """Initialize the bot instance with GPT5Service singleton"""
         try:
             logger.info("🤖 Initializing bot...")
-            from bot_service.advanced_bot import AdvancedRSSBot
 
-            self.bot = AdvancedRSSBot(self.bot_token)
-            logger.info("✅ Bot initialized successfully")
+            # Initialize GPT5Service singleton first
+            logger.info("🔮 Creating GPT5Service singleton...")
+            from gpt5_service_new import GPT5Service
+
+            try:
+                gpt5 = GPT5Service()
+                logger.info("✅ GPT5Service created successfully")
+
+                # Perform warm-up check using minimal prompt
+                logger.info("🔥 Performing GPT-5 warm-up check...")
+                try:
+                    _ = gpt5.generate_text_sync(
+                        "ping",
+                        model_id=gpt5.choose_model("chat"),
+                        max_output_tokens=16,
+                        temperature=0.0,
+                    )
+                    logger.info("✅ GPT-5 warm-up successful")
+                except Exception as warmup_err:
+                    logger.error(f"❌ GPT-5 warm-up failed: {warmup_err}")
+                    return False
+
+            except Exception as gpt_error:
+                logger.error(f"❌ GPT5Service initialization failed: {gpt_error}")
+                return False
+
+            # Initialize bot with GPT5Service
+            from bot_service.advanced_bot import AdvancedRSSBot
+            self.bot = AdvancedRSSBot(self.bot_token, gpt5_service=gpt5)
+            logger.info("✅ Bot initialized successfully with GPT-5 singleton")
             return True
 
         except Exception as e:

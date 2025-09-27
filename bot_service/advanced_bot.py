@@ -40,7 +40,7 @@ logger = logging.getLogger(__name__)
 class AdvancedRSSBot:
     """Production Telegram bot with advanced features"""
 
-    def __init__(self, bot_token: str, ranking_api: RankingAPI = None):
+    def __init__(self, bot_token: str, ranking_api: RankingAPI = None, gpt5_service=None):
         logger.info("🤖 Initializing Advanced RSS Bot...")
 
         if not bot_token:
@@ -50,6 +50,13 @@ class AdvancedRSSBot:
         self.bot_token = bot_token
         self.api_base = f"https://api.telegram.org/bot{bot_token}"
         logger.info(f"📡 Bot API base URL: {self.api_base}")
+
+        # Store GPT5Service singleton
+        self.gpt5 = gpt5_service
+        if self.gpt5:
+            logger.info("✅ GPT5Service singleton attached to bot")
+        else:
+            logger.warning("⚠️ No GPT5Service provided - GPT commands will be disabled")
 
         try:
             logger.info("🔧 Initializing ranking API...")
@@ -590,6 +597,9 @@ class AdvancedRSSBot:
                 elif command == 'topics':
                     return await self.handle_topics_command(chat_id, user_id, args)
 
+                elif command == 'gpt':
+                    return await self.handle_gpt_command(chat_id, user_id, args)
+
                 else:
                     return await self._send_message(chat_id, f"❓ Unknown command: /{command}")
 
@@ -871,6 +881,9 @@ class AdvancedRSSBot:
             if not articles:
                 return await self._send_message(chat_id, f"📭 No articles found for '{query}' in timeframe {timeframe}")
 
+            if not self.gpt5:
+                return await self._send_message(chat_id, "❌ GPT-5 service not available")
+
             # Use GPT-5 for analysis
             analysis_prompt = f"""Analyze the following {len(articles)} news articles about '{query}':
 
@@ -886,38 +899,23 @@ Provide a comprehensive analysis covering:
 
 Format as structured report with emojis and clear sections."""
 
-            from gpt5_service_new import create_gpt5_service
-            # RAILWAY DEBUG: GPT-5 Analysis Command
-            logger.info("🔍 [RAILWAY] Starting GPT-5 analysis command")
-            logger.info(f"🔍 [RAILWAY] Query: {query}")
-            logger.info(f"🔍 [RAILWAY] Analysis prompt length: {len(analysis_prompt)}")
-
             try:
-                logger.info("🔍 [RAILWAY] Creating GPT-5 service...")
-                gpt5 = create_gpt5_service("gpt-5-mini")
-                logger.info("✅ [RAILWAY] GPT-5 service created successfully")
+                analysis = self.gpt5.send_analysis(analysis_prompt, max_completion_tokens=1000)
 
-                logger.info("🔍 [RAILWAY] Calling send_analysis...")
-                analysis = gpt5.send_analysis(analysis_prompt, max_completion_tokens=1000)
-                logger.info(f"✅ [RAILWAY] GPT-5 analysis response received, length: {len(analysis) if analysis else 0}")
+                if analysis:
+                    message = f"🔬 **GPT-5 Analysis: {query.upper()}**\n\n"
+                    message += f"📊 **Data:** {len(articles)} articles, {timeframe}\n\n"
+                    message += analysis
+                else:
+                    message = "❌ GPT-5 analysis failed. Please try again."
+
+                return await self._send_long_message(chat_id, message)
 
             except Exception as gpt5_error:
-                logger.error(f"❌ [RAILWAY] GPT-5 analysis error: {str(gpt5_error)}")
-                logger.error(f"❌ [RAILWAY] GPT-5 error type: {type(gpt5_error).__name__}")
-                import traceback
-                logger.error(f"❌ [RAILWAY] GPT-5 traceback:\n{traceback.format_exc()}")
-                analysis = None
-
-            if analysis:
-                logger.info(f"✅ [RAILWAY] GPT-5 analysis successful, sending response to user")
-                message = f"🔬 **GPT-5 Analysis: {query.upper()}**\n\n"
-                message += f"📊 **Data:** {len(articles)} articles, {timeframe}\n\n"
-                message += analysis
-            else:
-                logger.error(f"❌ [RAILWAY] GPT-5 analysis failed - no response received")
-                message = "❌ GPT-5 analysis failed. Please try again."
-
-            return await self._send_message(chat_id, message)
+                logger.error(f"GPT-5 analysis error: {gpt5_error}")
+                from bot_service.error_handler import log_error
+                log_error(gpt5_error, user_id, chat_id, 'analyze_command')
+                return await self._send_message(chat_id, "❌ GPT-5 analysis failed. Please try again.")
 
         except Exception as e:
             logger.error(f"Analyze command failed: {e}")
@@ -970,39 +968,27 @@ Requirements:
 - Highlight the most important insights
 - Use clear formatting with emojis"""
 
-            # RAILWAY DEBUG: GPT-5 Summarize Command
-            logger.info("🔍 [RAILWAY] Starting GPT-5 summarize command")
-            logger.info(f"🔍 [RAILWAY] Topic: {topic}")
-            logger.info(f"🔍 [RAILWAY] Length: {length}")
-            logger.info(f"🔍 [RAILWAY] Summary prompt length: {len(summary_prompt)}")
-            logger.info(f"🔍 [RAILWAY] Articles found: {len(articles)}")
+            if not self.gpt5:
+                return await self._send_message(chat_id, "❌ GPT-5 service not available")
 
             try:
-                logger.info("🔍 [RAILWAY] Creating GPT-5 service for summarize...")
-                from gpt5_service_new import create_gpt5_service
-                gpt5 = create_gpt5_service("gpt-5")
-                logger.info("✅ [RAILWAY] GPT-5 service created for summarize")
+                summary = self.gpt5.send_chat(summary_prompt, max_completion_tokens=config['tokens'])
 
-                logger.info("🔍 [RAILWAY] Calling send_chat for summarize...")
-                summary = gpt5.send_chat(summary_prompt, max_completion_tokens=config['tokens'])
-                logger.info(f"✅ [RAILWAY] GPT-5 summarize response received, length: {len(summary) if summary else 0}")
+                if summary:
+                    message = f"📝 **GPT-5 Summary: {topic.upper()}**\n\n"
+                    message += f"📊 **Sources:** {len(articles)} articles ({timeframe})\n"
+                    message += f"📏 **Format:** {length}\n\n"
+                    message += summary
+                else:
+                    message = "❌ GPT-5 summarization failed. Please try again."
+
+                return await self._send_long_message(chat_id, message)
 
             except Exception as gpt5_error:
-                logger.error(f"❌ [RAILWAY] GPT-5 summarize error: {str(gpt5_error)}")
-                logger.error(f"❌ [RAILWAY] GPT-5 error type: {type(gpt5_error).__name__}")
-                import traceback
-                logger.error(f"❌ [RAILWAY] GPT-5 traceback:\n{traceback.format_exc()}")
-                summary = None
-
-            if summary:
-                message = f"📝 **GPT-5 Summary: {topic.upper()}**\n\n"
-                message += f"📊 **Sources:** {len(articles)} articles ({timeframe})\n"
-                message += f"📏 **Format:** {length}\n\n"
-                message += summary
-            else:
-                message = "❌ GPT-5 summarization failed. Please try again."
-
-            return await self._send_message(chat_id, message)
+                logger.error(f"GPT-5 summarize error: {gpt5_error}")
+                from bot_service.error_handler import log_error
+                log_error(gpt5_error, user_id, chat_id, 'summarize_command')
+                return await self._send_message(chat_id, "❌ GPT-5 summarization failed. Please try again.")
 
         except Exception as e:
             logger.error(f"Summarize command failed: {e}")
@@ -1051,41 +1037,29 @@ Provide:
 
 Format with charts, tables, and visual elements using emojis."""
 
-            # RAILWAY DEBUG: GPT-5 Aggregate Command
-            logger.info("🔍 [RAILWAY] Starting GPT-5 aggregate command")
-            logger.info(f"🔍 [RAILWAY] Metric: {metric}")
-            logger.info(f"🔍 [RAILWAY] Group by: {groupby}")
-            logger.info(f"🔍 [RAILWAY] Aggregation prompt length: {len(aggregation_prompt)}")
-            logger.info(f"🔍 [RAILWAY] Articles found: {len(articles)}")
+            if not self.gpt5:
+                return await self._send_message(chat_id, "❌ GPT-5 service not available")
 
             try:
-                logger.info("🔍 [RAILWAY] Creating GPT-5 service for aggregate...")
-                from gpt5_service_new import create_gpt5_service
-                gpt5 = create_gpt5_service("gpt-5-mini")
-                logger.info("✅ [RAILWAY] GPT-5 service created for aggregate")
+                aggregation = self.gpt5.send_analysis(aggregation_prompt, max_completion_tokens=800)
 
-                logger.info("🔍 [RAILWAY] Calling send_analysis for aggregate...")
-                aggregation = gpt5.send_analysis(aggregation_prompt, max_completion_tokens=800)
-                logger.info(f"✅ [RAILWAY] GPT-5 aggregate response received, length: {len(aggregation) if aggregation else 0}")
+                if aggregation:
+                    message = f"📊 **GPT-5 Aggregation Report**\n\n"
+                    message += f"📈 **Metric:** {metric}\n"
+                    message += f"📋 **Grouped by:** {groupby}\n"
+                    message += f"📅 **Timeframe:** {timeframe}\n"
+                    message += f"📊 **Sample size:** {len(articles)} articles\n\n"
+                    message += aggregation
+                else:
+                    message = "❌ GPT-5 aggregation failed. Please try again."
+
+                return await self._send_long_message(chat_id, message)
 
             except Exception as gpt5_error:
-                logger.error(f"❌ [RAILWAY] GPT-5 aggregate error: {str(gpt5_error)}")
-                logger.error(f"❌ [RAILWAY] GPT-5 error type: {type(gpt5_error).__name__}")
-                import traceback
-                logger.error(f"❌ [RAILWAY] GPT-5 traceback:\n{traceback.format_exc()}")
-                aggregation = None
-
-            if aggregation:
-                message = f"📊 **GPT-5 Aggregation Report**\n\n"
-                message += f"📈 **Metric:** {metric}\n"
-                message += f"📋 **Grouped by:** {groupby}\n"
-                message += f"📅 **Timeframe:** {timeframe}\n"
-                message += f"📊 **Sample size:** {len(articles)} articles\n\n"
-                message += aggregation
-            else:
-                message = "❌ GPT-5 aggregation failed. Please try again."
-
-            return await self._send_message(chat_id, message)
+                logger.error(f"GPT-5 aggregate error: {gpt5_error}")
+                from bot_service.error_handler import log_error
+                log_error(gpt5_error, user_id, chat_id, 'aggregate_command')
+                return await self._send_message(chat_id, "❌ GPT-5 aggregation failed. Please try again.")
 
         except Exception as e:
             logger.error(f"Aggregate command failed: {e}")
@@ -1139,40 +1113,28 @@ Tasks:
 
 Return top 10 filtered articles with explanations."""
 
-            # RAILWAY DEBUG: GPT-5 Filter Command
-            logger.info("🔍 [RAILWAY] Starting GPT-5 filter command")
-            logger.info(f"🔍 [RAILWAY] Criteria: {criteria}")
-            logger.info(f"🔍 [RAILWAY] Value: {value}")
-            logger.info(f"🔍 [RAILWAY] Filter prompt length: {len(filter_prompt)}")
-            logger.info(f"🔍 [RAILWAY] Articles found: {len(articles)}")
+            if not self.gpt5:
+                return await self._send_message(chat_id, "❌ GPT-5 service not available")
 
             try:
-                logger.info("🔍 [RAILWAY] Creating GPT-5 service for filter...")
-                from gpt5_service_new import create_gpt5_service
-                gpt5 = create_gpt5_service("gpt-5")
-                logger.info("✅ [RAILWAY] GPT-5 service created for filter")
+                filtered_results = self.gpt5.send_analysis(filter_prompt, max_completion_tokens=1000)
 
-                logger.info("🔍 [RAILWAY] Calling send_analysis for filter...")
-                filtered_results = gpt5.send_analysis(filter_prompt, max_completion_tokens=1000)
-                logger.info(f"✅ [RAILWAY] GPT-5 filter response received, length: {len(filtered_results) if filtered_results else 0}")
+                if filtered_results:
+                    message = f"🔍 **GPT-5 Filtered Results**\n\n"
+                    message += f"📋 **Filter:** {criteria} = {value}\n"
+                    message += f"📅 **Timeframe:** {timeframe}\n"
+                    message += f"📊 **Total articles:** {len(articles)}\n\n"
+                    message += filtered_results
+                else:
+                    message = "❌ GPT-5 filtering failed. Please try again."
+
+                return await self._send_long_message(chat_id, message)
 
             except Exception as gpt5_error:
-                logger.error(f"❌ [RAILWAY] GPT-5 filter error: {str(gpt5_error)}")
-                logger.error(f"❌ [RAILWAY] GPT-5 error type: {type(gpt5_error).__name__}")
-                import traceback
-                logger.error(f"❌ [RAILWAY] GPT-5 traceback:\n{traceback.format_exc()}")
-                filtered_results = None
-
-            if filtered_results:
-                message = f"🔍 **GPT-5 Filtered Results**\n\n"
-                message += f"📋 **Filter:** {criteria} = {value}\n"
-                message += f"📅 **Timeframe:** {timeframe}\n"
-                message += f"📊 **Total articles:** {len(articles)}\n\n"
-                message += filtered_results
-            else:
-                message = "❌ GPT-5 filtering failed. Please try again."
-
-            return await self._send_message(chat_id, message)
+                logger.error(f"GPT-5 filter error: {gpt5_error}")
+                from bot_service.error_handler import log_error
+                log_error(gpt5_error, user_id, chat_id, 'filter_command')
+                return await self._send_message(chat_id, "❌ GPT-5 filtering failed. Please try again.")
 
         except Exception as e:
             logger.error(f"Filter command failed: {e}")
@@ -1220,38 +1182,27 @@ Provide comprehensive insights covering:
 
 Format as executive briefing with clear sections."""
 
-            # RAILWAY DEBUG: GPT-5 Insights Command
-            logger.info("🔍 [RAILWAY] Starting GPT-5 insights command")
-            logger.info(f"🔍 [RAILWAY] Query: {query}")
-            logger.info(f"🔍 [RAILWAY] Insights prompt length: {len(insights_prompt)}")
-            logger.info(f"🔍 [RAILWAY] Articles found: {len(articles)}")
+            if not self.gpt5:
+                return await self._send_message(chat_id, "❌ GPT-5 service not available")
 
             try:
-                logger.info("🔍 [RAILWAY] Creating GPT-5 service for insights...")
-                from gpt5_service_new import create_gpt5_service
-                gpt5 = create_gpt5_service("gpt-5")
-                logger.info("✅ [RAILWAY] GPT-5 service created for insights")
+                insights = self.gpt5.send_insights(insights_prompt, max_completion_tokens=1200)
 
-                logger.info("🔍 [RAILWAY] Calling send_insights for insights...")
-                insights = gpt5.send_insights(insights_prompt, max_completion_tokens=1200)
-                logger.info(f"✅ [RAILWAY] GPT-5 insights response received, length: {len(insights) if insights else 0}")
+                if insights:
+                    message = f"💡 **GPT-5 Deep Insights: {query.upper()}**\n\n"
+                    message += f"📊 **Analysis basis:** {len(articles)} articles (7 days)\n"
+                    message += f"🕐 **Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M')}\n\n"
+                    message += insights
+                else:
+                    message = "❌ GPT-5 insights generation failed. Please try again."
+
+                return await self._send_long_message(chat_id, message)
 
             except Exception as gpt5_error:
-                logger.error(f"❌ [RAILWAY] GPT-5 insights error: {str(gpt5_error)}")
-                logger.error(f"❌ [RAILWAY] GPT-5 error type: {type(gpt5_error).__name__}")
-                import traceback
-                logger.error(f"❌ [RAILWAY] GPT-5 traceback:\n{traceback.format_exc()}")
-                insights = None
-
-            if insights:
-                message = f"💡 **GPT-5 Deep Insights: {query.upper()}**\n\n"
-                message += f"📊 **Analysis basis:** {len(articles)} articles (7 days)\n"
-                message += f"🕐 **Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M')}\n\n"
-                message += insights
-            else:
-                message = "❌ GPT-5 insights generation failed. Please try again."
-
-            return await self._send_message(chat_id, message)
+                logger.error(f"GPT-5 insights error: {gpt5_error}")
+                from bot_service.error_handler import log_error
+                log_error(gpt5_error, user_id, chat_id, 'insights_command')
+                return await self._send_message(chat_id, "❌ GPT-5 insights generation failed. Please try again.")
 
         except Exception as e:
             logger.error(f"Insights command failed: {e}")
@@ -1302,38 +1253,27 @@ Analyze and provide:
 
 Use emojis and clear formatting."""
 
-            # RAILWAY DEBUG: GPT-5 Sentiment Command
-            logger.info("🔍 [RAILWAY] Starting GPT-5 sentiment command")
-            logger.info(f"🔍 [RAILWAY] Query: {query}")
-            logger.info(f"🔍 [RAILWAY] Sentiment prompt length: {len(sentiment_prompt)}")
-            logger.info(f"🔍 [RAILWAY] Articles found: {len(articles)}")
+            if not self.gpt5:
+                return await self._send_message(chat_id, "❌ GPT-5 service not available")
 
             try:
-                logger.info("🔍 [RAILWAY] Creating GPT-5 service for sentiment...")
-                from gpt5_service_new import create_gpt5_service
-                gpt5 = create_gpt5_service("gpt-5-mini")
-                logger.info("✅ [RAILWAY] GPT-5 service created for sentiment")
+                sentiment_analysis = self.gpt5.send_sentiment(sentiment_prompt, max_completion_tokens=1000)
 
-                logger.info("🔍 [RAILWAY] Calling send_sentiment for sentiment...")
-                sentiment_analysis = gpt5.send_sentiment(sentiment_prompt, max_completion_tokens=1000)
-                logger.info(f"✅ [RAILWAY] GPT-5 sentiment response received, length: {len(sentiment_analysis) if sentiment_analysis else 0}")
+                if sentiment_analysis:
+                    message = f"😊 **GPT-5 Sentiment Analysis: {query.upper()}**\n\n"
+                    message += f"📊 **Sample:** {len(articles)} articles ({timeframe})\n"
+                    message += f"🕐 **Period:** {timeframe}\n\n"
+                    message += sentiment_analysis
+                else:
+                    message = "❌ GPT-5 sentiment analysis failed. Please try again."
+
+                return await self._send_long_message(chat_id, message)
 
             except Exception as gpt5_error:
-                logger.error(f"❌ [RAILWAY] GPT-5 sentiment error: {str(gpt5_error)}")
-                logger.error(f"❌ [RAILWAY] GPT-5 error type: {type(gpt5_error).__name__}")
-                import traceback
-                logger.error(f"❌ [RAILWAY] GPT-5 traceback:\n{traceback.format_exc()}")
-                sentiment_analysis = None
-
-            if sentiment_analysis:
-                message = f"😊 **GPT-5 Sentiment Analysis: {query.upper()}**\n\n"
-                message += f"📊 **Sample:** {len(articles)} articles ({timeframe})\n"
-                message += f"🕐 **Period:** {timeframe}\n\n"
-                message += sentiment_analysis
-            else:
-                message = "❌ GPT-5 sentiment analysis failed. Please try again."
-
-            return await self._send_message(chat_id, message)
+                logger.error(f"GPT-5 sentiment error: {gpt5_error}")
+                from bot_service.error_handler import log_error
+                log_error(gpt5_error, user_id, chat_id, 'sentiment_command')
+                return await self._send_message(chat_id, "❌ GPT-5 sentiment analysis failed. Please try again.")
 
         except Exception as e:
             logger.error(f"Sentiment command failed: {e}")
@@ -1342,6 +1282,9 @@ Use emojis and clear formatting."""
     async def handle_topics_command(self, chat_id: str, user_id: str, args: List[str]) -> bool:
         """Handle /topics command - GPT-5 topic modeling and analysis"""
         try:
+            if not self.gpt5:
+                return await self._send_message(chat_id, "❌ GPT-5 service not available")
+
             scope = args[0] if args else 'trending'
             timeframe = args[1] if len(args) > 1 else '1d'
 
@@ -1388,43 +1331,77 @@ Provide comprehensive topic analysis:
 
 Use emojis, percentages, and visual formatting."""
 
-            # RAILWAY DEBUG: GPT-5 Topics Command
-            logger.info("🔍 [RAILWAY] Starting GPT-5 topics command")
-            logger.info(f"🔍 [RAILWAY] Scope: {scope}")
-            logger.info(f"🔍 [RAILWAY] Topics prompt length: {len(topics_prompt)}")
-            logger.info(f"🔍 [RAILWAY] Articles found: {len(articles)}")
-
             try:
-                logger.info("🔍 [RAILWAY] Creating GPT-5 service for topics...")
-                from gpt5_service_new import create_gpt5_service
-                gpt5 = create_gpt5_service("gpt-5")
-                logger.info("✅ [RAILWAY] GPT-5 service created for topics")
+                model_id = self.gpt5.choose_model("analysis")
+                topic_analysis = self.gpt5.send_analysis(topics_prompt, max_completion_tokens=1200)
 
-                logger.info("🔍 [RAILWAY] Calling send_analysis for topics...")
-                topic_analysis = gpt5.send_analysis(topics_prompt, max_completion_tokens=1200)
-                logger.info(f"✅ [RAILWAY] GPT-5 topics response received, length: {len(topic_analysis) if topic_analysis else 0}")
+                if topic_analysis:
+                    message = f"🏷️ **GPT-5 Topic Analysis**\n\n"
+                    message += f"📊 **Scope:** {scope}\n"
+                    message += f"📅 **Timeframe:** {timeframe}\n"
+                    message += f"📰 **Articles analyzed:** {len(articles)}\n\n"
+                    message += topic_analysis
+                else:
+                    message = "❌ GPT-5 topic analysis failed. Please try again."
+
+                return await self._send_long_message(chat_id, message)
 
             except Exception as gpt5_error:
-                logger.error(f"❌ [RAILWAY] GPT-5 topics error: {str(gpt5_error)}")
-                logger.error(f"❌ [RAILWAY] GPT-5 error type: {type(gpt5_error).__name__}")
-                import traceback
-                logger.error(f"❌ [RAILWAY] GPT-5 traceback:\n{traceback.format_exc()}")
-                topic_analysis = None
-
-            if topic_analysis:
-                message = f"🏷️ **GPT-5 Topic Analysis**\n\n"
-                message += f"📊 **Scope:** {scope}\n"
-                message += f"📅 **Timeframe:** {timeframe}\n"
-                message += f"📰 **Articles analyzed:** {len(articles)}\n\n"
-                message += topic_analysis
-            else:
-                message = "❌ GPT-5 topic analysis failed. Please try again."
-
-            return await self._send_message(chat_id, message)
+                logger.error(f"GPT-5 topics error: {gpt5_error}")
+                from bot_service.error_handler import log_error
+                log_error(gpt5_error, user_id, chat_id, 'topics_command')
+                return await self._send_message(chat_id, "❌ GPT-5 topic analysis failed. Please try again.")
 
         except Exception as e:
             logger.error(f"Topics command failed: {e}")
             return await self._send_message(chat_id, f"❌ Topic analysis failed: {e}")
+
+    async def handle_gpt_command(self, chat_id: str, user_id: str, args: List[str]) -> bool:
+        """Handle /gpt command - free-form GPT-5 dialogue"""
+        try:
+            if not self.gpt5:
+                return await self._send_message(chat_id, "❌ GPT-5 service not available")
+
+            if not args:
+                help_text = "🤖 **GPT-5 Chat Help**\n\n"
+                help_text += "**Usage:** `/gpt [your message]`\n\n"
+                help_text += "**Examples:**\n"
+                help_text += "• `/gpt hello` - Simple greeting\n"
+                help_text += "• `/gpt explain quantum computing` - Ask for explanations\n"
+                help_text += "• `/gpt write a python function to sort a list` - Coding help\n"
+                help_text += "• `/gpt what are the latest trends in AI?` - Open questions\n\n"
+                help_text += "💡 **Tip:** Ask anything! GPT-5 can help with analysis, coding, explanations, and more."
+                return await self._send_message(chat_id, help_text)
+
+            # Check rate limit
+            if not self._check_rate_limit(user_id):
+                return await self._send_message(chat_id, "⏱️ Rate limit exceeded. Please wait a moment.")
+
+            user_message = ' '.join(args)
+
+            await self._send_message(chat_id, "🤖 GPT-5 thinking...")
+
+            try:
+                # Use chat model for general dialogue
+                model_id = self.gpt5.choose_model("chat")
+                response = self.gpt5.send_chat(user_message, max_completion_tokens=1000)
+
+                if response:
+                    # Format response message
+                    message = f"🤖 **GPT-5 Response:**\n\n{response}"
+                    return await self._send_long_message(chat_id, message)
+                else:
+                    return await self._send_message(chat_id, "❌ GPT-5 did not provide a response. Please try again.")
+
+            except Exception as gpt5_error:
+                logger.error(f"GPT-5 chat error: {gpt5_error}")
+                from bot_service.error_handler import log_error
+                log_error(gpt5_error, user_id, chat_id, 'gpt_command')
+                return await self._send_message(chat_id, "❌ GPT-5 chat failed. Please try again.")
+
+        except Exception as e:
+            logger.error(f"GPT command failed: {e}")
+            return await self._send_message(chat_id, f"❌ GPT command failed: {e}")
 
     async def _get_articles_for_analysis(self, query: str, timeframe: str) -> List[Dict[str, Any]]:
         """Get articles for GPT-5 analysis"""
