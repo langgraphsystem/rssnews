@@ -85,6 +85,8 @@ class AdvancedRSSBot:
         # User session management
         self.user_sessions = {}  # user_id -> session_data
         self.user_preferences = {}  # user_id -> preferences
+        # Prevent duplicate sends per chat within a short window
+        self._recent_messages = {}  # chat_id -> {'text': str, 'ts': float, 'parse_mode': str}
 
         # Rate limiting and error handling
         self.rate_limiter = TelegramRateLimiter()
@@ -137,6 +139,17 @@ class AdvancedRSSBot:
                 logger.warning(f"⏰ Rate limit hit for chat {chat_id}")
                 return False
 
+            # De-duplicate identical messages per chat within a short window
+            try:
+                from time import time as _now
+                now_ts = _now()
+                last = self._recent_messages.get(chat_id)
+                if last and last.get('text') == text and last.get('parse_mode') == parse_mode and (now_ts - last.get('ts', 0)) < 5:
+                    logger.info(f"🔁 Duplicate message suppressed for chat {chat_id}")
+                    return True
+            except Exception as _dedup_err:
+                logger.debug(f"Dedup check skipped due to error: {_dedup_err}")
+
             async def send_func():
                 payload = {
                     'chat_id': chat_id,
@@ -181,7 +194,46 @@ class AdvancedRSSBot:
                             raise Exception(f"HTTP {response.status_code}: {response.text}")
 
             # Use rate limiter's retry mechanism
-            await self.rate_limiter.send_with_retry(send_func)
+            try:
+                result = await self.rate_limiter.send_with_retry(send_func)
+            except Exception as send_err:
+                err_str = str(send_err)
+                if "can't parse entities" in err_str.lower():
+                    logger.warning("🩹 Parse error detected; retrying without markdown parse_mode")
+
+                    async def send_func_plain():
+                        payload = {
+                            'chat_id': chat_id,
+                            'text': text,
+                            'disable_web_page_preview': True
+                        }
+                        async with httpx.AsyncClient(timeout=30.0) as client:
+                            response = await client.post(
+                                f"{self.api_base}/sendMessage",
+                                json=payload
+                            )
+                            logger.info(f"📡 Telegram API response (plain): {response.status_code}")
+                            if response.status_code == 200:
+                                logger.info("✅ Message sent successfully (plain)")
+                                return response
+                            else:
+                                raise Exception(f"HTTP {response.status_code}: {response.text}")
+
+                    result = await self.rate_limiter.send_with_retry(send_func_plain)
+                else:
+                    raise
+
+            # Record successful send for deduplication window
+            try:
+                from time import time as _now
+                self._recent_messages[chat_id] = {
+                    'text': text,
+                    'ts': _now(),
+                    'parse_mode': parse_mode
+                }
+            except Exception as _rec_err:
+                logger.debug(f"Could not record recent message: {_rec_err}")
+
             return True
 
         except Exception as e:

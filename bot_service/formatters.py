@@ -326,18 +326,24 @@ Query: `{self._escape_markdown(query)}`
         lines = []
 
         lines.append(f"🏥 **System Health Report**")
-        lines.append(f"Timestamp: {health.get('timestamp', 'Unknown')}")
-        lines.append(f"Status: {health.get('system_status', 'Unknown')}")
+        ts = str(health.get('timestamp', 'Unknown'))
+        status = str(health.get('system_status', 'Unknown'))
+        lines.append(f"Timestamp: {self._escape_markdown(ts)}")
+        lines.append(f"Status: {self._escape_markdown(status)}")
         lines.append("")
 
         # Current weights
         weights = health.get('current_weights', {})
         if weights:
             lines.append(f"⚖️ **Scoring Weights:**")
-            lines.append(f"• Semantic: {weights.get('semantic', 0):.2f}")
-            lines.append(f"• Keywords: {weights.get('fts', 0):.2f}")
-            lines.append(f"• Freshness: {weights.get('freshness', 0):.2f}")
-            lines.append(f"• Source: {weights.get('source', 0):.2f}")
+            sem = f"{weights.get('semantic', 0):.2f}"
+            fts = f"{weights.get('fts', 0):.2f}"
+            fr  = f"{weights.get('freshness', 0):.2f}"
+            src = f"{weights.get('source', 0):.2f}"
+            lines.append(f"• Semantic: {self._escape_markdown(sem)}")
+            lines.append(f"• Keywords: {self._escape_markdown(fts)}")
+            lines.append(f"• Freshness: {self._escape_markdown(fr)}")
+            lines.append(f"• Source: {self._escape_markdown(src)}")
             lines.append("")
 
         # Analytics
@@ -362,8 +368,8 @@ Query: `{self._escape_markdown(query)}`
             lines.append(f"🏆 **Top Sources:**")
             for domain in top_domains[:5]:
                 name = domain.get('domain', 'Unknown')
-                score = domain.get('source_score', 0)
-                lines.append(f"• {self._escape_markdown(name)}: {score:.2f}")
+                score = f"{domain.get('source_score', 0):.2f}"
+                lines.append(f"• {self._escape_markdown(name)}: {self._escape_markdown(score)}")
 
         return "\n".join(lines)
 
