@@ -12,6 +12,7 @@ import hashlib
 import time
 from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional, Tuple
+from urllib.parse import urlparse
 
 # Setup detailed logging
 logging.basicConfig(
@@ -512,6 +513,30 @@ class AdvancedRSSBot:
                     chat_id, user_id, data, message_id
                 )
 
+            elif action == "trends":
+                # e.g., "refresh"
+                if data.startswith("refresh"):
+                    # Rebuild trends for default window
+                    payload = await asyncio.to_thread(self.trends_service.build_trends, "24h", 600, 10)
+                    message = self.trends_service.format_trends_markdown(payload, window="24h")
+                    return await self._send_long_message(chat_id, message)
+                return False
+
+            elif action == "analyze":
+                # e.g., "refresh|<query>|<length>|<timeframe>"
+                try:
+                    sub, rest = data.split('|', 1)
+                except ValueError:
+                    return False
+                if sub == 'refresh':
+                    try:
+                        q, ln, tf = rest.split('|', 3)[:3]
+                    except Exception:
+                        return False
+                    # Reuse handler with same params
+                    return await self.handle_analyze_command(chat_id, user_id, [q, ln, tf])
+                return False
+
             elif action == "similar":
                 return await self.quality_ux.handle_similar_request(
                     chat_id, user_id, data, message_id
@@ -931,32 +956,46 @@ class AdvancedRSSBot:
             return await self._send_message(chat_id, f"❌ Config operation failed: {e}")
 
     async def handle_analyze_command(self, chat_id: str, user_id: str, args: List[str]) -> bool:
-        """Handle /analyze command - GPT-5 powered data analysis"""
+        """Handle /analyze command - GPT-5 powered data analysis
+
+        Usage:
+          /analyze [query] [length?] [timeframe?]
+          length: short | medium | detailed | executive (optional)
+          timeframe: 1h, 6h, 12h, 1d, 3d, 7d, 1w, 2w, 1m, 3m (optional)
+        """
         try:
             start_ts = time.monotonic()
             logger.info(f"🧪 [ANALYZE_CHECK] Start /analyze, raw_args={args}")
             if not args:
                 help_text = "🔬 **GPT-5 Data Analysis Help**\n\n"
-                help_text += "**Usage:** `/analyze [query] [timeframe]`\n\n"
+                help_text += "**Usage:** `/analyze [query] [length] [timeframe]`\n\n"
                 help_text += "**Examples:**\n"
-                help_text += "• `/analyze AI trends 7d` - AI articles from last 7 days\n"
-                help_text += "• `/analyze climate change 1m` - Climate articles from last month\n"
-                help_text += "• `/analyze tech earnings` - Recent tech earnings news\n\n"
-                help_text += "**Time formats:** 1h, 6h, 1d, 7d, 1m, 3m"
+                help_text += "• `/analyze AI trends detailed 7d` - Detailed analysis for last 7 days\n"
+                help_text += "• `/analyze \"Immigration and Customs Enforcement\" executive 1w`\n"
+                help_text += "• `/analyze tech earnings short` - Short recent analysis\n\n"
+                help_text += "**Lengths:** short, medium, detailed, executive\n"
+                help_text += "**Timeframes:** 1h, 6h, 12h, 1d, 3d, 7d, 1w, 2w, 1m, 3m"
                 return await self._send_message(chat_id, help_text)
 
-            # Parse query and timeframe: take the last token if it looks like timeframe
+            # Parse: detect timeframe and optional length from the end
             timeframe_tokens = {"1h","6h","12h","1d","3d","7d","1w","2w","1m","3m"}
-            last = args[-1].lower()
-            if last in timeframe_tokens:
-                timeframe = last
-                query = " ".join(args[:-1]).strip() or args[0]
-            else:
-                timeframe = '7d'
-                query = " ".join(args).strip()
-            logger.info(f"🧪 [ANALYZE_CHECK] Parsed query='{query}', timeframe='{timeframe}'")
+            length_tokens = {"short","medium","detailed","executive"}
 
-            await self._send_message(chat_id, f"🔬 GPT-5 analyzing '{query}' data for {timeframe}...")
+            tokens = [t.strip() for t in args]
+            timeframe = '7d'
+            length = 'medium'
+            if tokens and tokens[-1].lower() in timeframe_tokens:
+                timeframe = tokens.pop().lower()
+            if tokens and tokens[-1].lower() in length_tokens:
+                length = tokens.pop().lower()
+            query = " ".join(tokens).strip() or args[0]
+            # Strip surrounding quotes if provided
+            if (query.startswith('"') and query.endswith('"')) or (query.startswith("'") and query.endswith("'")):
+                query = query[1:-1].strip()
+
+            logger.info(f"🧪 [ANALYZE_CHECK] Parsed query='{query}', length='{length}', timeframe='{timeframe}'")
+
+            await self._send_message(chat_id, f"🔬 GPT-5 analyzing '{query}' ({length}) data for {timeframe}...")
 
             # Get articles for analysis
             articles = await self._get_articles_for_analysis(query, timeframe)
@@ -970,8 +1009,19 @@ class AdvancedRSSBot:
                 logger.warning("🧪 [ANALYZE_CHECK] GPT5Service is not attached")
                 return await self._send_message(chat_id, "❌ GPT-5 service not available")
 
+            # Length configurations for analysis style
+            length_config = {
+                'short': {'tokens': 250, 'style': 'brief bullet points'},
+                'medium': {'tokens': 500, 'style': 'structured paragraphs'},
+                'detailed': {'tokens': 900, 'style': 'comprehensive analysis'},
+                'executive': {'tokens': 350, 'style': 'executive summary with key actions'}
+            }
+            config = length_config.get(length, length_config['medium'])
+
             # Use GPT-5 for analysis
-            analysis_prompt = f"""Analyze the following {len(articles)} news articles about '{query}':
+            analysis_prompt = f"""Analyze the following {len(articles)} news articles about '{query}'.
+
+STYLE: {config['style']}
 
 ARTICLES DATA:
 {self._format_articles_for_gpt(articles)}
@@ -983,7 +1033,7 @@ Provide a comprehensive analysis covering:
 4. Important developments
 5. Future predictions based on data
 
-Format as structured report with emojis and clear sections."""
+ Format as structured report with emojis and clear sections."""
 
             try:
                 try:
@@ -993,17 +1043,113 @@ Format as structured report with emojis and clear sections."""
                 logger.info(f"🧪 [ANALYZE_CHECK] Chosen model: {chosen_model}")
                 logger.info(f"🧪 [ANALYZE_CHECK] Prompt length: {len(analysis_prompt)}")
 
-                analysis = self.gpt5.send_analysis(analysis_prompt, max_output_tokens=1000)
+                analysis = self.gpt5.send_analysis(analysis_prompt, max_output_tokens=config['tokens'])
                 logger.info(f"🧪 [ANALYZE_CHECK] Analysis text length: {len(analysis) if analysis else 0}")
 
                 if analysis:
-                    message = f"🔬 **GPT-5 Analysis: {query.upper()}**\n\n"
-                    message += f"📊 **Data:** {len(articles)} articles, {timeframe}\n\n"
-                    message += analysis
+                    # Build Table of Contents
+                    toc = (
+                        "📑 Table of contents\n"
+                        "- Executive summary\n"
+                        "- Key themes\n"
+                        "- Sentiment\n"
+                        "- Important developments\n"
+                        "- Predictions\n"
+                        "- Sources & Links\n"
+                        "- Metrics & Timeline\n\n"
+                    )
+
+                    # Top domains and key links/quotes
+                    def _domain_of(a: Dict[str, Any]) -> str:
+                        u = a.get('url') or ''
+                        net = urlparse(u).netloc if u else ''
+                        return (a.get('source_domain') or a.get('domain') or a.get('source') or net or 'unknown').lower()
+
+                    domains: Dict[str, int] = {}
+                    for a in articles:
+                        d = _domain_of(a)
+                        domains[d] = domains.get(d, 0) + 1
+                    top_domains = sorted(domains.items(), key=lambda x: x[1], reverse=True)[:5]
+
+                    # Most recent 5 links
+                    def _adate(a):
+                        dt = a.get('published_at')
+                        return dt if isinstance(dt, datetime) else (datetime.fromisoformat(dt) if isinstance(dt, str) and len(dt) >= 10 else datetime.min)
+
+                    showcase = sorted(articles, key=_adate, reverse=True)[:5]
+                    links_lines: List[str] = []
+                    for a in showcase:
+                        t = (a.get('title') or a.get('headline') or a.get('name') or '').strip()[:160]
+                        url = a.get('url') or ''
+                        quote = (a.get('content') or a.get('description') or a.get('summary') or a.get('text') or '')
+                        quote = (quote or '').replace('\n', ' ').strip()[:200]
+                        if url:
+                            links_lines.append(f"• {t}\n  “{quote}”\n  {url}")
+                        else:
+                            links_lines.append(f"• {t}\n  “{quote}”")
+
+                    # Timeline by day
+                    from collections import Counter
+                    buckets = Counter()
+                    for a in articles:
+                        dt = a.get('published_at')
+                        if isinstance(dt, datetime):
+                            day = dt.date().isoformat()
+                        elif isinstance(dt, str) and len(dt) >= 10:
+                            day = dt[:10]
+                        else:
+                            continue
+                        buckets[day] += 1
+                    timeline_lines = [f"{day}: {cnt}" for day, cnt in sorted(buckets.items())]
+
+                    sources_section = "\n".join([
+                        "\n📚 Sources & Links",
+                        ("Top domains: " + ", ".join([f"{d} ({c})" for d, c in top_domains])) if top_domains else "Top domains: n/a",
+                        *links_lines
+                    ])
+
+                    metrics_section = "\n".join([
+                        "\n📈 Metrics & Timeline",
+                        "By day:",
+                        *timeline_lines
+                    ])
+
+                    header = f"🔬 **GPT-5 Analysis: {query.upper()}**\n\n"
+                    header += f"📊 **Data:** {len(articles)} articles, {timeframe}\n\n"
+                    message = header + toc + analysis + "\n\n" + sources_section + "\n\n" + metrics_section
                 else:
                     message = "❌ GPT-5 analysis failed. Please try again."
 
-                result = await self._send_long_message(chat_id, message)
+                # Persist brief report into diagnostics (optional)
+                try:
+                    details = {
+                        'query': query,
+                        'timeframe': timeframe,
+                        'length': length,
+                        'articles': len(articles),
+                        'top_domains': top_domains if 'top_domains' in locals() else [],
+                        'timeline': dict(buckets) if 'buckets' in locals() else {},
+                        'preview': (analysis or '')[:500]
+                    }
+                    with self.db._cursor() as cur:
+                        cur.execute(
+                            """
+                            INSERT INTO diagnostics (level, component, message, details)
+                            VALUES (%s, %s, %s, %s)
+                            """,
+                            ('INFO', 'analyze', f"analysis:{query}", json.dumps(details))
+                        )
+                except Exception as diag_err:
+                    logger.debug(f"Diagnostics write skipped: {diag_err}")
+
+                # Buttons: Refresh with same params
+                try:
+                    buttons = [[{"text": "🔄 Refresh", "callback_data": f"analyze:refresh|{query}|{length}|{timeframe}"}]]
+                    markup = self._create_inline_keyboard(buttons)
+                except Exception:
+                    markup = None
+
+                result = await self._send_long_message(chat_id, message, markup)
                 elapsed_ms = int((time.monotonic() - start_ts) * 1000)
                 logger.info(f"🧪 [ANALYZE_CHECK] Finished /analyze in {elapsed_ms}ms")
                 return result
