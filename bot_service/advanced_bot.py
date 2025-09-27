@@ -50,7 +50,8 @@ class AdvancedRSSBot:
 
         self.bot_token = bot_token
         self.api_base = f"https://api.telegram.org/bot{bot_token}"
-        logger.info(f"📡 Bot API base URL: {self.api_base}")
+        # Avoid leaking bot token in logs
+        logger.info("📡 Bot API base configured")
 
         # Store GPT5Service singleton
         self.gpt5 = gpt5_service
@@ -887,8 +888,15 @@ class AdvancedRSSBot:
                 help_text += "**Time formats:** 1h, 6h, 1d, 7d, 1m, 3m"
                 return await self._send_message(chat_id, help_text)
 
-            query = args[0]
-            timeframe = args[1] if len(args) > 1 else '7d'
+            # Parse query and timeframe: take the last token if it looks like timeframe
+            timeframe_tokens = {"1h","6h","12h","1d","3d","7d","1w","2w","1m","3m"}
+            last = args[-1].lower()
+            if last in timeframe_tokens:
+                timeframe = last
+                query = " ".join(args[:-1]).strip() or args[0]
+            else:
+                timeframe = '7d'
+                query = " ".join(args).strip()
 
             await self._send_message(chat_id, f"🔬 GPT-5 analyzing '{query}' data for {timeframe}...")
 
@@ -951,9 +959,18 @@ Format as structured report with emojis and clear sections."""
                 help_text += "**Lengths:** short, medium, detailed, executive"
                 return await self._send_message(chat_id, help_text)
 
-            topic = args[0]
-            length = args[1] if len(args) > 1 else 'medium'
-            timeframe = args[2] if len(args) > 2 else '3d'
+            # Flexible parse: detect timeframe and length tokens at the end
+            timeframe_tokens = {"1h","6h","12h","1d","3d","7d","1w","2w","1m","3m"}
+            length_tokens = {"short","medium","detailed","executive"}
+
+            timeframe = '3d'
+            length = 'medium'
+            tokens = [t.strip() for t in args]
+            if tokens and tokens[-1].lower() in timeframe_tokens:
+                timeframe = tokens.pop().lower()
+            if tokens and tokens[-1].lower() in length_tokens:
+                length = tokens.pop().lower()
+            topic = " ".join(tokens).strip() or args[0]
 
             await self._send_message(chat_id, f"📝 GPT-5 summarizing '{topic}' ({length} format)...")
 
@@ -1160,12 +1177,21 @@ Return top 10 filtered articles with explanations."""
     async def handle_insights_command(self, chat_id: str, user_id: str, args: List[str]) -> bool:
         """Handle /insights command - GPT-5 deep insights generation"""
         try:
-            query = ' '.join(args) if args else 'general market'
+            # Parse topic and optional timeframe (last token)
+            timeframe_tokens = {"1h","6h","12h","1d","3d","7d","1w","2w","1m","3m"}
+            if not args:
+                return await self._send_message(chat_id, "Usage: /insights <topic> [timeframe]")
 
-            await self._send_message(chat_id, f"💡 GPT-5 generating deep insights for '{query}'...")
+            tokens = [t.strip() for t in args]
+            timeframe = '7d'
+            if tokens and tokens[-1].lower() in timeframe_tokens:
+                timeframe = tokens.pop().lower()
+            query = " ".join(tokens).strip() or 'general market'
+
+            await self._send_message(chat_id, f"💡 GPT-5 generating deep insights for '{query}' ({timeframe})...")
 
             # Get comprehensive data
-            articles = await self._get_articles_for_analysis(query, '7d')
+            articles = await self._get_articles_for_analysis(query, timeframe)
 
             if not articles:
                 return await self._send_message(chat_id, f"📭 Not enough data for insights about '{query}'")
@@ -1207,7 +1233,7 @@ Format as executive briefing with clear sections."""
 
                 if insights:
                     message = f"💡 **GPT-5 Deep Insights: {query.upper()}**\n\n"
-                    message += f"📊 **Analysis basis:** {len(articles)} articles (7 days)\n"
+                    message += f"📊 **Analysis basis:** {len(articles)} articles ({timeframe})\n"
                     message += f"🕐 **Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M')}\n\n"
                     message += insights
                 else:
@@ -1452,8 +1478,21 @@ Use emojis, percentages, and visual formatting."""
         try:
             formatted = []
             for i, article in enumerate(articles[:20]):  # Limit to prevent context overflow
-                title = article.get('title', 'No title')[:100]
-                content = article.get('content', article.get('description', ''))[:300]
+                # Prefer best-available fields; fallbacks to improve coverage
+                title = (
+                    article.get('title') or
+                    article.get('headline') or
+                    article.get('name') or
+                    'No title'
+                )[:100]
+                content = (
+                    article.get('content') or
+                    article.get('description') or
+                    article.get('abstract') or
+                    article.get('summary') or
+                    article.get('text') or
+                    ''
+                )[:300]
                 source = article.get('source', 'Unknown')
                 date = article.get('published_at', 'Unknown date')
 
