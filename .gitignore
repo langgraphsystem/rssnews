@@ -81,3 +81,6 @@ Thumbs.db
 # Local app data
 storage/queue/*.lock
 
+# Portable Git
+.git-portable/
+
