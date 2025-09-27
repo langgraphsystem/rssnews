@@ -6,7 +6,15 @@
       "Bash(git rm:*)",
       "Bash(start_bot_with_gpt5.bat)",
       "Bash(del start_bot_with_gpt5.bat)",
-      "Bash(del test_gpt5_responses.py gpt5_test_log.txt bot_response_insights.txt)"
+      "Bash(del test_gpt5_responses.py gpt5_test_log.txt bot_response_insights.txt)",
+      "Bash(python test:*)",
+      "Bash(python -c \"from gpt5_service_new import GPT5Service; print(''✅ GPT5Service import successful'')\")",
+      "Bash(python -c \"import os; os.environ[''OPENAI_API_KEY''] = ''test''; from gpt5_service_new import GPT5Service; print(''✅ GPT5Service instantiation test passed'')\")",
+      "Bash(python:*)",
+      "Bash(del test_invalid_config.json test_config_validation.py test_warmup.py test_warmup_fixed.py)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
     ],
     "deny": [],
     "ask": []

@@ -107,7 +107,7 @@ class MockDataAnalysisProcessor:
 Формат с графиками, таблицами и визуальными элементами с использованием эмодзи."""
 
         start_time = time.time()
-        result = self.gpt5_service.send_analysis(prompt, max_completion_tokens=2000)
+        result = self.gpt5_service.send_analysis(prompt, max_output_tokens=2000)
         processing_time = time.time() - start_time
 
         return {

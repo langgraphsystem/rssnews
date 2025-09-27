@@ -37,6 +37,7 @@ from database.production_db_client import ProductionDBClient
 logger = logging.getLogger(__name__)
 
 
+# NOTE: GPT-5 service is injected as a singleton via constructor (self.gpt5)
 class AdvancedRSSBot:
     """Production Telegram bot with advanced features"""
 
@@ -373,7 +374,7 @@ class AdvancedRSSBot:
 
             markup = self._create_inline_keyboard(buttons)
 
-            return await self._send_message(chat_id, message, markup)
+            return await self._send_message(chat_id, message, markup, parse_mode="MarkdownV2")
 
         except Exception as e:
             logger.error(f"Trends command failed: {e}")
@@ -394,7 +395,7 @@ class AdvancedRSSBot:
 
             markup = self._create_inline_keyboard(buttons)
 
-            return await self._send_message(chat_id, message, markup)
+            return await self._send_message(chat_id, message, markup, parse_mode="MarkdownV2")
 
         except Exception as e:
             logger.error(f"Quality command failed: {e}")
@@ -478,7 +479,7 @@ class AdvancedRSSBot:
                 try:
                     analytics = self.db.get_search_analytics(days=7)
                     message = self.formatter.format_trends(analytics)
-                    return await self._send_message(chat_id, message)
+                    return await self._send_message(chat_id, message, parse_mode="MarkdownV2")
                 except Exception as e:
                     logger.error(f"Analytics full callback failed: {e}")
                     return await self._send_message(chat_id, "❌ Failed to load full analytics")
@@ -916,7 +917,7 @@ Provide a comprehensive analysis covering:
 Format as structured report with emojis and clear sections."""
 
             try:
-                analysis = self.gpt5.send_analysis(analysis_prompt, max_completion_tokens=1000)
+                analysis = self.gpt5.send_analysis(analysis_prompt, max_output_tokens=1000)
 
                 if analysis:
                     message = f"🔬 **GPT-5 Analysis: {query.upper()}**\n\n"
@@ -988,7 +989,7 @@ Requirements:
                 return await self._send_message(chat_id, "❌ GPT-5 service not available")
 
             try:
-                summary = self.gpt5.send_chat(summary_prompt, max_completion_tokens=config['tokens'])
+                summary = self.gpt5.send_chat(summary_prompt, max_output_tokens=config['tokens'])
 
                 if summary:
                     message = f"📝 **GPT-5 Summary: {topic.upper()}**\n\n"
@@ -1057,7 +1058,7 @@ Format with charts, tables, and visual elements using emojis."""
                 return await self._send_message(chat_id, "❌ GPT-5 service not available")
 
             try:
-                aggregation = self.gpt5.send_analysis(aggregation_prompt, max_completion_tokens=800)
+                aggregation = self.gpt5.send_analysis(aggregation_prompt, max_output_tokens=800)
 
                 if aggregation:
                     message = f"📊 **GPT-5 Aggregation Report**\n\n"
@@ -1133,7 +1134,7 @@ Return top 10 filtered articles with explanations."""
                 return await self._send_message(chat_id, "❌ GPT-5 service not available")
 
             try:
-                filtered_results = self.gpt5.send_analysis(filter_prompt, max_completion_tokens=1000)
+                filtered_results = self.gpt5.send_analysis(filter_prompt, max_output_tokens=1000)
 
                 if filtered_results:
                     message = f"🔍 **GPT-5 Filtered Results**\n\n"
@@ -1202,7 +1203,7 @@ Format as executive briefing with clear sections."""
                 return await self._send_message(chat_id, "❌ GPT-5 service not available")
 
             try:
-                insights = self.gpt5.send_insights(insights_prompt, max_completion_tokens=1200)
+                insights = self.gpt5.send_insights(insights_prompt, max_output_tokens=1200)
 
                 if insights:
                     message = f"💡 **GPT-5 Deep Insights: {query.upper()}**\n\n"
@@ -1273,7 +1274,7 @@ Use emojis and clear formatting."""
                 return await self._send_message(chat_id, "❌ GPT-5 service not available")
 
             try:
-                sentiment_analysis = self.gpt5.send_sentiment(sentiment_prompt, max_completion_tokens=1000)
+                sentiment_analysis = self.gpt5.send_sentiment(sentiment_prompt, max_output_tokens=1000)
 
                 if sentiment_analysis:
                     message = f"😊 **GPT-5 Sentiment Analysis: {query.upper()}**\n\n"
@@ -1349,7 +1350,7 @@ Use emojis, percentages, and visual formatting."""
 
             try:
                 model_id = self.gpt5.choose_model("analysis")
-                topic_analysis = self.gpt5.send_analysis(topics_prompt, max_completion_tokens=1200)
+                topic_analysis = self.gpt5.send_analysis(topics_prompt, max_output_tokens=1200)
 
                 if topic_analysis:
                     message = f"🏷️ **GPT-5 Topic Analysis**\n\n"
@@ -1400,7 +1401,7 @@ Use emojis, percentages, and visual formatting."""
             try:
                 # Use chat model for general dialogue
                 model_id = self.gpt5.choose_model("chat")
-                response = self.gpt5.send_chat(user_message, max_completion_tokens=1000)
+                response = self.gpt5.send_chat(user_message, max_output_tokens=1000)
 
                 if response:
                     # Format response message

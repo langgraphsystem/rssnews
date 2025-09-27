@@ -119,7 +119,15 @@ class GPT5Service:
         verbosity: Optional[str] = None,
         reasoning_effort: Optional[str] = None,
         stream: bool = False,
+        **kwargs,
     ) -> Dict[str, Any]:
+        # Backward-compat for old callers: accept max_completion_tokens as alias
+        if max_output_tokens is None and "max_completion_tokens" in kwargs:
+            try:
+                max_output_tokens = int(kwargs.pop("max_completion_tokens"))
+            except Exception:
+                # Remove invalid alias value silently
+                kwargs.pop("max_completion_tokens", None)
         payload: Dict[str, Any] = {
             "model": model_id,
             "input": [
@@ -222,16 +230,18 @@ class GPT5Service:
         *,
         model_id: Optional[str] = None,
         max_completion_tokens: Optional[int] = None,
+        max_output_tokens: Optional[int] = None,
         temperature: Optional[float] = None,
         verbosity: Optional[str] = None,
         reasoning_effort: Optional[str] = None,
         stream: bool = False,
     ) -> str:
         model = model_id or self.default_model_id
+        eff_tokens = max_output_tokens if max_output_tokens is not None else max_completion_tokens
         payload = self._build_payload(
             message=prompt,
             model_id=model,
-            max_output_tokens=max_completion_tokens,
+            max_output_tokens=eff_tokens,
             temperature=temperature,
             verbosity=verbosity,
             reasoning_effort=reasoning_effort,
@@ -246,6 +256,7 @@ class GPT5Service:
         *,
         model_id: Optional[str] = None,
         max_completion_tokens: Optional[int] = None,
+        max_output_tokens: Optional[int] = None,
         temperature: Optional[float] = None,
         verbosity: Optional[str] = None,
         reasoning_effort: Optional[str] = None,
@@ -256,6 +267,7 @@ class GPT5Service:
             prompt,
             model_id=model_id,
             max_completion_tokens=max_completion_tokens,
+            max_output_tokens=max_output_tokens,
             temperature=temperature,
             verbosity=verbosity,
             reasoning_effort=reasoning_effort,
@@ -423,7 +435,7 @@ if __name__ == "__main__":
             for model in service.list_available_models():
                 print(f"\n🧪 Testing {model}...")
                 try:
-                    response = service.generate_text_sync(test_message, model_id=model, max_completion_tokens=50)
+                    response = service.generate_text_sync(test_message, model_id=model, max_output_tokens=50)
                     print(f"✅ {model}: {response}")
                 except Exception as e:
                     print(f"❌ {model}: {e}")

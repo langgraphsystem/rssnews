@@ -8,7 +8,6 @@ import os
 import sys
 import asyncio
 import logging
-import json
 import httpx
 from datetime import datetime
 import signal
@@ -16,17 +15,26 @@ import signal
 # Add parent directory to path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-# Setup logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('bot_run.log'),
-        logging.StreamHandler()
-    ]
-)
+# Setup logging with optional file handler (controlled by LOG_TO_FILE=1)
+logger = logging.getLogger("bot_runner")
+logger.setLevel(logging.INFO)
+fmt = logging.Formatter("%(asctime)s | %(levelname)s | %(name)s | %(message)s")
 
-logger = logging.getLogger(__name__)
+# Console handler (always on)
+ch = logging.StreamHandler()
+ch.setLevel(logging.INFO)
+ch.setFormatter(fmt)
+logger.addHandler(ch)
+
+# Optional file handler
+if os.getenv("LOG_TO_FILE", "0") == "1":
+    try:
+        fh = logging.FileHandler("bot_run.log", encoding="utf-8")
+        fh.setLevel(logging.INFO)
+        fh.setFormatter(fmt)
+        logger.addHandler(fh)
+    except Exception as e:
+        logger.warning("File logging disabled (reason: %s). Using console only.", e)
 
 class BotRunner:
     """Simple bot runner with long polling"""
@@ -51,19 +59,12 @@ class BotRunner:
                 gpt5 = GPT5Service()
                 logger.info("✅ GPT5Service created successfully")
 
-                # Perform warm-up check using minimal prompt
+                # Warm-up check via dedicated ping() for minimal cost and fast fail
                 logger.info("🔥 Performing GPT-5 warm-up check...")
-                try:
-                    _ = gpt5.generate_text_sync(
-                        "ping",
-                        model_id=gpt5.choose_model("chat"),
-                        max_output_tokens=16,
-                        temperature=0.0,
-                    )
-                    logger.info("✅ GPT-5 warm-up successful")
-                except Exception as warmup_err:
-                    logger.error(f"❌ GPT-5 warm-up failed: {warmup_err}")
+                if not gpt5.ping():
+                    logger.error("❌ GPT-5 warm-up (ping) failed")
                     return False
+                logger.info("✅ GPT-5 warm-up successful")
 
             except Exception as gpt_error:
                 logger.error(f"❌ GPT5Service initialization failed: {gpt_error}")

@@ -128,7 +128,7 @@ class GPT5CommandTester:
                 logger.info("✅ [RAILWAY] GPT-5 service created for analyze")
 
                 logger.info("🔍 [RAILWAY] Calling send_analysis...")
-                analysis = gpt5.send_analysis(analysis_prompt, max_completion_tokens=1000)
+                analysis = gpt5.send_analysis(analysis_prompt, max_output_tokens=1000)
                 logger.info(f"✅ [RAILWAY] GPT-5 analysis response received, length: {len(analysis) if analysis else 0}")
 
                 if analysis:
@@ -197,7 +197,7 @@ class GPT5CommandTester:
                 logger.info("✅ [RAILWAY] GPT-5 service created for insights")
 
                 logger.info("🔍 [RAILWAY] Calling send_insights for insights...")
-                insights = gpt5.send_insights(insights_prompt, max_completion_tokens=1200)
+                insights = gpt5.send_insights(insights_prompt, max_output_tokens=1200)
                 logger.info(f"✅ [RAILWAY] GPT-5 insights response received, length: {len(insights) if insights else 0}")
 
                 if insights:
@@ -263,7 +263,7 @@ class GPT5CommandTester:
                 logger.info("✅ [RAILWAY] GPT-5 service created for sentiment")
 
                 logger.info("🔍 [RAILWAY] Calling send_sentiment for sentiment...")
-                sentiment_analysis = gpt5.send_sentiment(sentiment_prompt, max_completion_tokens=1000)
+                sentiment_analysis = gpt5.send_sentiment(sentiment_prompt, max_output_tokens=1000)
                 logger.info(f"✅ [RAILWAY] GPT-5 sentiment response received, length: {len(sentiment_analysis) if sentiment_analysis else 0}")
 
                 if sentiment_analysis:
@@ -332,7 +332,7 @@ class GPT5CommandTester:
                 logger.info("✅ [RAILWAY] GPT-5 service created for summarize")
 
                 logger.info("🔍 [RAILWAY] Calling send_chat for summarize...")
-                summary = gpt5.send_chat(summarize_prompt, max_completion_tokens=1200)
+                summary = gpt5.send_chat(summarize_prompt, max_output_tokens=1200)
                 logger.info(f"✅ [RAILWAY] GPT-5 summarize response received, length: {len(summary) if summary else 0}")
 
                 if summary:
@@ -407,7 +407,7 @@ class GPT5CommandTester:
                 logger.info("✅ [RAILWAY] GPT-5 service created for aggregate")
 
                 logger.info("🔍 [RAILWAY] Calling send_bulk for aggregate...")
-                aggregation = gpt5.send_bulk(aggregate_prompt, max_completion_tokens=1000)
+                aggregation = gpt5.send_bulk(aggregate_prompt, max_output_tokens=1000)
                 logger.info(f"✅ [RAILWAY] GPT-5 aggregate response received, length: {len(aggregation) if aggregation else 0}")
 
                 if aggregation:
@@ -482,7 +482,7 @@ class GPT5CommandTester:
                 logger.info("✅ [RAILWAY] GPT-5 service created for filter")
 
                 logger.info("🔍 [RAILWAY] Calling send_chat for filter...")
-                filtered_results = gpt5.send_chat(filter_prompt, max_completion_tokens=1000)
+                filtered_results = gpt5.send_chat(filter_prompt, max_output_tokens=1000)
                 logger.info(f"✅ [RAILWAY] GPT-5 filter response received, length: {len(filtered_results) if filtered_results else 0}")
 
                 if filtered_results:
@@ -560,7 +560,7 @@ class GPT5CommandTester:
                 logger.info("✅ [RAILWAY] GPT-5 service created for topics")
 
                 logger.info("🔍 [RAILWAY] Calling send_analysis for topics...")
-                topic_analysis = gpt5.send_analysis(topics_prompt, max_completion_tokens=1200)
+                topic_analysis = gpt5.send_analysis(topics_prompt, max_output_tokens=1200)
                 logger.info(f"✅ [RAILWAY] GPT-5 topics response received, length: {len(topic_analysis) if topic_analysis else 0}")
 
                 if topic_analysis:

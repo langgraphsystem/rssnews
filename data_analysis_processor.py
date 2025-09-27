@@ -311,7 +311,7 @@ class DataAnalysisProcessor:
         try:
             analysis_result = self.gpt5_service.send_analysis(
                 prompt,
-                max_completion_tokens=2000,
+                max_output_tokens=2000,
                 verbosity="high",
                 reasoning_effort="high"
             )
@@ -384,7 +384,7 @@ class DataAnalysisProcessor:
         try:
             summary_result = self.gpt5_service.send_chat(
                 prompt,
-                max_completion_tokens=max_tokens,
+                max_output_tokens=max_tokens,
                 verbosity="medium"
             )
 
@@ -448,7 +448,7 @@ class DataAnalysisProcessor:
         try:
             analysis_result = self.gpt5_service.send_bulk(
                 prompt,
-                max_completion_tokens=1200,
+                max_output_tokens=1200,
                 verbosity="high"
             )
 
@@ -515,7 +515,7 @@ class DataAnalysisProcessor:
         try:
             analysis_result = self.gpt5_service.send_chat(
                 prompt,
-                max_completion_tokens=1200,
+                max_output_tokens=1200,
                 verbosity="medium"
             )
 
@@ -575,7 +575,7 @@ class DataAnalysisProcessor:
         try:
             insights_result = self.gpt5_service.send_insights(
                 prompt,
-                max_completion_tokens=1500,
+                max_output_tokens=1500,
                 verbosity="high",
                 reasoning_effort="high"
             )
@@ -638,7 +638,7 @@ class DataAnalysisProcessor:
         try:
             sentiment_result = self.gpt5_service.send_sentiment(
                 prompt,
-                max_completion_tokens=1200,
+                max_output_tokens=1200,
                 verbosity="high"
             )
 
@@ -698,7 +698,7 @@ class DataAnalysisProcessor:
         try:
             topics_result = self.gpt5_service.send_analysis(
                 prompt,
-                max_completion_tokens=1500,
+                max_output_tokens=1500,
                 verbosity="high",
                 reasoning_effort="medium"
             )
