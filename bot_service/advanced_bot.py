@@ -33,6 +33,7 @@ from bot_service.quality_ux import QualityUXHandler
 from bot_service.rate_limiter import rate_limiter, TelegramRateLimiter
 from bot_service.error_handler import TelegramErrorHandler, log_user_action, log_error
 from database.production_db_client import ProductionDBClient
+from services.trends_service import TrendsService
 
 logger = logging.getLogger(__name__)
 
@@ -81,6 +82,7 @@ class AdvancedRSSBot:
         self.formatter = MessageFormatter()
         self.command_handler = CommandHandler(self.ranking_api, self.db)
         self.quality_ux = QualityUXHandler(self.ranking_api, self.db)
+        self.trends_service = TrendsService(self.db)
 
         # User session management
         self.user_sessions = {}  # user_id -> session_data
@@ -411,23 +413,23 @@ class AdvancedRSSBot:
     async def handle_trends_command(self, chat_id: str, user_id: str) -> bool:
         """Handle /trends command"""
         try:
-            await self._send_message(chat_id, "📈 Analyzing current trends...")
+            await self._send_message(chat_id, "📈 Сбор тем и ключевых слов за 24h...")
 
-            # For now, use search analytics as trends
-            analytics = self.db.get_search_analytics(days=1)
-
-            message = self.formatter.format_trends(analytics)
+            # Compute or fetch cached trends
+            payload = await asyncio.to_thread(self.trends_service.build_trends, "24h", 600, 10)
+            message = self.trends_service.format_trends_markdown(payload, window="24h")
 
             buttons = [
                 [
-                    {"text": "📊 Full Analytics", "callback_data": "analytics:full"},
-                    {"text": "🔄 Refresh", "callback_data": "trends:refresh"}
+                    {"text": "🔄 Обновить", "callback_data": "trends:refresh"},
+                    {"text": "📊 Аналитика", "callback_data": "analytics:full"}
                 ]
             ]
 
             markup = self._create_inline_keyboard(buttons)
 
-            return await self._send_message(chat_id, message, markup, parse_mode="MarkdownV2")
+            # HTML formatting used for links
+            return await self._send_long_message(chat_id, message)
 
         except Exception as e:
             logger.error(f"Trends command failed: {e}")
@@ -930,6 +932,8 @@ class AdvancedRSSBot:
     async def handle_analyze_command(self, chat_id: str, user_id: str, args: List[str]) -> bool:
         """Handle /analyze command - GPT-5 powered data analysis"""
         try:
+            start_ts = time.monotonic()
+            logger.info(f"🧪 [ANALYZE_CHECK] Start /analyze, raw_args={args}")
             if not args:
                 help_text = "🔬 **GPT-5 Data Analysis Help**\n\n"
                 help_text += "**Usage:** `/analyze [query] [timeframe]`\n\n"
@@ -949,16 +953,20 @@ class AdvancedRSSBot:
             else:
                 timeframe = '7d'
                 query = " ".join(args).strip()
+            logger.info(f"🧪 [ANALYZE_CHECK] Parsed query='{query}', timeframe='{timeframe}'")
 
             await self._send_message(chat_id, f"🔬 GPT-5 analyzing '{query}' data for {timeframe}...")
 
             # Get articles for analysis
             articles = await self._get_articles_for_analysis(query, timeframe)
+            logger.info(f"🧪 [ANALYZE_CHECK] Articles fetched: count={len(articles) if articles else 0}")
 
             if not articles:
+                logger.info("🧪 [ANALYZE_CHECK] No articles found; aborting")
                 return await self._send_message(chat_id, f"📭 No articles found for '{query}' in timeframe {timeframe}")
 
             if not self.gpt5:
+                logger.warning("🧪 [ANALYZE_CHECK] GPT5Service is not attached")
                 return await self._send_message(chat_id, "❌ GPT-5 service not available")
 
             # Use GPT-5 for analysis
@@ -977,7 +985,15 @@ Provide a comprehensive analysis covering:
 Format as structured report with emojis and clear sections."""
 
             try:
+                try:
+                    chosen_model = self.gpt5.choose_model("analysis")
+                except Exception:
+                    chosen_model = "<unknown>"
+                logger.info(f"🧪 [ANALYZE_CHECK] Chosen model: {chosen_model}")
+                logger.info(f"🧪 [ANALYZE_CHECK] Prompt length: {len(analysis_prompt)}")
+
                 analysis = self.gpt5.send_analysis(analysis_prompt, max_output_tokens=1000)
+                logger.info(f"🧪 [ANALYZE_CHECK] Analysis text length: {len(analysis) if analysis else 0}")
 
                 if analysis:
                     message = f"🔬 **GPT-5 Analysis: {query.upper()}**\n\n"
@@ -986,12 +1002,17 @@ Format as structured report with emojis and clear sections."""
                 else:
                     message = "❌ GPT-5 analysis failed. Please try again."
 
-                return await self._send_long_message(chat_id, message)
+                result = await self._send_long_message(chat_id, message)
+                elapsed_ms = int((time.monotonic() - start_ts) * 1000)
+                logger.info(f"🧪 [ANALYZE_CHECK] Finished /analyze in {elapsed_ms}ms")
+                return result
 
             except Exception as gpt5_error:
                 logger.error(f"GPT-5 analysis error: {gpt5_error}")
                 from bot_service.error_handler import log_error
                 log_error(gpt5_error, user_id, chat_id, 'analyze_command')
+                elapsed_ms = int((time.monotonic() - start_ts) * 1000)
+                logger.error(f"🧪 [ANALYZE_CHECK] Failed /analyze in {elapsed_ms}ms: {gpt5_error}")
                 return await self._send_message(chat_id, "❌ GPT-5 analysis failed. Please try again.")
 
         except Exception as e:

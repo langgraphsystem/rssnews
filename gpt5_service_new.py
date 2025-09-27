@@ -157,6 +157,96 @@ class GPT5Service:
 
         return payload
 
+    def _extract_output_text(self, resp: Any, logger) -> str:
+        """Best-effort extraction of text from a Responses API response object."""
+        # 1) Direct convenience field
+        text = getattr(resp, "output_text", None)
+        if isinstance(text, str) and text.strip():
+            return text
+
+        # 2) Inspect resp.output items for message text
+        try:
+            output = getattr(resp, "output", None)
+            if output:
+                # Try Pydantic model_dump when available to unify access
+                try:
+                    # model_dump available on SDK pydantic models
+                    output_dicts = [getattr(item, "model_dump", lambda: item)() for item in output]
+                except Exception:
+                    output_dicts = output
+
+                collected: List[str] = []
+                for item in output_dicts:
+                    # item could be dict-like or model
+                    itype = None
+                    content = None
+                    if isinstance(item, dict):
+                        itype = item.get("type")
+                        content = item.get("content") or item.get("summary")
+                    else:
+                        itype = getattr(item, "type", None)
+                        content = getattr(item, "content", None) or getattr(item, "summary", None)
+
+                    # Prefer message content blocks
+                    if itype == "message" and content:
+                        # content is a list of blocks; find text fields
+                        try:
+                            for block in content:
+                                if isinstance(block, dict):
+                                    t = block.get("text")
+                                    if isinstance(t, str) and t.strip():
+                                        collected.append(t)
+                                else:
+                                    t = getattr(block, "text", None)
+                                    if isinstance(t, str) and t.strip():
+                                        collected.append(t)
+                        except Exception:
+                            pass
+                    # As a fallback, if reasoning contains a non-empty summary array, join it
+                    if itype == "reasoning" and content:
+                        try:
+                            if isinstance(content, list) and content:
+                                joined = "\n".join([c for c in content if isinstance(c, str)])
+                                if joined.strip():
+                                    collected.append(joined)
+                        except Exception:
+                            pass
+
+                final = "\n".join([c for c in collected if c.strip()])
+                if final.strip():
+                    return final
+        except Exception as ex:
+            logger.info(f"🔍 [RAILWAY] Output inspection failed: {type(ex).__name__}: {ex}")
+
+        # 3) As a last resort, try converting the whole response to dict and mining text
+        try:
+            to_dict = getattr(resp, "to_dict", None) or getattr(resp, "model_dump", None)
+            if to_dict:
+                data = to_dict()
+                # Walk possible locations
+                paths = [
+                    ("output",),
+                    ("message",),
+                    ("content",),
+                ]
+                texts: List[str] = []
+                def _mine(obj: Any):
+                    if isinstance(obj, dict):
+                        for k, v in obj.items():
+                            if k == "text" and isinstance(v, str) and v.strip():
+                                texts.append(v)
+                            _mine(v)
+                    elif isinstance(obj, list):
+                        for v in obj:
+                            _mine(v)
+                _mine(data)
+                if texts:
+                    return "\n".join(texts)
+        except Exception:
+            pass
+
+        return ""
+
     def _call_responses(self, payload: Dict[str, Any], *, stream: bool = False) -> str:
         import logging
         logger = logging.getLogger(__name__)
@@ -177,7 +267,8 @@ class GPT5Service:
                                 chunks.append(piece)
                     s.until_done()
                     final = s.get_final_response()
-                return "".join(chunks) or getattr(final, "output_text", "")
+                text_final = "".join(chunks) or getattr(final, "output_text", "")
+                return text_final
             except Exception as e:
                 raise Exception(f"OpenAI Responses stream error: {type(e).__name__}: {e}") from e
 
@@ -187,31 +278,27 @@ class GPT5Service:
             logger.info(f"🔍 [RAILWAY] Response received: {type(resp)}")
             logger.info(f"🔍 [RAILWAY] Response attributes: {dir(resp)}")
 
-            output_text = getattr(resp, "output_text", "")
-            logger.info(f"🔍 [RAILWAY] output_text: '{output_text}' (length: {len(output_text)})")
+            output_text = self._extract_output_text(resp, logger)
+            logger.info(f"🔍 [RAILWAY] output_text (extracted): '{output_text}' (length: {len(output_text)})")
 
-            # Try alternative attributes if output_text is empty
             if not output_text:
-                logger.info("🔍 [RAILWAY] output_text is empty, trying alternatives...")
-
-                # Check for other possible attributes
-                for attr in ['text', 'content', 'response', 'message', 'output', 'result']:
-                    if hasattr(resp, attr):
-                        value = getattr(resp, attr)
-                        logger.info(f"🔍 [RAILWAY] Found {attr}: {value} (type: {type(value)})")
-                        if isinstance(value, str) and value:
-                            output_text = value
-                            break
-
-                # Check for choices like in Chat API
-                if hasattr(resp, 'choices') and resp.choices:
-                    logger.info(f"🔍 [RAILWAY] Found choices: {len(resp.choices)}")
-                    choice = resp.choices[0]
-                    logger.info(f"🔍 [RAILWAY] Choice attributes: {dir(choice)}")
-
-                    if hasattr(choice, 'message') and hasattr(choice.message, 'content'):
-                        output_text = choice.message.content
-                        logger.info(f"🔍 [RAILWAY] Using choice.message.content: '{output_text}'")
+                logger.info("🔍 [RAILWAY] No text from Responses. Trying GPT-5-mini (Responses) fallback...")
+                # Build a second Responses request with chat model (gpt-5-mini)
+                try:
+                    payload2 = dict(payload)
+                    payload2["model"] = self.routing.get("chat", "gpt-5-mini")
+                    # Removing reasoning can help force plain text output on some models
+                    if "reasoning" in payload2:
+                        payload2.pop("reasoning", None)
+                    resp2 = self.client.responses.create(**payload2)
+                    output_text2 = self._extract_output_text(resp2, logger)
+                    if output_text2 and output_text2.strip():
+                        output_text = output_text2
+                        logger.info(f"✅ [RAILWAY] GPT-5-mini fallback succeeded, length: {len(output_text)}")
+                    else:
+                        logger.info("⚠️ [RAILWAY] GPT-5-mini fallback returned empty text")
+                except Exception as fe:
+                    logger.error(f"❌ [RAILWAY] GPT-5-mini fallback failed: {type(fe).__name__}: {fe}")
 
             logger.info(f"✅ [RAILWAY] Final output_text: '{output_text}' (length: {len(output_text)})")
             return output_text
