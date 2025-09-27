@@ -1,0 +1,86 @@
+{
+  "timestamp": "2025-09-27T08:57:18.220129",
+  "total_time": 1.4804508686065674,
+  "summary": {
+    "total_commands": 7,
+    "successful": 7,
+    "failed": 0,
+    "errors": 0,
+    "success_rate": 100.0
+  },
+  "detailed_results": {
+    "analyze": {
+      "status": "SUCCESS",
+      "processing_time": 0.16800332069396973,
+      "result_length": 1592,
+      "metadata": {
+        "success": true,
+        "processing_time": 0.16800332069396973,
+        "articles_count": 3
+      }
+    },
+    "summarize": {
+      "status": "SUCCESS",
+      "processing_time": 0.26552700996398926,
+      "result_length": 1592,
+      "metadata": {
+        "success": true,
+        "processing_time": 0.26552700996398926,
+        "word_count": 207,
+        "length": "medium"
+      }
+    },
+    "aggregate": {
+      "status": "SUCCESS",
+      "processing_time": 0.2744140625,
+      "result_length": 1592,
+      "metadata": {
+        "success": true,
+        "processing_time": 0.2744140625,
+        "metric": "источники",
+        "groupby": "дата"
+      }
+    },
+    "filter": {
+      "status": "SUCCESS",
+      "processing_time": 0.20603728294372559,
+      "result_length": 1592,
+      "metadata": {
+        "success": true,
+        "processing_time": 0.20603728294372559,
+        "criteria": "источник",
+        "value": "tech"
+      }
+    },
+    "insights": {
+      "status": "SUCCESS",
+      "processing_time": 0.10545897483825684,
+      "result_length": 1592,
+      "metadata": {
+        "success": true,
+        "processing_time": 0.10545897483825684,
+        "topic": "инвестиции"
+      }
+    },
+    "sentiment": {
+      "status": "SUCCESS",
+      "processing_time": 0.18287229537963867,
+      "result_length": 1592,
+      "metadata": {
+        "success": true,
+        "processing_time": 0.18287229537963867,
+        "query": "криптовалюты"
+      }
+    },
+    "topics": {
+      "status": "SUCCESS",
+      "processing_time": 0.27713704109191895,
+      "result_length": 1592,
+      "metadata": {
+        "success": true,
+        "processing_time": 0.27713704109191895,
+        "scope": "инновации"
+      }
+    }
+  }
+}

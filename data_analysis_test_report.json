@@ -1,0 +1,187 @@
+{
+  "timestamp": "2025-09-27T14:48:48.024917",
+  "total_time": 10.079185485839844,
+  "summary": {
+    "total_tests": 22,
+    "passed": 22,
+    "failed": 0,
+    "errors": 0,
+    "success_rate": 100.0
+  },
+  "detailed_results": {
+    "analyze_Tech Innovation Analysis": {
+      "status": "PASSED",
+      "processing_time": 0.7011594772338867,
+      "details": {
+        "articles_count": 3,
+        "request_type": "analyze",
+        "query": "технологические инновации",
+        "timeframe": "7d",
+        "timestamp": "2025-09-27T14:48:43.441037"
+      }
+    },
+    "analyze_Market Trends Analysis": {
+      "status": "PASSED",
+      "processing_time": 0.2721254825592041,
+      "details": {
+        "articles_count": 3,
+        "request_type": "analyze",
+        "query": "рыночные тренды",
+        "timeframe": "14d",
+        "timestamp": "2025-09-27T14:48:43.713162"
+      }
+    },
+    "analyze_Cross-Industry Analysis": {
+      "status": "PASSED",
+      "processing_time": 0.19069552421569824,
+      "details": {
+        "articles_count": 3,
+        "request_type": "analyze",
+        "query": "цифровая трансформация",
+        "timeframe": "30d",
+        "timestamp": "2025-09-27T14:48:43.903857"
+      }
+    },
+    "summarize_Short Tech Summary": {
+      "status": "PASSED",
+      "processing_time": 0.20648431777954102,
+      "word_count": 0,
+      "details": {
+        "articles_count": 3,
+        "request_type": "summarize",
+        "query": "ИИ технологии",
+        "timeframe": "7d",
+        "timestamp": "2025-09-27T14:48:44.111345"
+      }
+    },
+    "summarize_Medium Market Summary": {
+      "status": "PASSED",
+      "processing_time": 0.16797709465026855,
+      "word_count": 0,
+      "details": {
+        "articles_count": 3,
+        "request_type": "summarize",
+        "query": "рыночная аналитика",
+        "timeframe": "14d",
+        "timestamp": "2025-09-27T14:48:44.279322"
+      }
+    },
+    "summarize_Long Detailed Summary": {
+      "status": "PASSED",
+      "processing_time": 0.22000861167907715,
+      "word_count": 0,
+      "details": {
+        "articles_count": 3,
+        "request_type": "summarize",
+        "query": "технологические тренды",
+        "timeframe": "30d",
+        "timestamp": "2025-09-27T14:48:44.499330"
+      }
+    },
+    "summarize_Ultra Detailed Summary": {
+      "status": "PASSED",
+      "processing_time": 0.30881571769714355,
+      "word_count": 0,
+      "details": {
+        "articles_count": 3,
+        "request_type": "summarize",
+        "query": "цифровая экономика",
+        "timeframe": "7d",
+        "timestamp": "2025-09-27T14:48:44.809146"
+      }
+    },
+    "aggregate_Source Aggregation by Date": {
+      "status": "PASSED",
+      "processing_time": 0.23237013816833496,
+      "details": {
+        "articles_count": 3,
+        "request_type": "aggregate",
+        "query": "технологии",
+        "timeframe": "7d",
+        "timestamp": "2025-09-27T14:48:45.041516"
+      }
+    },
+    "aggregate_Content Aggregation by Source": {
+      "status": "PASSED",
+      "processing_time": 0.16648507118225098,
+      "details": {
+        "articles_count": 3,
+        "request_type": "aggregate",
+        "query": "рынок",
+        "timeframe": "14d",
+        "timestamp": "2025-09-27T14:48:45.208001"
+      }
+    },
+    "aggregate_Topic Aggregation by Time": {
+      "status": "PASSED",
+      "processing_time": 0.1997051239013672,
+      "details": {
+        "articles_count": 3,
+        "request_type": "aggregate",
+        "query": "инновации",
+        "timeframe": "30d",
+        "timestamp": "2025-09-27T14:48:45.407707"
+      }
+    },
+    "filter_Filter by Source Domain": {
+      "status": "PASSED",
+      "processing_time": 0.2744603157043457,
+      "filter_stats": {}
+    },
+    "filter_Filter by Content Keywords": {
+      "status": "PASSED",
+      "processing_time": 0.23105788230895996,
+      "filter_stats": {}
+    },
+    "filter_Filter by Title Keywords": {
+      "status": "PASSED",
+      "processing_time": 0.25734448432922363,
+      "filter_stats": {}
+    },
+    "insights_Tech Market Insights": {
+      "status": "PASSED",
+      "processing_time": 0.1762092113494873,
+      "confidence_score": 0
+    },
+    "insights_AI Industry Insights": {
+      "status": "PASSED",
+      "processing_time": 0.1702737808227539,
+      "confidence_score": 0
+    },
+    "insights_Investment Opportunities": {
+      "status": "PASSED",
+      "processing_time": 0.20205998420715332,
+      "confidence_score": 0
+    },
+    "sentiment_Tech News Sentiment": {
+      "status": "PASSED",
+      "processing_time": 0.23673009872436523,
+      "sentiment_metrics": {}
+    },
+    "sentiment_Market Sentiment": {
+      "status": "PASSED",
+      "processing_time": 0.24137425422668457,
+      "sentiment_metrics": {}
+    },
+    "sentiment_Investment Sentiment": {
+      "status": "PASSED",
+      "processing_time": 0.20493316650390625,
+      "sentiment_metrics": {}
+    },
+    "topics_Technology Topics": {
+      "status": "PASSED",
+      "processing_time": 0.22368168830871582,
+      "topic_metrics": {}
+    },
+    "topics_Market Topics": {
+      "status": "PASSED",
+      "processing_time": 0.18449854850769043,
+      "topic_metrics": {}
+    },
+    "topics_Innovation Topics": {
+      "status": "PASSED",
+      "processing_time": 0.20805120468139648,
+      "topic_metrics": {}
+    }
+  }
+}
