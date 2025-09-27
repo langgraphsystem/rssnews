@@ -2,10 +2,10 @@
   "version": "2.0",
   "api_version": "2025-08-07",
   "models": [
-    { "id": "gpt-5", "supports_reasoning_effort": true, "context_length": 400000, "max_output_tokens": 128000 },
-    { "id": "gpt-5-mini", "supports_reasoning_effort": true, "context_length": 400000, "max_output_tokens": 128000 },
-    { "id": "gpt-5-nano", "supports_reasoning_effort": true, "context_length": 400000, "max_output_tokens": 128000 },
-    { "id": "gpt-5-chat", "supports_reasoning_effort": true, "context_length": 400000, "max_output_tokens": 128000 }
+    { "id": "gpt-5", "supports_reasoning_effort": true, "supports_temperature": false, "context_length": 400000, "max_output_tokens": 128000 },
+    { "id": "gpt-5-mini", "supports_reasoning_effort": true, "supports_temperature": false, "context_length": 400000, "max_output_tokens": 128000 },
+    { "id": "gpt-5-nano", "supports_reasoning_effort": true, "supports_temperature": false, "context_length": 400000, "max_output_tokens": 128000 },
+    { "id": "gpt-5-chat", "supports_reasoning_effort": true, "supports_temperature": false, "context_length": 400000, "max_output_tokens": 128000 }
   ],
   "routing": {
     "qa": "gpt-5",
