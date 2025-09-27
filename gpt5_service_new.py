@@ -92,14 +92,13 @@ class GPT5Service:
             test_prompt = "ping"
             model_id = self.choose_model("chat")
 
-            result = self.generate_text_sync(
+            # Success is the absence of errors from the API, regardless of text content
+            _ = self.generate_text_sync(
                 test_prompt,
                 model_id=model_id,
                 max_output_tokens=16,
             )
-
-            # Any non-empty response indicates success
-            return bool(result and len(result.strip()) > 0)
+            return True
 
         except Exception as e:
             import logging

@@ -36,6 +36,9 @@ if os.getenv("LOG_TO_FILE", "0") == "1":
     except Exception as e:
         logger.warning("File logging disabled (reason: %s). Using console only.", e)
 
+# Prevent duplicate logs via root handlers set elsewhere (e.g., starter script)
+logger.propagate = False
+
 class BotRunner:
     """Simple bot runner with long polling"""
 
