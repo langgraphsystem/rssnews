@@ -6,6 +6,7 @@ Extends pg_client_new with production features: search logs, quality metrics, do
 import os
 import logging
 import json
+import asyncio
 from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional, Tuple
 from dataclasses import dataclass
@@ -402,7 +403,8 @@ class ProductionDBClient(PgClient):
                     return default
 
         except Exception as e:
-            logger.error(f"Failed to get config value {key}: {e}")
+            # Schema may differ across environments; fall back to defaults quietly
+            logger.warning(f"Failed to get config value {key}: {e}")
             return default
 
     def set_config_value(self, key: str, value: Any, config_type: str = 'string',
@@ -531,7 +533,8 @@ class ProductionDBClient(PgClient):
                 return True
 
         except Exception as e:
-            logger.error(f"Failed to log user interaction: {e}")
+            # Tolerate schema differences without spamming errors
+            logger.warning(f"Failed to log user interaction: {e}")
             return False
 
     # ============================================================================
@@ -563,6 +566,39 @@ class ProductionDBClient(PgClient):
             results['error'] = str(e)
 
         return results
+
+    # ============================================================================
+    # Article Retrieval for Analysis
+    # ============================================================================
+
+    async def get_recent_articles(self, hours: int = 24, limit: int = 50) -> List[Dict[str, Any]]:
+        """Get recent articles for analysis (async version)"""
+        return await asyncio.to_thread(self._get_recent_articles_sync, hours, limit)
+
+    def _get_recent_articles_sync(self, hours: int = 24, limit: int = 50) -> List[Dict[str, Any]]:
+        """Get recent articles for analysis (sync version)"""
+        try:
+            with self._cursor() as cur:
+                cur.execute("""
+                    SELECT
+                        ai.article_id, ai.url, ai.source, ai.domain,
+                        ai.title_norm, ai.clean_text, ai.published_at,
+                        ai.source_score
+                    FROM articles_index ai
+                    WHERE ai.published_at >= NOW() - (%s || ' hours')::interval
+                      AND (ai.is_canonical IS TRUE OR ai.is_canonical IS NULL)
+                      AND ai.title_norm IS NOT NULL
+                    ORDER BY ai.published_at DESC NULLS LAST
+                    LIMIT %s
+                """, (int(hours), limit))
+
+                cols = [d[0] for d in cur.description]
+                rows = cur.fetchall()
+                return [dict(zip(cols, row)) for row in rows]
+
+        except Exception as e:
+            logger.error(f"Failed to get recent articles: {e}")
+            return []
 
     # ============================================================================
     # Analysis Reports Persistence

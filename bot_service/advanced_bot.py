@@ -100,6 +100,9 @@ class AdvancedRSSBot:
         )
         self.rate_limits = {}  # user_id -> {'last_request': timestamp, 'count': int}
 
+        # Compact storage for oversize callback payloads
+        self._cb_store: Dict[str, Dict[str, Any]] = {}
+
         logger.info("✅ Advanced RSS Bot initialized successfully!")
 
     def _generate_session_id(self, user_id: str) -> str:
@@ -213,8 +216,17 @@ class AdvancedRSSBot:
                 }
 
                 if reply_markup:
-                    payload['reply_markup'] = json.dumps(reply_markup)
-                    logger.debug(f"🔘 Including reply markup: {reply_markup}")
+                    # Sanitize inline keyboards to respect Telegram's 64-byte callback_data limit
+                    try:
+                        if isinstance(reply_markup, dict) and 'inline_keyboard' in reply_markup:
+                            safe_markup = self._create_inline_keyboard(reply_markup['inline_keyboard'])
+                        else:
+                            safe_markup = reply_markup
+                    except Exception:
+                        safe_markup = reply_markup
+
+                    payload['reply_markup'] = json.dumps(safe_markup)
+                    logger.debug(f"🔘 Including reply markup: {safe_markup}")
 
                 logger.debug(f"📡 API URL: {self.api_base}/sendMessage")
                 logger.debug(f"📦 Payload keys: {list(payload.keys())}")
@@ -336,10 +348,66 @@ class AdvancedRSSBot:
         return success_count == len(parts)
 
     def _create_inline_keyboard(self, buttons: List[List[Dict[str, str]]]) -> Dict:
-        """Create inline keyboard markup"""
-        return {
-            "inline_keyboard": buttons
-        }
+        """Create inline keyboard markup with safe callback_data (<=64 bytes)."""
+        safe_buttons: List[List[Dict[str, str]]] = []
+        for row in buttons:
+            safe_row: List[Dict[str, str]] = []
+            for btn in row:
+                if 'callback_data' in btn:
+                    action, data = self._split_action_data(btn['callback_data'])
+                    # If data part is too long or contains spaces, store it and replace with short token
+                    safe_cb = self._encode_callback(action, data)
+                    safe_row.append({"text": btn.get("text", ""), "callback_data": safe_cb})
+                else:
+                    safe_row.append(btn)
+            safe_buttons.append(safe_row)
+        return {"inline_keyboard": safe_buttons}
+
+    def _split_action_data(self, callback_data: str) -> Tuple[str, str]:
+        parts = (callback_data or '').split(':', 1)
+        if len(parts) == 2:
+            return parts[0], parts[1]
+        return callback_data, ""
+
+    def _encode_callback(self, action: str, data: str) -> str:
+        """Ensure callback_data stays within Telegram's 64-byte limit.
+
+        If needed, store the full payload in-memory and return a short token.
+        """
+        raw = f"{action}:{data}" if data else action
+        try:
+            raw_bytes = raw.encode('utf-8')
+        except Exception:
+            raw_bytes = raw.encode('utf-8', errors='ignore')
+
+        if len(raw_bytes) <= 64 and '\n' not in raw and '\r' not in raw:
+            return raw
+
+        # Create compact token from payload
+        token_src = f"{action}\u241F{data}"
+        token = hashlib.sha256(token_src.encode('utf-8')).hexdigest()[:16]
+        # Store mapping with timestamp for later resolution/cleanup
+        self._cb_store[token] = {"action": action, "data": data, "ts": time.time()}
+        # Periodically prune old tokens (older than 1 hour)
+        try:
+            self._prune_cb_store(max_age_seconds=3600)
+        except Exception:
+            pass
+        return f"{action}:{token}"
+
+    def _resolve_callback_token(self, action: str, data: str) -> Tuple[str, str]:
+        """If data is a stored token, resolve to original payload."""
+        if data in self._cb_store:
+            saved = self._cb_store.get(data) or {}
+            if saved.get('action') == action or saved.get('action') is None:
+                return action, saved.get('data')
+        return action, data
+
+    def _prune_cb_store(self, max_age_seconds: int = 3600):
+        now = time.time()
+        to_del = [k for k, v in self._cb_store.items() if now - (v.get('ts') or now) > max_age_seconds]
+        for k in to_del:
+            self._cb_store.pop(k, None)
 
     async def handle_search_command(self, chat_id: str, user_id: str,
                                   args: List[str], message_id: int = None) -> bool:
@@ -552,6 +620,8 @@ class AdvancedRSSBot:
                 return False
 
             action, data = parts
+            # Resolve tokenized payloads
+            action, data = self._resolve_callback_token(action, data)
 
             if action == "explain":
                 return await self.quality_ux.handle_explain_request(

@@ -126,16 +126,13 @@ class GPT5Service:
             except Exception:
                 # Remove invalid alias value silently
                 kwargs.pop("max_completion_tokens", None)
+        # Map any unsupported/placeholder model IDs to a known good default
+        eff_model = self._map_model_id(model_id)
+
+        # Keep payload minimal for widest SDK compatibility
         payload: Dict[str, Any] = {
-            "model": model_id,
-            "input": [
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "input_text", "text": message}
-                    ],
-                }
-            ],
+            "model": eff_model,
+            "input": message,
         }
 
         if max_output_tokens is not None:
@@ -144,10 +141,7 @@ class GPT5Service:
             supports_temp = bool(self.models.get(model_id, {}).get("supports_temperature"))
             if supports_temp:
                 payload["temperature"] = float(temperature)
-        if verbosity:
-            payload["text"] = {"verbosity": verbosity}
-        # Prefer explicit text format when supported by SDK
-        payload["response_format"] = {"type": "text"}
+        # Avoid setting verbosity/response_format unconditionally as some SDKs reject these
 
         # Only include reasoning if supported
         supports_reasoning = bool(self.models.get(model_id, {}).get("supports_reasoning_effort"))
@@ -158,6 +152,18 @@ class GPT5Service:
             payload["stream"] = True
 
         return payload
+
+    def _map_model_id(self, model_id: str) -> str:
+        """Map project placeholder model IDs to real, available models."""
+        # If config provides real model IDs, prefer them
+        if model_id in self.models:
+            return model_id
+
+        # Map any gpt-5* aliases to a stable known model
+        if model_id.lower().startswith("gpt-5"):
+            return os.getenv("OPENAI_FALLBACK_MODEL", "gpt-4o-mini")
+
+        return model_id
 
     def _extract_output_text(self, resp: Any, logger) -> str:
         """Best-effort extraction of text from a Responses API response object."""
@@ -290,23 +296,37 @@ class GPT5Service:
             logger.info(f"🔍 [RAILWAY] output_text (extracted): '{output_text}' (length: {len(output_text)})")
 
             if not output_text:
-                logger.info("🔍 [RAILWAY] No text from Responses. Trying GPT-5-mini (Responses) fallback...")
-                # Build a second Responses request with chat model (gpt-5-mini)
+                logger.info("🔍 [RAILWAY] No text from Responses. Trying Responses with chat route...")
+                # Second attempt via Responses using chat route
                 try:
                     payload2 = dict(payload)
-                    payload2["model"] = self.routing.get("chat", "gpt-5-mini")
-                    # Removing reasoning can help force plain text output on some models
-                    if "reasoning" in payload2:
-                        payload2.pop("reasoning", None)
+                    payload2["model"] = self._map_model_id(self.routing.get("chat", "gpt-4o-mini"))
+                    payload2.pop("reasoning", None)
                     resp2 = self.client.responses.create(**payload2)
                     output_text2 = self._extract_output_text(resp2, logger)
                     if output_text2 and output_text2.strip():
                         output_text = output_text2
-                        logger.info(f"✅ [RAILWAY] GPT-5-mini fallback succeeded, length: {len(output_text)}")
+                        logger.info(f"✅ [RAILWAY] Responses chat-route fallback succeeded, length: {len(output_text)}")
                     else:
-                        logger.info("⚠️ [RAILWAY] GPT-5-mini fallback returned empty text")
+                        logger.info("⚠️ [RAILWAY] Responses chat-route fallback empty; trying Chat Completions...")
                 except Exception as fe:
-                    logger.error(f"❌ [RAILWAY] GPT-5-mini fallback failed: {type(fe).__name__}: {fe}")
+                    logger.warning(f"⚠️ [RAILWAY] Responses chat-route fallback error: {type(fe).__name__}: {fe}")
+
+                # Final fallback to Chat Completions for broad compatibility
+                if not output_text:
+                    try:
+                        msg = payload.get("input", "")
+                        cc_model = os.getenv("OPENAI_FALLBACK_MODEL", "gpt-4o-mini")
+                        cc = self.client.chat.completions.create(
+                            model=cc_model,
+                            messages=[{"role": "user", "content": msg}],
+                            max_tokens=payload.get("max_output_tokens", None)
+                        )
+                        if getattr(cc, "choices", None):
+                            output_text = (cc.choices[0].message.content or "").strip()
+                            logger.info(f"✅ [RAILWAY] Chat Completions fallback succeeded, length: {len(output_text)}")
+                    except Exception as cce:
+                        logger.error(f"❌ [RAILWAY] Chat Completions fallback failed: {type(cce).__name__}: {cce}")
 
             logger.info(f"✅ [RAILWAY] Final output_text: '{output_text}' (length: {len(output_text)})")
             return output_text
