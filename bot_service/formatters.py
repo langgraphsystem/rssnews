@@ -480,7 +480,7 @@ Query: `{self._escape_markdown(query)}`
         source_name: Optional[str] = None,
     ) -> str:
         dom = source_name or self.short_domain(url)
-        date = f" · {self.esc(published_at[:10])}" if published_at else ""
+        date = f" · {self.esc(published_at[:10])}" if (published_at and len(published_at) >= 10) else ""
         # <a href="...">Title — domain</a> · YYYY-MM-DD
         return f'{idx}. <a href="{self.esc(url)}">{self.esc(title)} — {self.esc(dom)}</a>{date}'
 
@@ -496,7 +496,7 @@ Query: `{self._escape_markdown(query)}`
             lines.append(
                 self._render_source_line(
                     i,
-                    s.get("title") or "(untitled)",
+                    (s.get("title") or "(untitled)")[:160],
                     s.get("url") or "#",
                     s.get("published_at"),
                     s.get("source_name"),

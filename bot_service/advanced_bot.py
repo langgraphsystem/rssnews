@@ -348,12 +348,13 @@ class AdvancedRSSBot:
             return False
 
     async def _send_long_message(self, chat_id: str, text: str,
-                                reply_markup: Dict = None) -> bool:
+                                reply_markup: Dict = None,
+                                parse_mode: str = "Markdown") -> bool:
         """Send long message, splitting if necessary"""
         max_length = 4000
 
         if len(text) <= max_length:
-            return await self._send_message(chat_id, text, reply_markup)
+            return await self._send_message(chat_id, text, reply_markup, parse_mode=parse_mode)
 
         # Split message
         parts = []
@@ -375,12 +376,15 @@ class AdvancedRSSBot:
         success_count = 0
         for i, part in enumerate(parts):
             if len(parts) > 1:
-                part_header = f"📄 **Part {i+1}/{len(parts)}**\n\n"
+                if parse_mode == "HTML":
+                    part_header = f"📄 <b>Part {i+1}/{len(parts)}</b>\n\n"
+                else:
+                    part_header = f"📄 **Part {i+1}/{len(parts)}**\n\n"
                 part = part_header + part
 
             # Only add markup to last part
             markup = reply_markup if i == len(parts) - 1 else None
-            if await self._send_message(chat_id, part, markup):
+            if await self._send_message(chat_id, part, markup, parse_mode=parse_mode):
                 success_count += 1
 
         return success_count == len(parts)
@@ -1228,7 +1232,7 @@ class AdvancedRSSBot:
                         "- Metrics & Timeline\n\n"
                     )
 
-                    # Top domains and key links/quotes
+                    # Top domains and key links/quotes (compact HTML sources later)
                     def _domain_of(a: Dict[str, Any]) -> str:
                         u = a.get('url') or ''
                         net = urlparse(u).netloc if u else ''
@@ -1248,17 +1252,26 @@ class AdvancedRSSBot:
                     require_trump = 'trump' in (query or '').lower()
                     rel_list = [a for a in articles if self._article_is_relevant(a, require_trump=require_trump)]
                     source_pool = rel_list or articles
-                    showcase = sorted(source_pool, key=_adate, reverse=True)[:5]
-                    links_lines: List[str] = []
+                    showcase = sorted(source_pool, key=_adate, reverse=True)[:7]
+                    # Prepare compact sources payload for HTML rendering
+                    sources_payload: List[Dict[str, Any]] = []
                     for a in showcase:
-                        t = (a.get('title') or a.get('headline') or a.get('name') or '').strip()[:160]
+                        title = (a.get('title') or a.get('headline') or a.get('name') or 'Untitled').strip()[:160]
                         url = a.get('url') or ''
-                        quote = (a.get('content') or a.get('description') or a.get('summary') or a.get('text') or '')
-                        quote = (quote or '').replace('\n', ' ').strip()[:200]
-                        if url:
-                            links_lines.append(f"• {t}\n  “{quote}”\n  {url}")
+                        src = (a.get('source') or a.get('domain') or a.get('source_domain') or '').lower()
+                        pub = a.get('published_at')
+                        if isinstance(pub, datetime):
+                            published_at = pub.isoformat()
+                        elif isinstance(pub, str):
+                            published_at = pub
                         else:
-                            links_lines.append(f"• {t}\n  “{quote}”")
+                            published_at = None
+                        sources_payload.append({
+                            'title': title,
+                            'url': url,
+                            'source_name': src,
+                            'published_at': published_at,
+                        })
 
                     # Timeline by day
                     from collections import Counter
@@ -1274,11 +1287,8 @@ class AdvancedRSSBot:
                         buckets[day] += 1
                     timeline_lines = [f"{day}: {cnt}" for day, cnt in sorted(buckets.items())]
 
-                    sources_section = "\n".join([
-                        "\n📚 Sources & Links",
-                        ("Top domains: " + ", ".join([f"{d} ({c})" for d, c in top_domains])) if top_domains else "Top domains: n/a",
-                        *links_lines
-                    ])
+                    # Compact sources rendered as HTML links "Title — domain · YYYY-MM-DD"
+                    sources_section = self.formatter.render_sources_block(sources_payload)
 
                     # Optional citations map if grounded
                     if grounded:
@@ -1295,14 +1305,17 @@ class AdvancedRSSBot:
                         sources_section += "\n" + "\n".join(citation_lines)
 
                     metrics_section = "\n".join([
-                        "\n📈 Metrics & Timeline",
-                        "By day:",
+                        ("Top domains: " + ", ".join([f"{d} ({c})" for d, c in top_domains])) if top_domains else "Top domains: n/a",
+                        "<b>By day</b>",
                         *timeline_lines
                     ])
 
-                    header = f"🔬 **GPT-5 Analysis: {query.upper()}**\n\n"
-                    header += f"📊 **Data:** {len(articles)} articles, {timeframe}\n\n"
-                    message = header + toc + analysis + "\n\n" + sources_section + "\n\n" + metrics_section
+                    header = f"🔬 <b>GPT-5 Analysis: {self.formatter.esc(query.upper())}</b>\n\n"
+                    header += f"📊 <b>Data:</b> {len(articles)} articles, {self.formatter.esc(timeframe)}\n\n"
+                    message = header + toc + analysis
+                    # Attach compact HTML sources and then metrics
+                    message = self.formatter.attach_sources(message, sources_payload)
+                    message += "\n\n" + metrics_section
                 else:
                     # Build a data-only fallback report if model didn't return text
                     def _domain_of(a: Dict[str, Any]) -> str:
@@ -1320,17 +1333,25 @@ class AdvancedRSSBot:
                         dt = a.get('published_at')
                         return dt if isinstance(dt, datetime) else (datetime.fromisoformat(dt) if isinstance(dt, str) and len(dt) >= 10 else datetime.min)
 
-                    showcase = sorted(articles, key=_adate, reverse=True)[:5]
-                    links_lines: List[str] = []
+                    showcase = sorted(articles, key=_adate, reverse=True)[:7]
+                    sources_payload: List[Dict[str, Any]] = []
                     for a in showcase:
-                        t = (a.get('title') or a.get('headline') or a.get('name') or '').strip()[:160]
+                        title = (a.get('title') or a.get('headline') or a.get('name') or '').strip()[:160]
                         url = a.get('url') or ''
-                        quote = (a.get('content') or a.get('description') or a.get('summary') or a.get('text') or '')
-                        quote = (quote or '').replace('\n', ' ').strip()[:200]
-                        if url:
-                            links_lines.append(f"• {t}\n  “{quote}”\n  {url}")
+                        src = (a.get('source') or a.get('domain') or a.get('source_domain') or '').lower()
+                        pub = a.get('published_at')
+                        if isinstance(pub, datetime):
+                            published_at = pub.isoformat()
+                        elif isinstance(pub, str):
+                            published_at = pub
                         else:
-                            links_lines.append(f"• {t}\n  “{quote}”")
+                            published_at = None
+                        sources_payload.append({
+                            'title': title,
+                            'url': url,
+                            'source_name': src,
+                            'published_at': published_at,
+                        })
 
                     from collections import Counter
                     buckets = Counter()
@@ -1345,24 +1366,22 @@ class AdvancedRSSBot:
                         buckets[day] += 1
                     timeline_lines = [f"{day}: {cnt}" for day, cnt in sorted(buckets.items())]
 
-                    header = f"🔬 **GPT-5 Analysis (data-only fallback): {query.upper()}**\n\n"
-                    header += f"📊 **Data:** {len(articles)} articles, {timeframe}\n\n"
+                    header = f"🔬 <b>GPT-5 Analysis (data-only fallback): {self.formatter.esc(query.upper())}</b>\n\n"
+                    header += f"📊 <b>Data:</b> {len(articles)} articles, {self.formatter.esc(timeframe)}\n\n"
                     toc = (
                         "📑 Table of contents\n"
-                        "- Sources & Links\n"
+                        "- Sources\n"
                         "- Metrics & Timeline\n\n"
                     )
-                    sources_section = "\n".join([
-                        "\n📚 Sources & Links",
-                        ("Top domains: " + ", ".join([f"{d} ({c})" for d, c in top_domains])) if top_domains else "Top domains: n/a",
-                        *links_lines
-                    ])
+                    sources_section = self.formatter.render_sources_block(sources_payload)
                     metrics_section = "\n".join([
-                        "\n📈 Metrics & Timeline",
-                        "By day:",
+                        ("Top domains: " + ", ".join([f"{d} ({c})" for d, c in top_domains])) if top_domains else "Top domains: n/a",
+                        "<b>By day</b>",
                         *timeline_lines
                     ])
-                    message = header + toc + sources_section + "\n\n" + metrics_section
+                    message = header + toc
+                    message = self.formatter.attach_sources(message, sources_payload)
+                    message += "\n\n" + metrics_section
 
                 # Persist brief report into diagnostics (optional)
                 try:
@@ -1420,7 +1439,7 @@ class AdvancedRSSBot:
                 except Exception:
                     markup = None
 
-                result = await self._send_long_message(chat_id, message, markup)
+                result = await self._send_long_message(chat_id, message, markup, parse_mode="HTML")
                 elapsed_ms = int((time.monotonic() - start_ts) * 1000)
                 logger.info(f"🧪 [ANALYZE_CHECK] Finished /analyze in {elapsed_ms}ms")
                 return result
@@ -1988,14 +2007,18 @@ Use emojis, percentages, and visual formatting."""
                     article.get('summary') or
                     article.get('text') or
                     ''
-                )[:300]
-                source = article.get('source', 'Unknown')
+                )[:500]
+                source = (article.get('source') or article.get('domain') or article.get('source_domain') or 'Unknown')
                 date = article.get('published_at', 'Unknown date')
+                url = article.get('url') or ''
 
                 article_text = f"Article {i+1}:\nTitle: {title}\nContent: {content}\n"
 
                 if include_metadata:
-                    article_text += f"Source: {source}\nDate: {date}\n"
+                    article_text += f"Source: {source}\n"
+                    if url:
+                        article_text += f"URL: {url}\n"
+                    article_text += f"Date: {date}\n"
 
                 article_text += "---\n"
                 formatted.append(article_text)
