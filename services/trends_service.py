@@ -156,6 +156,17 @@ class TrendsService:
         # buckets: hours ago  (oldest first)
         counts = [0] * hours
         for dt in datetimes:
+            # Convert string dates to datetime objects if needed
+            if isinstance(dt, str):
+                try:
+                    dt = datetime.fromisoformat(dt.replace('Z', '+00:00'))
+                    if dt.tzinfo:
+                        dt = dt.replace(tzinfo=None)
+                except Exception:
+                    continue
+            elif not isinstance(dt, datetime):
+                continue
+
             delta = now - dt
             h = int(delta.total_seconds() // 3600)
             if 0 <= h < hours:
