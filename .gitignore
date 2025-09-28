@@ -84,3 +84,6 @@ storage/queue/*.lock
 # Portable Git
 .git-portable/
 
+# Tools directory (contains Portable Git and other tools)
+tools/
+
