@@ -1,4 +1,4 @@
-"""
+﻿"""
 Advanced RSS News Telegram Bot
 Production-ready bot with search, ask, trends, and user management
 """
@@ -572,18 +572,27 @@ class AdvancedRSSBot:
             logger.error(f"Ask command failed: {e}")
             return await self._send_message(chat_id, f"❌ Question processing failed: {e}")
 
-    async def handle_trends_command(self, chat_id: str, user_id: str) -> bool:
-        """Handle /trends command"""
+    async def handle_trends_command(self, chat_id: str, user_id: str, args: List[str] = None) -> bool:
+        """Handle /trends command with optional time period"""
         try:
-            await self._send_message(chat_id, "📈 Сбор тем и ключевых слов за 24h...")
+            # Parse time window from args
+            if args and len(args) > 0:
+                time_window = args[0]
+            else:
+                time_window = "24h"
+
+            # Get user-friendly display name
+            display_window = self.trends_service._format_window_display(time_window)
+
+            await self._send_message(chat_id, f"📈 Сбор тем и ключевых слов за {display_window}...")
 
             # Compute or fetch cached trends
-            payload = await asyncio.to_thread(self.trends_service.build_trends, "24h", 600, 10)
-            message = self.trends_service.format_trends_markdown(payload, window="24h")
+            payload = await asyncio.to_thread(self.trends_service.build_trends, time_window, 600, 10)
+            message = self.trends_service.format_trends_markdown(payload, window=time_window)
 
             buttons = [
                 [
-                    {"text": "🔄 Обновить", "callback_data": "trends:refresh"},
+                    {"text": "🔄 Обновить", "callback_data": f"trends:refresh:{time_window}"},
                     {"text": "📊 Аналитика", "callback_data": "analytics:full"}
                 ]
             ]
@@ -676,11 +685,15 @@ class AdvancedRSSBot:
                 )
 
             elif action == "trends":
-                # e.g., "refresh"
+                # e.g., "refresh" or "refresh:1w"
                 if data.startswith("refresh"):
-                    # Rebuild trends for default window
-                    payload = await asyncio.to_thread(self.trends_service.build_trends, "24h", 600, 10)
-                    message = self.trends_service.format_trends_markdown(payload, window="24h")
+                    # Parse time window from callback data
+                    parts = data.split(":", 1)
+                    time_window = parts[1] if len(parts) > 1 else "24h"
+
+                    # Rebuild trends for specified window
+                    payload = await asyncio.to_thread(self.trends_service.build_trends, time_window, 600, 10)
+                    message = self.trends_service.format_trends_markdown(payload, window=time_window)
                     return await self._send_long_message(chat_id, message)
                 return False
 
@@ -820,7 +833,7 @@ class AdvancedRSSBot:
                     return await self.handle_ask_command(chat_id, user_id, args)
 
                 elif command == 'trends':
-                    return await self.handle_trends_command(chat_id, user_id)
+                    return await self.handle_trends_command(chat_id, user_id, args)
 
                 elif command == 'quality':
                     return await self.handle_quality_command(chat_id, user_id)
@@ -1199,10 +1212,12 @@ class AdvancedRSSBot:
             }
             config = length_config.get(length, length_config['medium'])
 
+            # Use a single slice for prompt and sources to align [i] indices
+            prompt_slice = articles[:20]
             # Use GPT-5 for analysis with structured prompt
             analysis_prompt = build_analysis_prompt(
                 query=query,
-                articles=articles,
+                articles=prompt_slice,
                 length=length,
                 grounded=grounded,
                 structure_first=True,
@@ -1249,15 +1264,15 @@ class AdvancedRSSBot:
                         dt = a.get('published_at')
                         return dt if isinstance(dt, datetime) else (datetime.fromisoformat(dt) if isinstance(dt, str) and len(dt) >= 10 else datetime.min)
 
-                    require_trump = 'trump' in (query or '').lower()
-                    rel_list = [a for a in articles if self._article_is_relevant(a, require_trump=require_trump)]
-                    source_pool = rel_list or articles
-                    showcase = sorted(source_pool, key=_adate, reverse=True)[:7]
+                    # Keep source order consistent with prompt enumeration so [i] indices align
+                    showcase = prompt_slice[:7]
                     # Prepare compact sources payload for HTML rendering
                     sources_payload: List[Dict[str, Any]] = []
                     for a in showcase:
                         title = (a.get('title') or a.get('headline') or a.get('name') or 'Untitled').strip()[:160]
                         url = a.get('url') or ''
+                        if url and not (url.startswith('http://') or url.startswith('https://')):
+                            continue
                         src = (a.get('source') or a.get('domain') or a.get('source_domain') or '').lower()
                         pub = a.get('published_at')
                         if isinstance(pub, datetime):
@@ -1290,19 +1305,15 @@ class AdvancedRSSBot:
                     # Compact sources rendered as HTML links "Title — domain · YYYY-MM-DD"
                     sources_section = self.formatter.render_sources_block(sources_payload)
 
-                    # Optional citations map if grounded
+                    # Optional citations map if grounded — aligned with prompt_slice order
                     if grounded:
-                        # Enumerate first 10 articles to map [i] -> URL
-                        citation_lines: List[str] = ["\n📎 Citations Map"]
-                        for idx, a in enumerate(articles[:10], start=1):
-                            title = (a.get('title') or a.get('headline') or a.get('name') or '').strip()[:120]
-                            dom = _domain_of(a)
-                            url = a.get('url') or ''
-                            if url:
-                                citation_lines.append(f"[{idx}] {title} ({dom})\n{url}")
-                            else:
-                                citation_lines.append(f"[{idx}] {title} ({dom})")
-                        sources_section += "\n" + "\n".join(citation_lines)
+                        citations: Dict[str, str] = {}
+                        idx_i = 1
+                        for a in prompt_slice:
+                            u = a.get('url') or ''
+                            if u and (u.startswith('http://') or u.startswith('https://')):
+                                citations[str(idx_i)] = u
+                            idx_i += 1
 
                     metrics_section = "\n".join([
                         ("Top domains: " + ", ".join([f"{d} ({c})" for d, c in top_domains])) if top_domains else "Top domains: n/a",
@@ -1333,11 +1344,14 @@ class AdvancedRSSBot:
                         dt = a.get('published_at')
                         return dt if isinstance(dt, datetime) else (datetime.fromisoformat(dt) if isinstance(dt, str) and len(dt) >= 10 else datetime.min)
 
-                    showcase = sorted(articles, key=_adate, reverse=True)[:7]
+                    # Keep same order as in prompt enumeration
+                    showcase = prompt_slice[:7]
                     sources_payload: List[Dict[str, Any]] = []
                     for a in showcase:
                         title = (a.get('title') or a.get('headline') or a.get('name') or '').strip()[:160]
                         url = a.get('url') or ''
+                        if url and not (url.startswith('http://') or url.startswith('https://')):
+                            continue
                         src = (a.get('source') or a.get('domain') or a.get('source_domain') or '').lower()
                         pub = a.get('published_at')
                         if isinstance(pub, datetime):
