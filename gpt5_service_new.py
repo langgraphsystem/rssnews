@@ -128,8 +128,6 @@ class GPT5Service:
                 kwargs.pop("max_completion_tokens", None)
         payload: Dict[str, Any] = {
             "model": model_id,
-            # Force text output modality to ensure model returns text, not only reasoning
-            "modalities": ["text"],
             "input": [
                 {
                     "role": "user",
@@ -148,7 +146,7 @@ class GPT5Service:
                 payload["temperature"] = float(temperature)
         if verbosity:
             payload["text"] = {"verbosity": verbosity}
-        # Prefer explicit text response format
+        # Prefer explicit text format when supported by SDK
         payload["response_format"] = {"type": "text"}
 
         # Only include reasoning if supported
@@ -278,7 +276,13 @@ class GPT5Service:
 
         try:
             logger.info("🔍 [RAILWAY] Calling self.client.responses.create...")
-            resp = self.client.responses.create(**payload)
+            try:
+                resp = self.client.responses.create(**payload)
+            except TypeError as te:
+                # SDK might not support certain keys; retry without them
+                logger.warning(f"⚠️ [RAILWAY] TypeError on responses.create: {te}. Retrying without optional keys...")
+                cleaned = {k: v for k, v in payload.items() if k not in ("modalities", "response_format")}
+                resp = self.client.responses.create(**cleaned)
             logger.info(f"🔍 [RAILWAY] Response received: {type(resp)}")
             logger.info(f"🔍 [RAILWAY] Response attributes: {dir(resp)}")
 
