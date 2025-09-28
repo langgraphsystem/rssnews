@@ -530,11 +530,23 @@ class AdvancedRSSBot:
                     return False
                 if sub == 'refresh':
                     try:
-                        q, ln, tf = rest.split('|', 3)[:3]
+                        parts2 = rest.split('|')
+                        q = parts2[0]
+                        ln = parts2[1] if len(parts2) > 1 else 'medium'
+                        tf = parts2[2] if len(parts2) > 2 else '7d'
+                        gr = parts2[3] if len(parts2) > 3 else '0'
                     except Exception:
                         return False
                     # Reuse handler with same params
-                    return await self.handle_analyze_command(chat_id, user_id, [q, ln, tf])
+                    args = [q]
+                    if ln:
+                        args.append(ln)
+                    if tf:
+                        args.append(tf)
+                    if gr == '1':
+                        args.append('grounded')
+                        args.append('sources')
+                    return await self.handle_analyze_command(chat_id, user_id, args)
                 return False
 
             elif action == "similar":
@@ -980,20 +992,27 @@ class AdvancedRSSBot:
             # Parse: detect timeframe and optional length from the end
             timeframe_tokens = {"1h","6h","12h","1d","3d","7d","1w","2w","1m","3m"}
             length_tokens = {"short","medium","detailed","executive"}
+            flag_tokens = {"sources","grounded","citations"}
 
             tokens = [t.strip() for t in args]
             timeframe = '7d'
             length = 'medium'
+            grounded = False
             if tokens and tokens[-1].lower() in timeframe_tokens:
                 timeframe = tokens.pop().lower()
             if tokens and tokens[-1].lower() in length_tokens:
                 length = tokens.pop().lower()
+            # Optional flags (can appear at end in any order)
+            while tokens and tokens[-1].lower() in flag_tokens:
+                tok = tokens.pop().lower()
+                if tok in ("sources","grounded","citations"):
+                    grounded = True
             query = " ".join(tokens).strip() or args[0]
             # Strip surrounding quotes if provided
             if (query.startswith('"') and query.endswith('"')) or (query.startswith("'") and query.endswith("'")):
                 query = query[1:-1].strip()
 
-            logger.info(f"🧪 [ANALYZE_CHECK] Parsed query='{query}', length='{length}', timeframe='{timeframe}'")
+            logger.info(f"🧪 [ANALYZE_CHECK] Parsed query='{query}', length='{length}', timeframe='{timeframe}', grounded={grounded}")
 
             await self._send_message(chat_id, f"🔬 GPT-5 analyzing '{query}' ({length}) data for {timeframe}...")
 
@@ -1034,6 +1053,9 @@ Provide a comprehensive analysis covering:
 5. Future predictions based on data
 
  Format as structured report with emojis and clear sections."""
+
+            if grounded:
+                analysis_prompt += "\n\nCITATIONS: When stating facts or claims, include bracketed citations like [i] that refer to the Article i numbers in the ARTICLES DATA above. Keep citations concise and place them at sentence ends."
 
             try:
                 try:
@@ -1108,6 +1130,20 @@ Provide a comprehensive analysis covering:
                         *links_lines
                     ])
 
+                    # Optional citations map if grounded
+                    if grounded:
+                        # Enumerate first 10 articles to map [i] -> URL
+                        citation_lines: List[str] = ["\n📎 Citations Map"]
+                        for idx, a in enumerate(articles[:10], start=1):
+                            title = (a.get('title') or a.get('headline') or a.get('name') or '').strip()[:120]
+                            dom = _domain_of(a)
+                            url = a.get('url') or ''
+                            if url:
+                                citation_lines.append(f"[{idx}] {title} ({dom})\n{url}")
+                            else:
+                                citation_lines.append(f"[{idx}] {title} ({dom})")
+                        sources_section += "\n" + "\n".join(citation_lines)
+
                     metrics_section = "\n".join([
                         "\n📈 Metrics & Timeline",
                         "By day:",
@@ -1126,6 +1162,7 @@ Provide a comprehensive analysis covering:
                         'query': query,
                         'timeframe': timeframe,
                         'length': length,
+                        'grounded': grounded,
                         'articles': len(articles),
                         'top_domains': top_domains if 'top_domains' in locals() else [],
                         'timeline': dict(buckets) if 'buckets' in locals() else {},
@@ -1142,9 +1179,35 @@ Provide a comprehensive analysis covering:
                 except Exception as diag_err:
                     logger.debug(f"Diagnostics write skipped: {diag_err}")
 
+                # Persist full report into analysis_reports
+                try:
+                    sources_payload = []
+                    for a in showcase:
+                        sources_payload.append({
+                            'title': a.get('title') or a.get('headline') or a.get('name'),
+                            'url': a.get('url'),
+                            'source': a.get('source') or a.get('domain') or a.get('source_domain')
+                        })
+                    self.db.save_analysis_report(
+                        query=query,
+                        timeframe=timeframe,
+                        length=length,
+                        grounded=grounded,
+                        articles_count=len(articles),
+                        report_text=message,
+                        top_domains=top_domains if 'top_domains' in locals() else [],
+                        timeline=dict(buckets) if 'buckets' in locals() else {},
+                        sources=sources_payload,
+                        user_id=user_id,
+                        chat_id=chat_id,
+                    )
+                except Exception as rep_err:
+                    logger.debug(f"Report save skipped: {rep_err}")
+
                 # Buttons: Refresh with same params
                 try:
-                    buttons = [[{"text": "🔄 Refresh", "callback_data": f"analyze:refresh|{query}|{length}|{timeframe}"}]]
+                    btn_cb = f"analyze:refresh|{query}|{length}|{timeframe}|{'1' if grounded else '0'}"
+                    buttons = [[{"text": "🔄 Refresh", "callback_data": btn_cb}]]
                     markup = self._create_inline_keyboard(buttons)
                 except Exception:
                     markup = None

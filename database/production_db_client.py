@@ -563,3 +563,66 @@ class ProductionDBClient(PgClient):
             results['error'] = str(e)
 
         return results
+
+    # ============================================================================
+    # Analysis Reports Persistence
+    # ============================================================================
+
+    def save_analysis_report(
+        self,
+        *,
+        query: str,
+        timeframe: str,
+        length: str,
+        grounded: bool,
+        articles_count: int,
+        report_text: str,
+        top_domains: List[Tuple[str, int]] = None,
+        timeline: Dict[str, int] = None,
+        sources: List[Dict[str, Any]] = None,
+        user_id: Optional[str] = None,
+        chat_id: Optional[str] = None,
+    ) -> bool:
+        """Persist full analysis report to database (idempotent-safe)."""
+        try:
+            with self._cursor() as cur:
+                # Ensure table exists
+                cur.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS analysis_reports (
+                        id SERIAL PRIMARY KEY,
+                        created_at TIMESTAMPTZ DEFAULT NOW(),
+                        query TEXT,
+                        timeframe TEXT,
+                        length TEXT,
+                        grounded BOOLEAN,
+                        articles_count INTEGER,
+                        report TEXT,
+                        top_domains JSONB,
+                        timeline JSONB,
+                        sources JSONB,
+                        user_id TEXT,
+                        chat_id TEXT
+                    )
+                    """
+                )
+                cur.execute(
+                    """
+                    INSERT INTO analysis_reports (
+                        query, timeframe, length, grounded, articles_count, report,
+                        top_domains, timeline, sources, user_id, chat_id
+                    ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                    """,
+                    (
+                        query, timeframe, length, grounded, int(articles_count),
+                        report_text,
+                        json.dumps(top_domains or []),
+                        json.dumps(timeline or {}),
+                        json.dumps(sources or []),
+                        user_id, chat_id,
+                    ),
+                )
+                return True
+        except Exception as e:
+            logger.error(f"Failed to save analysis report: {e}")
+            return False
