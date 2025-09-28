@@ -128,6 +128,8 @@ class GPT5Service:
                 kwargs.pop("max_completion_tokens", None)
         payload: Dict[str, Any] = {
             "model": model_id,
+            # Force text output modality to ensure model returns text, not only reasoning
+            "modalities": ["text"],
             "input": [
                 {
                     "role": "user",
@@ -146,6 +148,8 @@ class GPT5Service:
                 payload["temperature"] = float(temperature)
         if verbosity:
             payload["text"] = {"verbosity": verbosity}
+        # Prefer explicit text response format
+        payload["response_format"] = {"type": "text"}
 
         # Only include reasoning if supported
         supports_reasoning = bool(self.models.get(model_id, {}).get("supports_reasoning_effort"))

@@ -1068,7 +1068,7 @@ Provide a comprehensive analysis covering:
                 analysis = self.gpt5.send_analysis(analysis_prompt, max_output_tokens=config['tokens'])
                 logger.info(f"🧪 [ANALYZE_CHECK] Analysis text length: {len(analysis) if analysis else 0}")
 
-                if analysis:
+                if analysis and analysis.strip():
                     # Build Table of Contents
                     toc = (
                         "📑 Table of contents\n"
@@ -1154,7 +1154,65 @@ Provide a comprehensive analysis covering:
                     header += f"📊 **Data:** {len(articles)} articles, {timeframe}\n\n"
                     message = header + toc + analysis + "\n\n" + sources_section + "\n\n" + metrics_section
                 else:
-                    message = "❌ GPT-5 analysis failed. Please try again."
+                    # Build a data-only fallback report if model didn't return text
+                    def _domain_of(a: Dict[str, Any]) -> str:
+                        u = a.get('url') or ''
+                        net = urlparse(u).netloc if u else ''
+                        return (a.get('source_domain') or a.get('domain') or a.get('source') or net or 'unknown').lower()
+
+                    domains: Dict[str, int] = {}
+                    for a in articles:
+                        d = _domain_of(a)
+                        domains[d] = domains.get(d, 0) + 1
+                    top_domains = sorted(domains.items(), key=lambda x: x[1], reverse=True)[:5]
+
+                    def _adate(a):
+                        dt = a.get('published_at')
+                        return dt if isinstance(dt, datetime) else (datetime.fromisoformat(dt) if isinstance(dt, str) and len(dt) >= 10 else datetime.min)
+
+                    showcase = sorted(articles, key=_adate, reverse=True)[:5]
+                    links_lines: List[str] = []
+                    for a in showcase:
+                        t = (a.get('title') or a.get('headline') or a.get('name') or '').strip()[:160]
+                        url = a.get('url') or ''
+                        quote = (a.get('content') or a.get('description') or a.get('summary') or a.get('text') or '')
+                        quote = (quote or '').replace('\n', ' ').strip()[:200]
+                        if url:
+                            links_lines.append(f"• {t}\n  “{quote}”\n  {url}")
+                        else:
+                            links_lines.append(f"• {t}\n  “{quote}”")
+
+                    from collections import Counter
+                    buckets = Counter()
+                    for a in articles:
+                        dt = a.get('published_at')
+                        if isinstance(dt, datetime):
+                            day = dt.date().isoformat()
+                        elif isinstance(dt, str) and len(dt) >= 10:
+                            day = dt[:10]
+                        else:
+                            continue
+                        buckets[day] += 1
+                    timeline_lines = [f"{day}: {cnt}" for day, cnt in sorted(buckets.items())]
+
+                    header = f"🔬 **GPT-5 Analysis (data-only fallback): {query.upper()}**\n\n"
+                    header += f"📊 **Data:** {len(articles)} articles, {timeframe}\n\n"
+                    toc = (
+                        "📑 Table of contents\n"
+                        "- Sources & Links\n"
+                        "- Metrics & Timeline\n\n"
+                    )
+                    sources_section = "\n".join([
+                        "\n📚 Sources & Links",
+                        ("Top domains: " + ", ".join([f"{d} ({c})" for d, c in top_domains])) if top_domains else "Top domains: n/a",
+                        *links_lines
+                    ])
+                    metrics_section = "\n".join([
+                        "\n📈 Metrics & Timeline",
+                        "By day:",
+                        *timeline_lines
+                    ])
+                    message = header + toc + sources_section + "\n\n" + metrics_section
 
                 # Persist brief report into diagnostics (optional)
                 try:
