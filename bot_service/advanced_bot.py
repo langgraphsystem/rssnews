@@ -40,6 +40,44 @@ from services.trends_service import TrendsService
 logger = logging.getLogger(__name__)
 
 
+# Structured analysis prompt builder for GPT-5
+def build_analysis_prompt(query: str, articles: List[Dict[str, Any]], length: str = "detailed",
+                          grounded: bool = False, structure_first: bool = True) -> str:
+    head: List[str] = []
+    if structure_first:
+        head.append(
+            "You are GPT-5. First, silently aggregate ALL salient facts from the provided articles. "
+            "Then produce a SINGLE, CLEAN, STRUCTURED analysis in this exact order:\n"
+            "1) TL;DR (3–5 bullets)\n"
+            "2) Key developments (bulleted; each with what/so-what)\n"
+            "3) Timeline (dated)\n"
+            "4) Impacts (policy, legal, operational)\n"
+            "5) Risks & controversies\n"
+            "6) Open questions\n"
+            "7) Outlook (near-term, 1–3 mo)\n"
+            "8) What to watch next\n"
+            "— Only after that, a compact Sources list.\n"
+            "Keep it concise, non-repetitive, and avoid URLs in the body.\n"
+        )
+        if grounded:
+            head.append(
+                "When you claim a fact, anchor it with a bracketed index like [1], [2]... matching the Sources list.\n"
+            )
+
+    # Compact packaging of articles for context
+    art_lines: List[str] = []
+    for i, a in enumerate(articles[:20], start=1):
+        title = (a.get("title") or a.get("headline") or a.get("name") or "").strip()
+        snippet = (a.get("content") or a.get("description") or a.get("summary") or a.get("text") or "").strip()
+        snippet = snippet[:500]
+        source = a.get("source_name") or a.get("domain") or a.get("source_domain") or a.get("source") or ""
+        url = a.get("url") or ""
+        art_lines.append(f"[{i}] Title: {title}\nSource: {source}\nURL: {url}\nContent: {snippet}\n")
+
+    body = "\n".join(art_lines)
+    return "".join(head) + f"\n=== TOPIC: {query} ===\n" + "\n=== ARTICLES DATA ===\n" + body
+
+
 # NOTE: GPT-5 service is injected as a singleton via constructor (self.gpt5)
 class AdvancedRSSBot:
     """Production Telegram bot with advanced features"""
@@ -1157,25 +1195,14 @@ class AdvancedRSSBot:
             }
             config = length_config.get(length, length_config['medium'])
 
-            # Use GPT-5 for analysis
-            analysis_prompt = f"""Analyze the following {len(articles)} news articles about '{query}'.
-
-STYLE: {config['style']}
-
-ARTICLES DATA:
-{self._format_articles_for_gpt(articles)}
-
-Provide a comprehensive analysis covering:
-1. Key themes and patterns
-2. Market trends and implications
-3. Sentiment analysis
-4. Important developments
-5. Future predictions based on data
-
- Format as structured report with emojis and clear sections."""
-
-            if grounded:
-                analysis_prompt += "\n\nCITATIONS: When stating facts or claims, include bracketed citations like [i] that refer to the Article i numbers in the ARTICLES DATA above. Keep citations concise and place them at sentence ends."
+            # Use GPT-5 for analysis with structured prompt
+            analysis_prompt = build_analysis_prompt(
+                query=query,
+                articles=articles,
+                length=length,
+                grounded=grounded,
+                structure_first=True,
+            )
 
             try:
                 try:
