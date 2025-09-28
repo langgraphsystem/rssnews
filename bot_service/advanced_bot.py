@@ -485,6 +485,14 @@ class AdvancedRSSBot:
                 no_results = self.formatter.format_no_results(query)
                 return await self._send_message(chat_id, no_results)
 
+            # Apply soft relevance filter on results for better ranking
+            try:
+                filtered = self.command_handler._soft_relevance_filter(query, response.results)
+                if filtered:
+                    response.results = filtered
+            except Exception as _soft_err:
+                logger.debug(f"Soft relevance filter skipped: {_soft_err}")
+
             # Format results
             message = self.formatter.format_search_results(response)
 
@@ -1514,10 +1522,13 @@ class AdvancedRSSBot:
 
             config = length_config.get(length, length_config['medium'])
 
-            summary_prompt = f"""Create a {config['style']} summary of the following {len(articles)} news articles about '{topic}':
+            # Keep a prompt slice for consistent indexing with sources
+            prompt_slice = articles[:20]
+
+            summary_prompt = f"""Create a {config['style']} summary of the following {len(prompt_slice)} news articles about '{topic}':
 
 ARTICLES:
-{self._format_articles_for_gpt(articles)}
+{self._format_articles_for_gpt(prompt_slice)}
 
 Requirements:
 - Style: {config['style']}
@@ -1533,14 +1544,33 @@ Requirements:
                 summary = self.gpt5.send_chat(summary_prompt, max_output_tokens=config['tokens'])
 
                 if summary:
-                    message = f"📝 **GPT-5 Summary: {topic.upper()}**\n\n"
-                    message += f"📊 **Sources:** {len(articles)} articles ({timeframe})\n"
-                    message += f"📏 **Format:** {length}\n\n"
-                    message += summary
+                    header = f"📝 <b>GPT-5 Summary: {self.formatter.esc(topic.upper())}</b>\n\n"
+                    header += f"📊 <b>Sources:</b> {len(articles)} articles ({self.formatter.esc(timeframe)})\n"
+                    header += f"📏 <b>Format:</b> {self.formatter.esc(length)}\n\n"
+                    message = header + summary
+
+                    # Build compact HTML sources block from the same prompt slice
+                    sources_payload: List[Dict[str, Any]] = []
+                    for a in prompt_slice[:7]:
+                        title = (a.get('title') or a.get('headline') or a.get('name') or 'Untitled').strip()[:160]
+                        url = a.get('url') or ''
+                        if url and not (url.startswith('http://') or url.startswith('https://')):
+                            continue
+                        src = (a.get('source') or a.get('domain') or a.get('source_domain') or '').lower()
+                        pub = a.get('published_at')
+                        if isinstance(pub, datetime):
+                            published_at = pub.isoformat()
+                        elif isinstance(pub, str):
+                            published_at = pub
+                        else:
+                            published_at = None
+                        sources_payload.append({'title': title, 'url': url, 'source_name': src, 'published_at': published_at})
+
+                    message = self.formatter.attach_sources(message, sources_payload)
                 else:
                     message = "❌ GPT-5 summarization failed. Please try again."
 
-                return await self._send_long_message(chat_id, message)
+                return await self._send_long_message(chat_id, message, parse_mode="HTML")
 
             except Exception as gpt5_error:
                 logger.error(f"GPT-5 summarize error: {gpt5_error}")
@@ -1578,13 +1608,16 @@ Requirements:
             if not articles:
                 return await self._send_message(chat_id, f"📭 No data available for timeframe {timeframe}")
 
+            # Keep a prompt slice for consistent sources rendering
+            prompt_slice = articles[:20]
+
             # Prepare aggregation prompt
-            aggregation_prompt = f"""Analyze and aggregate the following {len(articles)} news articles:
+            aggregation_prompt = f"""Analyze and aggregate the following {len(prompt_slice)} news articles:
 
 TASK: Aggregate '{metric}' grouped by '{groupby}' for timeframe '{timeframe}'
 
 DATA:
-{self._format_articles_for_gpt(articles, include_metadata=True)}
+{self._format_articles_for_gpt(prompt_slice, include_metadata=True)}
 
 Provide:
 1. Clear statistical breakdown
@@ -1602,16 +1635,34 @@ Format with charts, tables, and visual elements using emojis."""
                 aggregation = self.gpt5.send_analysis(aggregation_prompt, max_output_tokens=800)
 
                 if aggregation:
-                    message = f"📊 **GPT-5 Aggregation Report**\n\n"
-                    message += f"📈 **Metric:** {metric}\n"
-                    message += f"📋 **Grouped by:** {groupby}\n"
-                    message += f"📅 **Timeframe:** {timeframe}\n"
-                    message += f"📊 **Sample size:** {len(articles)} articles\n\n"
-                    message += aggregation
+                    header = "📊 <b>GPT-5 Aggregation Report</b>\n\n"
+                    header += f"📈 <b>Metric:</b> {self.formatter.esc(metric)}\n"
+                    header += f"📋 <b>Grouped by:</b> {self.formatter.esc(groupby)}\n"
+                    header += f"📅 <b>Timeframe:</b> {self.formatter.esc(timeframe)}\n"
+                    header += f"📊 <b>Sample size:</b> {len(articles)} articles\n\n"
+                    message = header + aggregation
+
+                    # Compact HTML sources from prompt slice
+                    sources_payload: List[Dict[str, Any]] = []
+                    for a in prompt_slice[:7]:
+                        title = (a.get('title') or a.get('headline') or a.get('name') or 'Untitled').strip()[:160]
+                        url = a.get('url') or ''
+                        if url and not (url.startswith('http://') or url.startswith('https://')):
+                            continue
+                        src = (a.get('source') or a.get('domain') or a.get('source_domain') or '').lower()
+                        pub = a.get('published_at')
+                        if isinstance(pub, datetime):
+                            published_at = pub.isoformat()
+                        elif isinstance(pub, str):
+                            published_at = pub
+                        else:
+                            published_at = None
+                        sources_payload.append({'title': title, 'url': url, 'source_name': src, 'published_at': published_at})
+                    message = self.formatter.attach_sources(message, sources_payload)
                 else:
                     message = "❌ GPT-5 aggregation failed. Please try again."
 
-                return await self._send_long_message(chat_id, message)
+                return await self._send_long_message(chat_id, message, parse_mode="HTML")
 
             except Exception as gpt5_error:
                 logger.error(f"GPT-5 aggregate error: {gpt5_error}")
