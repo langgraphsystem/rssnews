@@ -107,6 +107,56 @@ class AdvancedRSSBot:
         timestamp = datetime.utcnow().isoformat()
         return hashlib.md5(f"{user_id}_{timestamp}".encode()).hexdigest()[:16]
 
+    # ------------------------ Query helpers ------------------------
+    def _expand_query_for_disambiguation(self, query: str) -> str:
+        """Expand ambiguous short queries to steer hybrid search semantically.
+
+        Example: "trump ice" -> "trump ICE Immigration and Customs Enforcement DHS-ICE deportation detention"
+        """
+        q = (query or "").strip()
+        q_lower = q.lower()
+        tokens = q_lower.split()
+
+        expanded = [q]
+
+        # Heuristic: if 'ice' present but not accompanied by immigration/customs/enforcement words,
+        # add agency-related anchors to guide semantic retrieval.
+        has_ice = any(t == 'ice' for t in tokens)
+        has_agency_words = any(w in q_lower for w in [
+            'immigration', 'customs', 'enforcement', 'dhs-ice', 'deport', 'detention', 'asylum', 'border'
+        ])
+        if has_ice and not has_agency_words:
+            expanded += [
+                'Immigration and Customs Enforcement',
+                'DHS-ICE', 'ICE agents', 'ICE field office',
+                'immigration enforcement', 'deportation', 'detention'
+            ]
+
+        # If query is very short (<=2 words), add a few generic news anchors to avoid sports/weather noise.
+        if len(tokens) <= 2:
+            expanded += ['US policy', 'federal agency', 'news']
+
+        return ' '.join(expanded)
+
+    def _article_is_relevant(self, a: Dict[str, Any], require_trump: bool) -> bool:
+        """Light-weight relevance check to weed out sports/weather collisions for 'ICE'."""
+        text = ' '.join([
+            str(a.get('title') or a.get('headline') or a.get('name') or ''),
+            str(a.get('content') or a.get('description') or a.get('summary') or a.get('text') or ''),
+        ]).lower()
+        # Must include at least one immigration/ICE-agency signal
+        signals = ['immigration', 'customs', 'enforcement', 'dhs-ice', 'ice field office', 'ice agents', 'deport', 'detention', 'asylum', 'border']
+        has_signal = any(s in text for s in signals)
+        if not has_signal:
+            return False
+        if require_trump and 'trump' not in text:
+            return False
+        # Filter out obvious sports/weather collisions
+        noise = ['football', 'soccer', 'nba', 'mlb', 'nhl', 'tennis', 'golf', 'arsenal', 'match', 'fixture', 'forecast', 'hurricane']
+        if any(n in text for n in noise) and not ('immigration' in text or 'ice field office' in text):
+            return False
+        return True
+
     def _check_rate_limit(self, user_id: str) -> bool:
         """Check if user is within rate limits"""
         now = datetime.utcnow()
@@ -1093,12 +1143,15 @@ Provide a comprehensive analysis covering:
                         domains[d] = domains.get(d, 0) + 1
                     top_domains = sorted(domains.items(), key=lambda x: x[1], reverse=True)[:5]
 
-                    # Most recent 5 links
+                    # Prefer 5 most recent relevant links
                     def _adate(a):
                         dt = a.get('published_at')
                         return dt if isinstance(dt, datetime) else (datetime.fromisoformat(dt) if isinstance(dt, str) and len(dt) >= 10 else datetime.min)
 
-                    showcase = sorted(articles, key=_adate, reverse=True)[:5]
+                    require_trump = 'trump' in (query or '').lower()
+                    rel_list = [a for a in articles if self._article_is_relevant(a, require_trump=require_trump)]
+                    source_pool = rel_list or articles
+                    showcase = sorted(source_pool, key=_adate, reverse=True)[:5]
                     links_lines: List[str] = []
                     for a in showcase:
                         t = (a.get('title') or a.get('headline') or a.get('name') or '').strip()[:160]
@@ -1113,7 +1166,7 @@ Provide a comprehensive analysis covering:
                     # Timeline by day
                     from collections import Counter
                     buckets = Counter()
-                    for a in articles:
+                    for a in (rel_list or articles):
                         dt = a.get('published_at')
                         if isinstance(dt, datetime):
                             day = dt.date().isoformat()
@@ -1804,11 +1857,16 @@ Use emojis, percentages, and visual formatting."""
             else:
                 # Use search functionality
                 from ranking_api import SearchRequest
-                request = SearchRequest(query=query, method='hybrid', limit=50)
+                expanded_q = self._expand_query_for_disambiguation(query)
+                request = SearchRequest(query=expanded_q, method='hybrid', limit=50, filters={'time_range': timeframe})
                 response = await self.ranking_api.search(request)
                 articles = response.results if response else []
 
-            return articles[:30]  # Limit for GPT-5 context
+            # Apply relevance filter for ambiguous topics (e.g., ICE agency)
+            require_trump = 'trump' in (query or '').lower()
+            filtered = [a for a in (articles or []) if self._article_is_relevant(a, require_trump=require_trump)]
+            chosen = (filtered or articles)[:30]
+            return chosen
 
         except Exception as e:
             logger.error(f"Error getting articles for analysis: {e}")
