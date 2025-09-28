@@ -4,8 +4,12 @@ Handles complex command processing and state management
 """
 
 import logging
+import re
+from urllib.parse import urlparse
+from collections import Counter
+from functools import lru_cache
 from datetime import datetime
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Tuple, Set
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +23,123 @@ class CommandHandler:
 
         # Command state tracking
         self.command_states = {}  # user_id -> command_state
+
+    # ---------- Generic soft relevance helpers (query-driven) ----------
+    @staticmethod
+    def _short_domain(url: str) -> str:
+        try:
+            d = urlparse(url).netloc.lower()
+            if d.startswith("www."):
+                d = d[4:]
+            return d
+        except Exception:
+            return ""
+
+    @staticmethod
+    def _normalize_text(s: Optional[str]) -> str:
+        s = (s or "").lower()
+        return re.sub(r"[^a-z0-9\/\-\._\s]", " ", s)
+
+    @staticmethod
+    def _tokenize(s: str) -> List[str]:
+        return [t for t in re.split(r"\s+|[\/\-\._]", s) if t]
+
+    @staticmethod
+    def _ngrams(tokens: List[str], n: int) -> Set[str]:
+        return {" ".join(tokens[i:i+n]) for i in range(len(tokens)-n+1)} if n > 1 else set(tokens)
+
+    @staticmethod
+    def _top_level_domain(domain: str) -> str:
+        parts = domain.split(".")
+        return parts[-1] if parts else ""
+
+    @staticmethod
+    @lru_cache(maxsize=256)
+    def _synonyms_for_query(raw_query: str) -> Set[str]:
+        q = raw_query.lower()
+        synonyms_map = {
+            "immigration and customs enforcement": {"dhs ice","immigration enforcement","enforcement and removal operations","ero","homeland security investigations","hsi"},
+            "customs and border protection": {"cbp","border patrol","ports of entry"},
+            "department of homeland security": {"dhs","homeland security"},
+            "supreme court": {"scotus","supreme court of the united states"},
+            "federal reserve": {"the fed","us central bank"},
+        }
+        syns: Set[str] = set()
+        for key, vals in synonyms_map.items():
+            if key in q:
+                syns |= vals
+        return syns
+
+    def _build_positive_cues(self, query: str) -> Set[str]:
+        qn = self._normalize_text(query)
+        toks = self._tokenize(qn)
+        cues: Set[str] = set(toks)
+        cues |= self._ngrams(toks, 2)
+        cues |= self._ngrams(toks, 3)
+        cues |= self._synonyms_for_query(query)
+        STOP = {"the","a","an","of","and","or","in","on","for","to","with","news","update","today","latest"}
+        return {c for c in cues if c and c not in STOP and len(c) > 1}
+
+    def _score_article(self, article: Dict[str, Any], cues: Set[str]) -> Tuple[float, Dict[str, int]]:
+        """Return (score, evidence_counts). Higher score => more relevant."""
+        title = self._normalize_text(article.get("title"))
+        content = self._normalize_text(article.get("content") or article.get("description"))
+        url = (article.get("url") or "")
+        dom = self._short_domain(url)
+        path = self._normalize_text(url)
+        ents = [self._normalize_text(e) for e in (article.get("entities") or [])]
+
+        NOISE = {"football","soccer","hockey","forecast","weather","nhl","odds","bet","coupon","promo","recipe","cooking","celebrity","gossip","horoscope"}
+
+        score = 0.0
+        ev = Counter()
+
+        for cue in cues:
+            if cue in title:
+                score += 2.5; ev["title"] += 1
+            if cue in content:
+                score += 1.5; ev["content"] += 1
+            if cue in path:
+                score += 1.0; ev["url"] += 1
+            if cue and ents and any(cue in e for e in ents):
+                score += 1.5; ev["entities"] += 1
+
+        TRUSTED = {"apnews.com","reuters.com","nytimes.com","washingtonpost.com","wsj.com","bbc.com","theguardian.com","npr.org","bloomberg.com","axios.com","politico.com","ft.com"}
+        tld = self._top_level_domain(dom)
+        if tld in {"gov","edu"}:
+            score += 2.0; ev["domain_trusted"] += 1
+        if dom in TRUSTED:
+            score += 1.5; ev["domain_major_media"] += 1
+
+        text = f"{title}\n{content}"
+        if any(n in text for n in NOISE) and score < 2.0:
+            score -= 2.0; ev["noise"] += 1
+
+        if any(h in path for h in ("/policy/","/regulation","/court","/law","/case","/immigration","/agency","/press/")):
+            score += 0.5; ev["url_hint"] += 1
+
+        return score, ev
+
+    def _soft_relevance_filter(self, query: str, results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Generic soft filter: score by cues from query and keep top items.
+
+        - Build cues = tokens + n-grams + synonyms; score by title/content/url/entities.
+        - Drop obvious noise; keep top-30 sorted by score; ensure len>=0.
+        """
+        if not results:
+            return results
+        cues = self._build_positive_cues(query)
+        scored: List[Tuple[float, Dict[str, Any]]] = []
+        for r in results:
+            s, _ = self._score_article(r, cues)
+            r["_soft_score"] = s
+            scored.append((s, r))
+        kept = [r for (s, r) in scored if s >= 0.5]
+        if len(kept) < 30:
+            kept = [r for (s, r) in sorted(scored, key=lambda x: x[0], reverse=True)[:30]]
+        else:
+            kept = sorted(kept, key=lambda x: x.get("_soft_score", 0), reverse=True)[:30]
+        return kept
 
     def _update_command_state(self, user_id: str, state: Dict[str, Any]):
         """Update user command state"""

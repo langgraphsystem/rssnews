@@ -67,7 +67,7 @@ class TrendsService:
             with self.db._cursor() as cur:
                 cur.execute(
                     """
-                    SELECT ai.article_id, ai.url, ai.source, ai.domain,
+                    SELECT ai.article_id, ai.url, ai.source,
                            ai.title_norm, ai.clean_text, ai.published_at,
                            ac.embedding
                     FROM articles_index ai
@@ -79,7 +79,6 @@ class TrendsService:
                         LIMIT 1
                     ) ac ON TRUE
                     WHERE ai.published_at >= NOW() - (%s || ' hours')::interval
-                      AND (ai.is_canonical IS TRUE OR ai.is_canonical IS NULL)
                     ORDER BY ai.published_at DESC NULLS LAST
                     LIMIT %s
                     """,
@@ -166,6 +165,10 @@ class TrendsService:
                     continue
             elif not isinstance(dt, datetime):
                 continue
+
+            # Handle timezone-aware datetimes from database
+            if hasattr(dt, 'tzinfo') and dt.tzinfo is not None:
+                dt = dt.replace(tzinfo=None)
 
             delta = now - dt
             h = int(delta.total_seconds() // 3600)

@@ -16,7 +16,9 @@
       "Bash(git commit:*)",
       "Bash(git push:*)",
       "Bash(echo $PG_DSN)",
-      "Bash(del test_analyze_cycle.py)"
+      "Bash(del test_analyze_cycle.py)",
+      "Bash(git reset:*)",
+      "Bash(find:*)"
     ],
     "deny": [],
     "ask": []

@@ -4,6 +4,8 @@ Handles formatting of search results, explanations, and UI elements
 """
 
 import logging
+import html
+from urllib.parse import urlparse
 from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional
 
@@ -17,6 +19,23 @@ class MessageFormatter:
         self.max_title_length = 80
         self.max_snippet_length = 200
         self.max_results_per_message = 8
+        # Use HTML for safer links and fewer parse errors (consumed optionally by caller)
+        self.parse_mode = "HTML"
+
+    # ---------- Safe escaping helpers ----------
+    @staticmethod
+    def esc(s: Optional[str]) -> str:
+        return html.escape(s or "", quote=True)
+
+    @staticmethod
+    def short_domain(url: str) -> str:
+        try:
+            d = urlparse(url).netloc.lower()
+            if d.startswith("www."):
+                d = d[4:]
+            return d
+        except Exception:
+            return ""
 
     def _escape_markdown(self, text: str) -> str:
         """Escape markdown special characters"""
@@ -450,3 +469,45 @@ Query: `{self._escape_markdown(query)}`
                 lines.append(f"• {self._escape_markdown(penalty)}")
 
         return "\n".join(lines)
+
+    # ---------- Compact Sources block (one-line per source) ----------
+    def _render_source_line(
+        self,
+        idx: int,
+        title: str,
+        url: str,
+        published_at: Optional[str] = None,
+        source_name: Optional[str] = None,
+    ) -> str:
+        dom = source_name or self.short_domain(url)
+        date = f" · {self.esc(published_at[:10])}" if published_at else ""
+        # <a href="...">Title — domain</a> · YYYY-MM-DD
+        return f'{idx}. <a href="{self.esc(url)}">{self.esc(title)} — {self.esc(dom)}</a>{date}'
+
+    def render_sources_block(self, sources: List[Dict[str, Any]]) -> str:
+        """
+        sources: list of dicts with keys {title, url, source_name?, published_at?}
+        Produces compact, clickable lines without exposing raw URLs in the body.
+        """
+        if not sources:
+            return ""
+        lines: List[str] = []
+        for i, s in enumerate(sources[:7], start=1):
+            lines.append(
+                self._render_source_line(
+                    i,
+                    s.get("title") or "(untitled)",
+                    s.get("url") or "#",
+                    s.get("published_at"),
+                    s.get("source_name"),
+                )
+            )
+        return "📚 <b>Sources</b>\n" + "\n".join(lines)
+
+    def attach_sources(self, body_html: str, sources: List[Dict[str, Any]]) -> str:
+        """Convenience wrapper used by callers that previously formatted sources inline."""
+        block = self.render_sources_block(sources)
+        if not block:
+            return body_html
+        joiner = "\n\n" if body_html else ""
+        return f"{body_html}{joiner}{block}"

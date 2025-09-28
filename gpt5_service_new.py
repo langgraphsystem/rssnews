@@ -165,6 +165,35 @@ class GPT5Service:
 
         return model_id
 
+    # -------------------- Helpers for article context --------------------
+    def _format_articles_for_gpt(
+        self,
+        articles: List[Dict[str, Any]],
+        max_items: int = 20,
+        grounded: bool = False,
+    ) -> str:
+        """Format articles into compact blocks for GPT prompts.
+
+        When grounded=True include Source and URL to help the model anchor citations.
+        Otherwise keep lean (no URLs) to save tokens.
+        """
+        if not articles:
+            return ""
+
+        lines: List[str] = []
+        for i, a in enumerate(articles[:max_items], start=1):
+            title = (a.get("title") or a.get("headline") or a.get("name") or "").strip()
+            content = (a.get("content") or a.get("description") or a.get("summary") or a.get("text") or "").strip()
+            content = content[:500]
+            if grounded:
+                src = (a.get("source_name") or a.get("domain") or a.get("source_domain") or a.get("source") or "").strip()
+                url = (a.get("url") or "").strip()
+                lines.append(f"[{i}] Title: {title}\nSource: {src}\nURL: {url}\nContent: {content}\n")
+            else:
+                lines.append(f"[{i}] Title: {title}\nContent: {content}\n")
+
+        return "\n".join(lines)
+
     def _extract_output_text(self, resp: Any, logger) -> str:
         """Best-effort extraction of text from a Responses API response object."""
         # 1) Direct convenience field

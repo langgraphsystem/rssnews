@@ -581,12 +581,10 @@ class ProductionDBClient(PgClient):
             with self._cursor() as cur:
                 cur.execute("""
                     SELECT
-                        ai.article_id, ai.url, ai.source, ai.domain,
-                        ai.title_norm, ai.clean_text, ai.published_at,
-                        ai.source_score
+                        ai.article_id, ai.url, ai.source,
+                        ai.title_norm, ai.clean_text, ai.published_at
                     FROM articles_index ai
                     WHERE ai.published_at >= NOW() - (%s || ' hours')::interval
-                      AND (ai.is_canonical IS TRUE OR ai.is_canonical IS NULL)
                       AND ai.title_norm IS NOT NULL
                     ORDER BY ai.published_at DESC NULLS LAST
                     LIMIT %s

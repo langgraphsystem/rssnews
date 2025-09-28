@@ -10,6 +10,10 @@ import asyncio
 import logging
 import argparse
 from datetime import datetime
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Setup logging
 logging.basicConfig(

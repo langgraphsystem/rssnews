@@ -11,6 +11,10 @@ import logging
 import httpx
 from datetime import datetime
 import signal
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Add parent directory to path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
