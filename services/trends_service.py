@@ -42,6 +42,7 @@ class TrendTopic:
 class TrendsService:
     def __init__(self, db: ProductionDBClient, *, cache_ttl_seconds: int = 600) -> None:
         self.db = db
+        # Optional fallback generator; main path uses embeddings from DB (pgvector/JSON)
         self.embedder = LocalEmbeddingGenerator()
         self._cache: Dict[str, Tuple[float, Dict[str, Any]]] = {}
         self.cache_ttl = cache_ttl_seconds
@@ -60,26 +61,34 @@ class TrendsService:
         self._cache[key] = (time.time(), value)
 
     # ----------------------- Data fetch -----------------------
-    def _fetch_recent_articles(self, hours: int, limit: int) -> List[Dict[str, Any]]:
+    def _fetch_articles_with_embeddings(self, hours: int, limit: int) -> List[Dict[str, Any]]:
+        """Fetch recent canonical articles with one representative chunk embedding each."""
         try:
-            # Prefer canonical articles, most recent first
-            with self.db._cursor() as cur:  # using internal cursor helper as elsewhere in repo
+            with self.db._cursor() as cur:
                 cur.execute(
                     """
-                    SELECT article_id, url, source, domain, title_norm, clean_text, published_at
-                    FROM articles_index
-                    WHERE published_at >= NOW() - INTERVAL %s
-                      AND (is_canonical IS TRUE OR is_canonical IS NULL)
-                    ORDER BY published_at DESC NULLS LAST
+                    SELECT ai.article_id, ai.url, ai.source, ai.domain,
+                           ai.title_norm, ai.clean_text, ai.published_at,
+                           ac.embedding
+                    FROM articles_index ai
+                    JOIN LATERAL (
+                        SELECT ac.embedding
+                        FROM article_chunks ac
+                        WHERE ac.article_id = ai.article_id AND ac.embedding IS NOT NULL
+                        ORDER BY ac.chunk_index ASC
+                        LIMIT 1
+                    ) ac ON TRUE
+                    WHERE ai.published_at >= NOW() - (%s || ' hours')::interval
+                      AND (ai.is_canonical IS TRUE OR ai.is_canonical IS NULL)
+                    ORDER BY ai.published_at DESC NULLS LAST
                     LIMIT %s
                     """,
-                    (f"{hours} hours", limit),
+                    (int(hours), limit),
                 )
                 cols = [d[0] for d in cur.description]
-                rows = cur.fetchall()
-                return [dict(zip(cols, r)) for r in rows]
+                return [dict(zip(cols, r)) for r in cur.fetchall()]
         except Exception as e:
-            logger.error(f"Failed to fetch recent articles: {e}")
+            logger.error(f"Failed to fetch articles with embeddings: {e}")
             return []
 
     # ----------------------- Embeddings -----------------------
@@ -203,14 +212,40 @@ class TrendsService:
         else:
             hours = 24
 
-        articles = self._fetch_recent_articles(hours, limit)
-        if not articles:
+        # Fetch articles paired with an embedding from DB
+        rows = self._fetch_articles_with_embeddings(hours, limit)
+        if not rows:
             payload = {"status": "ok", "data": [], "errors": ["no_data"]}
             self._cache_set(cache_key, payload)
             return payload
 
-        texts = self._prepare_texts(articles)
-        embs = self.embedder.generate_embeddings_sync(texts)
+        # Prepare texts and parse embeddings
+        texts: List[str] = []
+        embs: List[Optional[List[float]]] = []
+        def _parse_embedding(val: Any) -> Optional[List[float]]:
+            try:
+                if val is None:
+                    return None
+                if isinstance(val, list):
+                    return [float(x) for x in val]
+                if isinstance(val, (bytes, bytearray, memoryview)):
+                    s = bytes(val).decode('utf-8', errors='ignore')
+                else:
+                    s = str(val)
+                s = s.strip()
+                if s.startswith('[') and s.endswith(']'):
+                    import json as _json
+                    return [float(x) for x in _json.loads(s)]
+                # Fallback: split by comma
+                if ',' in s:
+                    return [float(x.strip()) for x in s.strip('[]').split(',')]
+            except Exception:
+                return None
+            return None
+
+        for r in rows:
+            texts.append(self._prepare_texts([r])[0])
+            embs.append(_parse_embedding(r.get('embedding')))
 
         labels = self._cluster(embs)
         if labels.size == 0:
@@ -230,12 +265,12 @@ class TrendsService:
 
         topics: List[TrendTopic] = []
         for cid, idxs in label_to_indices.items():
-            dt_list = [articles[i]["published_at"] for i in idxs if articles[i].get("published_at")]
+            dt_list = [rows[i]["published_at"] for i in idxs if rows[i].get("published_at")]
             series = self._hour_buckets(dt_list, min(hours, 48))
             momentum, burst = self._momentum_and_burst(series)
             # pick showcase articles (top 3 most recent)
             showcase = sorted(
-                (articles[i] for i in idxs), key=lambda a: a.get("published_at") or datetime.min, reverse=True
+                (rows[i] for i in idxs), key=lambda a: a.get("published_at") or datetime.min, reverse=True
             )[:3]
             top_articles = [
                 {"title": (a.get("title_norm") or "").strip()[:140], "source": a.get("domain") or a.get("source"), "url": a.get("url")}
