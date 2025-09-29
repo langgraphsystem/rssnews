@@ -77,10 +77,20 @@ class BotRunner:
                 logger.error(f"❌ GPT5Service initialization failed: {gpt_error}")
                 return False
 
-            # Initialize bot with GPT5Service
+            # Initialize Claude Service (optional)
+            claude_service = None
+            try:
+                from services.claude_service import create_claude_service
+                claude_service = create_claude_service()
+                logger.info("✅ Claude Service initialized")
+            except Exception as claude_error:
+                logger.warning(f"⚠️ Claude Service initialization failed: {claude_error}")
+                logger.info("📊 Trends will use basic format without Claude enhancement")
+
+            # Initialize bot with both GPT5 and Claude services
             from bot_service.advanced_bot import AdvancedRSSBot
-            self.bot = AdvancedRSSBot(self.bot_token, gpt5_service=gpt5)
-            logger.info("✅ Bot initialized successfully with GPT-5 singleton")
+            self.bot = AdvancedRSSBot(self.bot_token, gpt5_service=gpt5, claude_service=claude_service)
+            logger.info("✅ Bot initialized successfully with AI services")
             return True
 
         except Exception as e:

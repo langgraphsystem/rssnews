@@ -82,7 +82,7 @@ def build_analysis_prompt(query: str, articles: List[Dict[str, Any]], length: st
 class AdvancedRSSBot:
     """Production Telegram bot with advanced features"""
 
-    def __init__(self, bot_token: str, ranking_api: RankingAPI = None, gpt5_service=None):
+    def __init__(self, bot_token: str, ranking_api: RankingAPI = None, gpt5_service=None, claude_service=None):
         logger.info("🤖 Initializing Advanced RSS Bot...")
 
         if not bot_token:
@@ -100,6 +100,13 @@ class AdvancedRSSBot:
             logger.info("✅ GPT5Service singleton attached to bot")
         else:
             logger.warning("⚠️ No GPT5Service provided - GPT commands will be disabled")
+
+        # Store Claude Service
+        self.claude = claude_service
+        if self.claude:
+            logger.info("✅ Claude Service attached to bot")
+        else:
+            logger.warning("⚠️ No Claude Service provided - enhanced trends will fallback to basic format")
 
         try:
             logger.info("🔧 Initializing ranking API...")
@@ -581,7 +588,7 @@ class AdvancedRSSBot:
             return await self._send_message(chat_id, f"❌ Question processing failed: {e}")
 
     async def handle_trends_command(self, chat_id: str, user_id: str, args: List[str] = None) -> bool:
-        """Handle /trends command with optional time period"""
+        """Handle /trends command with optional time period and Claude enhancement"""
         try:
             # Parse time window from args
             if args and len(args) > 0:
@@ -594,10 +601,43 @@ class AdvancedRSSBot:
 
             await self._send_message(chat_id, f"📈 Сбор тем и ключевых слов за {display_window}...")
 
-            # Compute or fetch cached trends
-            payload = await asyncio.to_thread(self.trends_service.build_trends, time_window, 600, 10)
-            message = self.trends_service.format_trends_markdown(payload, window=time_window)
+            # Step 1: Get basic trends data
+            trends_payload = await asyncio.to_thread(self.trends_service.build_trends, time_window, 600, 10)
 
+            # Step 2: Try to enhance with Claude analysis
+            message = None
+            claude_success = False
+
+            if self.claude and trends_payload.get("status") == "ok":
+                try:
+                    # Send "analyzing" message
+                    await self._send_message(chat_id, "🤖 Claude анализирует тренды...")
+
+                    # Prepare data for Claude
+                    claude_input = self.trends_service.prepare_for_claude(trends_payload, top_n=5)
+
+                    if "error" not in claude_input:
+                        # Get Claude analysis
+                        claude_analysis = await self.claude.analyze_trends(claude_input)
+
+                        # Format Claude enhanced message
+                        message = self.trends_service.format_claude_enhanced_trends(claude_analysis, time_window)
+                        claude_success = True
+                        logger.info("✅ Claude enhanced trends generated successfully")
+
+                    else:
+                        logger.warning(f"Claude input preparation failed: {claude_input.get('error')}")
+
+                except Exception as claude_error:
+                    logger.error(f"Claude analysis failed: {claude_error}")
+                    # Claude failed, will fallback to basic trends
+
+            # Step 3: Fallback to basic trends if Claude failed or unavailable
+            if not claude_success:
+                message = self.trends_service.format_trends_markdown(trends_payload, window=time_window)
+                logger.info("📊 Using basic trends format (Claude unavailable or failed)")
+
+            # Create buttons
             buttons = [
                 [
                     {"text": "🔄 Обновить", "callback_data": f"trends:refresh:{time_window}"},
@@ -605,10 +645,16 @@ class AdvancedRSSBot:
                 ]
             ]
 
+            # Add Claude toggle button if service is available
+            if self.claude:
+                claude_mode_button = "🧠 Claude OFF" if claude_success else "🧠 Claude ON"
+                claude_callback = f"trends:toggle_claude:{time_window}"
+                buttons.append([{"text": claude_mode_button, "callback_data": claude_callback}])
+
             markup = self._create_inline_keyboard(buttons)
 
-            # HTML formatting used for links
-            return await self._send_long_message(chat_id, message)
+            # Send the final message
+            return await self._send_long_message(chat_id, message, markup)
 
         except Exception as e:
             logger.error(f"Trends command failed: {e}")
@@ -693,16 +739,23 @@ class AdvancedRSSBot:
                 )
 
             elif action == "trends":
-                # e.g., "refresh" or "refresh:1w"
+                # Handle different trends actions: "refresh:1w", "toggle_claude:24h"
                 if data.startswith("refresh"):
                     # Parse time window from callback data
                     parts = data.split(":", 1)
                     time_window = parts[1] if len(parts) > 1 else "24h"
 
-                    # Rebuild trends for specified window
-                    payload = await asyncio.to_thread(self.trends_service.build_trends, time_window, 600, 10)
-                    message = self.trends_service.format_trends_markdown(payload, window=time_window)
-                    return await self._send_long_message(chat_id, message)
+                    # Use the full trends command handler for consistency
+                    return await self.handle_trends_command(chat_id, user_id, [time_window])
+
+                elif data.startswith("toggle_claude"):
+                    # Toggle Claude mode for trends - not implemented yet, just refresh
+                    parts = data.split(":", 1)
+                    time_window = parts[1] if len(parts) > 1 else "24h"
+
+                    # For now, just refresh trends (Claude toggle could be implemented later)
+                    return await self.handle_trends_command(chat_id, user_id, [time_window])
+
                 return False
 
             elif action == "analyze":
