@@ -1,4 +1,4 @@
-﻿"""
+"""
 Advanced RSS News Telegram Bot
 Production-ready bot with search, ask, trends, and user management
 """
@@ -1352,7 +1352,7 @@ class AdvancedRSSBot:
                     # Timeline by day
                     from collections import Counter
                     buckets = Counter()
-                    for a in (rel_list or articles):
+                    for a in articles:
                         dt = a.get('published_at')
                         if isinstance(dt, datetime):
                             day = dt.date().isoformat()

@@ -1,0 +1,361 @@
+                message += "• `cache_settings` - Cache configuration\n"
+                message += "• `search_limits` - Search result limits\n\n"
+                message += "💡 Use `/dbconfig show key` to view specific settings"
+                return await self._send_message(chat_id, message)
+
+            action = args[0].lower()
+
+            if action == 'show':
+                message = f"⚙️ **Current Configuration:**\n\n"
+                message += f"• Semantic weight: 0.58\n"
+                message += f"• FTS weight: 0.32\n"
+                message += f"• Freshness weight: 0.06\n"
+                message += f"• Source weight: 0.04\n\n"
+                message += f"💡 Configuration loaded from environment variables"
+                return await self._send_message(chat_id, message)
+
+            else:
+                message = f"🔧 **Config Action:** {action}\n"
+                message += f"💡 Configuration management available"
+                return await self._send_message(chat_id, message)
+
+        except Exception as e:
+            logger.error(f"DB config command failed: {e}")
+            return await self._send_message(chat_id, f"❌ Config operation failed: {e}")
+
+    async def handle_analyze_command(self, chat_id: str, user_id: str, args: List[str]) -> bool:
+        """Handle /analyze command - GPT-5 powered data analysis
+
+        Usage:
+          /analyze [query] [length?] [timeframe?]
+          length: short | medium | detailed | executive (optional)
+          timeframe: 1h, 6h, 12h, 1d, 3d, 7d, 1w, 2w, 1m, 3m (optional)
+        """
+        try:
+            start_ts = time.monotonic()
+            logger.info(f"🧪 [ANALYZE_CHECK] Start /analyze, raw_args={args}")
+            if not args:
+                help_text = "🔬 **GPT-5 Data Analysis Help**\n\n"
+                help_text += "**Usage:** `/analyze [query] [length] [timeframe]`\n\n"
+                help_text += "**Examples:**\n"
+                help_text += "• `/analyze AI trends detailed 7d` - Detailed analysis for last 7 days\n"
+                help_text += "• `/analyze \"Immigration and Customs Enforcement\" executive 1w`\n"
+                help_text += "• `/analyze tech earnings short` - Short recent analysis\n\n"
+                help_text += "**Lengths:** short, medium, detailed, executive\n"
+                help_text += "**Timeframes:** 1h, 6h, 12h, 1d, 3d, 7d, 1w, 2w, 1m, 3m"
+                return await self._send_message(chat_id, help_text)
+
+            # Parse: detect timeframe and optional length from the end
+            timeframe_tokens = {"1h","6h","12h","1d","3d","7d","1w","2w","1m","3m"}
+            length_tokens = {"short","medium","detailed","executive"}
+            flag_tokens = {"sources","grounded","citations"}
+
+            tokens = [t.strip() for t in args]
+            timeframe = '7d'
+            length = 'medium'
+            grounded = False
+            if tokens and tokens[-1].lower() in timeframe_tokens:
+                timeframe = tokens.pop().lower()
+            if tokens and tokens[-1].lower() in length_tokens:
+                length = tokens.pop().lower()
+            # Optional flags (can appear at end in any order)
+            while tokens and tokens[-1].lower() in flag_tokens:
+                tok = tokens.pop().lower()
+                if tok in ("sources","grounded","citations"):
+                    grounded = True
+            query = " ".join(tokens).strip() or args[0]
+            # Strip surrounding quotes if provided
+            if (query.startswith('"') and query.endswith('"')) or (query.startswith("'") and query.endswith("'")):
+                query = query[1:-1].strip()
+
+            logger.info(f"🧪 [ANALYZE_CHECK] Parsed query='{query}', length='{length}', timeframe='{timeframe}', grounded={grounded}")
+
+            await self._send_message(chat_id, f"🔬 GPT-5 analyzing '{query}' ({length}) data for {timeframe}...")
+
+            # Get articles for analysis
+            articles = await self._get_articles_for_analysis(query, timeframe)
+            logger.info(f"🧪 [ANALYZE_CHECK] Articles fetched: count={len(articles) if articles else 0}")
+
+            if not articles:
+                logger.info("🧪 [ANALYZE_CHECK] No articles found; aborting")
+                return await self._send_message(chat_id, f"📭 No articles found for '{query}' in timeframe {timeframe}")
+
+            if not self.gpt5:
+                logger.warning("🧪 [ANALYZE_CHECK] GPT5Service is not attached")
+                return await self._send_message(chat_id, "❌ GPT-5 service not available")
+
+            # Length configurations for analysis style
+            length_config = {
+                'short': {'tokens': 250, 'style': 'brief bullet points'},
+                'medium': {'tokens': 500, 'style': 'structured paragraphs'},
+                'detailed': {'tokens': 900, 'style': 'comprehensive analysis'},
+                'executive': {'tokens': 350, 'style': 'executive summary with key actions'}
+            }
+            config = length_config.get(length, length_config['medium'])
+
+            # Use a single slice for prompt and sources to align [i] indices
+            prompt_slice = articles[:20]
+            # Use GPT-5 for analysis with structured prompt
+            analysis_prompt = build_analysis_prompt(
+                query=query,
+                articles=prompt_slice,
+                length=length,
+                grounded=grounded,
+                structure_first=True,
+            )
+
+            try:
+                try:
+                    chosen_model = self.gpt5.choose_model("analysis")
+                except Exception:
+                    chosen_model = "<unknown>"
+                logger.info(f"🧪 [ANALYZE_CHECK] Chosen model: {chosen_model}")
+                logger.info(f"🧪 [ANALYZE_CHECK] Prompt length: {len(analysis_prompt)}")
+
+                analysis = self.gpt5.send_analysis(analysis_prompt, max_output_tokens=config['tokens'])
+                logger.info(f"🧪 [ANALYZE_CHECK] Analysis text length: {len(analysis) if analysis else 0}")
+
+                if analysis and analysis.strip():
+                    # Build Table of Contents
+                    toc = (
+                        "📑 Table of contents\n"
+                        "- Executive summary\n"
+                        "- Key themes\n"
+                        "- Sentiment\n"
+                        "- Important developments\n"
+                        "- Predictions\n"
+                        "- Sources & Links\n"
+                        "- Metrics & Timeline\n\n"
+                    )
+
+                    # Top domains and key links/quotes (compact HTML sources later)
+                    def _domain_of(a: Dict[str, Any]) -> str:
+                        u = a.get('url') or ''
+                        net = urlparse(u).netloc if u else ''
+                        return (a.get('source_domain') or a.get('domain') or a.get('source') or net or 'unknown').lower()
+
+                    domains: Dict[str, int] = {}
+                    for a in articles:
+                        d = _domain_of(a)
+                        domains[d] = domains.get(d, 0) + 1
+                    top_domains = sorted(domains.items(), key=lambda x: x[1], reverse=True)[:5]
+
+                    # Prefer 5 most recent relevant links
+                    def _adate(a):
+                        dt = a.get('published_at')
+                        return dt if isinstance(dt, datetime) else (datetime.fromisoformat(dt) if isinstance(dt, str) and len(dt) >= 10 else datetime.min)
+
+                    # Keep source order consistent with prompt enumeration so [i] indices align
+                    showcase = prompt_slice[:7]
+                    # Prepare compact sources payload for HTML rendering
+                    sources_payload: List[Dict[str, Any]] = []
+                    for a in showcase:
+                        title = (a.get('title') or a.get('headline') or a.get('name') or 'Untitled').strip()[:160]
+                        url = a.get('url') or ''
+                        if url and not (url.startswith('http://') or url.startswith('https://')):
+                            continue
+                        src = (a.get('source') or a.get('domain') or a.get('source_domain') or '').lower()
+                        pub = a.get('published_at')
+                        if isinstance(pub, datetime):
+                            published_at = pub.isoformat()
+                        elif isinstance(pub, str):
+                            published_at = pub
+                        else:
+                            published_at = None
+                        sources_payload.append({
+                            'title': title,
+                            'url': url,
+                            'source_name': src,
+                            'published_at': published_at,
+                        })
+
+                    # Timeline by day
+                    from collections import Counter
+                    buckets = Counter()
+                    for a in (rel_list or articles):
+                        dt = a.get('published_at')
+                        if isinstance(dt, datetime):
+                            day = dt.date().isoformat()
+                        elif isinstance(dt, str) and len(dt) >= 10:
+                            day = dt[:10]
+                        else:
+                            continue
+                        buckets[day] += 1
+                    timeline_lines = [f"{day}: {cnt}" for day, cnt in sorted(buckets.items())]
+
+                    # Compact sources rendered as HTML links "Title — domain · YYYY-MM-DD"
+                    sources_section = self.formatter.render_sources_block(sources_payload)
+
+                    # Optional citations map if grounded — aligned with prompt_slice order
+                    if grounded:
+                        citations: Dict[str, str] = {}
+                        idx_i = 1
+                        for a in prompt_slice:
+                            u = a.get('url') or ''
+                            if u and (u.startswith('http://') or u.startswith('https://')):
+                                citations[str(idx_i)] = u
+                            idx_i += 1
+
+                    metrics_section = "\n".join([
+                        ("Top domains: " + ", ".join([f"{d} ({c})" for d, c in top_domains])) if top_domains else "Top domains: n/a",
+                        "<b>By day</b>",
+                        *timeline_lines
+                    ])
+
+                    header = f"🔬 <b>GPT-5 Analysis: {self.formatter.esc(query.upper())}</b>\n\n"
+                    header += f"📊 <b>Data:</b> {len(articles)} articles, {self.formatter.esc(timeframe)}\n\n"
+                    message = header + toc + analysis
+                    # Attach compact HTML sources and then metrics
+                    message = self.formatter.attach_sources(message, sources_payload)
+                    message += "\n\n" + metrics_section
+                else:
+                    # Build a data-only fallback report if model didn't return text
+                    def _domain_of(a: Dict[str, Any]) -> str:
+                        u = a.get('url') or ''
+                        net = urlparse(u).netloc if u else ''
+                        return (a.get('source_domain') or a.get('domain') or a.get('source') or net or 'unknown').lower()
+
+                    domains: Dict[str, int] = {}
+                    for a in articles:
+                        d = _domain_of(a)
+                        domains[d] = domains.get(d, 0) + 1
+                    top_domains = sorted(domains.items(), key=lambda x: x[1], reverse=True)[:5]
+
+                    def _adate(a):
+                        dt = a.get('published_at')
+                        return dt if isinstance(dt, datetime) else (datetime.fromisoformat(dt) if isinstance(dt, str) and len(dt) >= 10 else datetime.min)
+
+                    # Keep same order as in prompt enumeration
+                    showcase = prompt_slice[:7]
+                    sources_payload: List[Dict[str, Any]] = []
+                    for a in showcase:
+                        title = (a.get('title') or a.get('headline') or a.get('name') or '').strip()[:160]
+                        url = a.get('url') or ''
+                        if url and not (url.startswith('http://') or url.startswith('https://')):
+                            continue
+                        src = (a.get('source') or a.get('domain') or a.get('source_domain') or '').lower()
+                        pub = a.get('published_at')
+                        if isinstance(pub, datetime):
+                            published_at = pub.isoformat()
+                        elif isinstance(pub, str):
+                            published_at = pub
+                        else:
+                            published_at = None
+                        sources_payload.append({
+                            'title': title,
+                            'url': url,
+                            'source_name': src,
+                            'published_at': published_at,
+                        })
+
+                    from collections import Counter
+                    buckets = Counter()
+                    for a in articles:
+                        dt = a.get('published_at')
+                        if isinstance(dt, datetime):
+                            day = dt.date().isoformat()
+                        elif isinstance(dt, str) and len(dt) >= 10:
+                            day = dt[:10]
+                        else:
+                            continue
+                        buckets[day] += 1
+                    timeline_lines = [f"{day}: {cnt}" for day, cnt in sorted(buckets.items())]
+
+                    header = f"🔬 <b>GPT-5 Analysis (data-only fallback): {self.formatter.esc(query.upper())}</b>\n\n"
+                    header += f"📊 <b>Data:</b> {len(articles)} articles, {self.formatter.esc(timeframe)}\n\n"
+                    toc = (
+                        "📑 Table of contents\n"
+                        "- Sources\n"
+                        "- Metrics & Timeline\n\n"
+                    )
+                    sources_section = self.formatter.render_sources_block(sources_payload)
+                    metrics_section = "\n".join([
+                        ("Top domains: " + ", ".join([f"{d} ({c})" for d, c in top_domains])) if top_domains else "Top domains: n/a",
+                        "<b>By day</b>",
+                        *timeline_lines
+                    ])
+                    message = header + toc
+                    message = self.formatter.attach_sources(message, sources_payload)
+                    message += "\n\n" + metrics_section
+
+                # Persist brief report into diagnostics (optional)
+                try:
+                    details = {
+                        'query': query,
+                        'timeframe': timeframe,
+                        'length': length,
+                        'grounded': grounded,
+                        'articles': len(articles),
+                        'top_domains': top_domains if 'top_domains' in locals() else [],
+                        'timeline': dict(buckets) if 'buckets' in locals() else {},
+                        'preview': (analysis or '')[:500]
+                    }
+                    with self.db._cursor() as cur:
+                        cur.execute(
+                            """
+                            INSERT INTO diagnostics (level, component, message, details)
+                            VALUES (%s, %s, %s, %s)
+                            """,
+                            ('INFO', 'analyze', f"analysis:{query}", json.dumps(details))
+                        )
+                except Exception as diag_err:
+                    logger.debug(f"Diagnostics write skipped: {diag_err}")
+
+                # Persist full report into analysis_reports
+                try:
+                    sources_payload = []
+                    for a in showcase:
+                        sources_payload.append({
+                            'title': a.get('title') or a.get('headline') or a.get('name'),
+                            'url': a.get('url'),
+                            'source': a.get('source') or a.get('domain') or a.get('source_domain')
+                        })
+                    self.db.save_analysis_report(
+                        query=query,
+                        timeframe=timeframe,
+                        length=length,
+                        grounded=grounded,
+                        articles_count=len(articles),
+                        report_text=message,
+                        top_domains=top_domains if 'top_domains' in locals() else [],
+                        timeline=dict(buckets) if 'buckets' in locals() else {},
+                        sources=sources_payload,
+                        user_id=user_id,
+                        chat_id=chat_id,
+                    )
+                except Exception as rep_err:
+                    logger.debug(f"Report save skipped: {rep_err}")
+
+                # Buttons: Refresh with same params
+                try:
+                    btn_cb = f"analyze:refresh|{query}|{length}|{timeframe}|{'1' if grounded else '0'}"
+                    buttons = [[{"text": "🔄 Refresh", "callback_data": btn_cb}]]
+                    markup = self._create_inline_keyboard(buttons)
+                except Exception:
+                    markup = None
+
+                result = await self._send_long_message(chat_id, message, markup, parse_mode="HTML")
+                elapsed_ms = int((time.monotonic() - start_ts) * 1000)
+                logger.info(f"🧪 [ANALYZE_CHECK] Finished /analyze in {elapsed_ms}ms")
+                return result
+
+            except Exception as gpt5_error:
+                logger.error(f"GPT-5 analysis error: {gpt5_error}")
+                from bot_service.error_handler import log_error
+                log_error(gpt5_error, user_id, chat_id, 'analyze_command')
+                elapsed_ms = int((time.monotonic() - start_ts) * 1000)
+                logger.error(f"🧪 [ANALYZE_CHECK] Failed /analyze in {elapsed_ms}ms: {gpt5_error}")
+                return await self._send_message(chat_id, "❌ GPT-5 analysis failed. Please try again.")
+
+        except Exception as e:
+            logger.error(f"Analyze command failed: {e}")
+            return await self._send_message(chat_id, f"❌ Analysis failed: {e}")
+
+    async def handle_summarize_command(self, chat_id: str, user_id: str, args: List[str]) -> bool:
+        """Handle /summarize command - GPT-5 content summarization"""
+        try:
+            if not args:
+                help_text = "📝 **GPT-5 Summarization Help**\n\n"
+                help_text += "**Usage:** `/summarize [topic] [length] [timeframe]`\n\n"
+                help_text += "**Examples:**\n"
+                help_text += "• `/summarize ukraine war short 3d` - Brief war update\n"
