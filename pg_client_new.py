@@ -1143,7 +1143,59 @@ class PgClient:
 
     def search_chunks_by_similarity(self, query_embedding: List[float],
                                    limit: int = 10, similarity_threshold: float = 0.7) -> List[Dict[str, Any]]:
-        """Search chunks by embedding similarity using cosine similarity."""
+        """Search chunks by embedding similarity using pgvector native operator.
+
+        Performance notes:
+        - Uses pgvector <=> operator for cosine distance (fast with HNSW index)
+        - Fallback to Python implementation if pgvector not available
+        """
+        try:
+            with self._cursor() as cur:
+                # Try pgvector-native search first (fast, indexed)
+                try:
+                    # Convert list to pgvector format: '[1,2,3,...]'
+                    vector_str = '[' + ','.join(str(x) for x in query_embedding) + ']'
+
+                    cur.execute("""
+                        SELECT
+                            id, article_id, chunk_index, text,
+                            url, title_norm, source_domain,
+                            1 - (embedding_vector <=> %s::vector) AS similarity
+                        FROM article_chunks
+                        WHERE embedding_vector IS NOT NULL
+                          AND (1 - (embedding_vector <=> %s::vector)) >= %s
+                        ORDER BY embedding_vector <=> %s::vector
+                        LIMIT %s
+                    """, (vector_str, vector_str, similarity_threshold, vector_str, limit))
+
+                    results = []
+                    for row in cur.fetchall():
+                        results.append({
+                            'id': row[0],
+                            'article_id': row[1],
+                            'chunk_index': row[2],
+                            'text': row[3],
+                            'url': row[4],
+                            'title_norm': row[5],
+                            'source_domain': row[6],
+                            'similarity': float(row[7])
+                        })
+
+                    logger.debug(f"pgvector search returned {len(results)} results")
+                    return results
+
+                except Exception as e:
+                    # Fallback to Python implementation if pgvector not available
+                    logger.warning(f"pgvector search failed, falling back to Python: {e}")
+                    return self._search_chunks_python_fallback(query_embedding, limit, similarity_threshold)
+
+        except Exception as e:
+            logger.error(f"Similarity search failed: {e}")
+            return []
+
+    def _search_chunks_python_fallback(self, query_embedding: List[float],
+                                       limit: int = 10, similarity_threshold: float = 0.7) -> List[Dict[str, Any]]:
+        """Fallback Python-based cosine similarity search (slower, for compatibility)."""
         try:
             import json
             with self._cursor() as cur:
@@ -1153,7 +1205,7 @@ class PgClient:
                         id, article_id, chunk_index, text,
                         url, title_norm, source_domain, embedding
                     FROM article_chunks
-                    WHERE embedding IS NOT NULL
+                    WHERE embedding IS NOT NULL OR embedding_vector IS NOT NULL
                 """)
 
                 results = []
@@ -1163,20 +1215,16 @@ class PgClient:
 
                         # Handle both vector and JSON string formats
                         if isinstance(embedding_data, str):
-                            # Try to parse as JSON string
                             try:
                                 stored_vector = json.loads(embedding_data)
                             except json.JSONDecodeError:
-                                # Try to parse as vector string format [1,2,3]
                                 if embedding_data.startswith('[') and embedding_data.endswith(']'):
                                     stored_vector = [float(x.strip()) for x in embedding_data[1:-1].split(',')]
                                 else:
                                     continue
                         elif isinstance(embedding_data, list):
-                            # Already a list
                             stored_vector = embedding_data
                         else:
-                            # Skip unknown formats
                             continue
 
                         if len(stored_vector) == len(query_embedding):
@@ -1198,8 +1246,9 @@ class PgClient:
 
                 # Sort by similarity and limit
                 results.sort(key=lambda x: x['similarity'], reverse=True)
+                logger.debug(f"Python fallback search returned {len(results)} results")
                 return results[:limit]
 
         except Exception as e:
-            logger.error(f"Similarity search failed: {e}")
+            logger.error(f"Python fallback similarity search failed: {e}")
             return []

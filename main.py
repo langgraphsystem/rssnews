@@ -352,9 +352,16 @@ def main():
                             self.search_type = "fts_constrained"
                     res = _Res(rows, args.query)
                 else:
-                    from stage8_retrieval.retriever import HybridRetriever
-                    retriever = HybridRetriever(client)
-                    res = retriever.hybrid_retrieve(args.query, limit=args.limit * 3, alpha=args.alpha)
+                    # Use embedding-based semantic search (pgvector)
+                    from services.embedding_service import EmbeddingService
+                    embedding_svc = EmbeddingService(client)
+                    chunks = embedding_svc.search_similar_chunks(args.query, limit=args.limit * 3)
+                    class _Res:
+                        def __init__(self, chunks, q):
+                            self.chunks = chunks
+                            self.query_normalized = q
+                            self.search_type = "semantic_vector"
+                    res = _Res(chunks, args.query)
                 print("=== RAG Results ===")
                 print(f"Query (normalized): {res.query_normalized}")
                 print(f"Search type: {res.search_type}")
@@ -492,31 +499,49 @@ def main():
         # (removed duplicate index block; merged above)
 
         if args.cmd == "rag":
-            logger.info("Starting Stage 8 RAG query")
-            # Lazy import for RAG components
-            from stage8_retrieval.rag_pipeline import RAGPipeline
+            logger.info("Starting semantic RAG query with pgvector")
 
-            pipeline = RAGPipeline(client)
-            
             try:
-                response = pipeline.answer_query(
-                    query=args.query,
-                    limit=args.limit,
-                    alpha=args.alpha
-                )
-                
+                # Use embedding service for semantic search
+                from services.embedding_service import EmbeddingService
+                embedding_svc = EmbeddingService(client)
+
                 print(f"🔍 Processing query: '{args.query}'")
                 print(f"   Search parameters: limit={args.limit}, alpha={args.alpha}\n")
-                print(f"📰 Answer:\n{response.answer}\n")
-                st = response.retrieval_info.get('search_type') if isinstance(getattr(response, 'retrieval_info', {}), dict) else None
-                print("📊 Details:")
-                print(f"   Sources used: {len(response.chunks_used)}")
-                if st:
-                    print(f"   Search type: {st}")
-                print(f"   Total time: {response.total_time_ms:.1f}ms")
+
+                # Retrieve similar chunks using pgvector
+                chunks = embedding_svc.search_similar_chunks(args.query, limit=args.limit)
+
+                if not chunks:
+                    print("📭 No relevant chunks found for your query.")
+                    return
+
+                print(f"📰 Found {len(chunks)} relevant chunks:\n")
+
+                # Display results
+                seen_articles = set()
+                for i, chunk in enumerate(chunks, 1):
+                    article_id = chunk.get('article_id')
+                    if article_id in seen_articles:
+                        continue
+                    seen_articles.add(article_id)
+
+                    title = chunk.get('title_norm') or 'Untitled'
+                    url = chunk.get('url') or ''
+                    source = chunk.get('source_domain') or ''
+                    similarity = chunk.get('similarity', 0)
+                    text_snippet = (chunk.get('text') or '')[:200]
+
+                    print(f"{i}. {title}")
+                    print(f"   Source: {source} | Similarity: {similarity:.3f}")
+                    print(f"   {text_snippet}...")
+                    if url:
+                        print(f"   URL: {url}")
+                    print()
 
             except Exception as e:
-                logger.error(f"RAG pipeline failed: {e}", exc_info=True)
+                logger.error(f"RAG query failed: {e}", exc_info=True)
+                print(f"❌ RAG query failed: {e}")
             return
 
         if args.cmd == "report":

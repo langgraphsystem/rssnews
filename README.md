@@ -83,6 +83,9 @@ ENABLE_LOCAL_EMBEDDINGS=true
 OLLAMA_BASE_URL=http://localhost:11434
 OLLAMA_MODEL=qwen2.5-coder:3b
 EMBEDDING_MODEL=embeddinggemma
+
+# Vector Search (recommended for production)
+# pgvector extension must be installed in PostgreSQL
 ```
 
 ## Commands
@@ -96,12 +99,15 @@ python main.py discovery --feed <url>  # Add new feed
 python main.py work              # Process pending articles
 
 # Search & Retrieval
-python main.py rag "query"       # Semantic search
+python main.py rag "query"       # Semantic search (pgvector)
 python main.py db-inspect        # Database statistics
 python main.py report            # Generate reports
 
 # Database
 python main.py ensure            # Create/verify schema
+
+# Vector Search Setup (one-time)
+python scripts/apply_pgvector_migration.py  # Enable pgvector
 ```
 
 ## Railway Deployment
