@@ -22,7 +22,9 @@
       "Bash(del test_trends_time_periods.py test_trends_command_integration.py)",
       "Bash(mkdir:*)",
       "Bash(findstr:*)",
-      "Bash(git log:*)"
+      "Bash(git log:*)",
+      "Bash(psql:*)",
+      "Bash(echo $EMBEDDING_MODEL)"
     ],
     "deny": [],
     "ask": []

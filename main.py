@@ -352,15 +352,29 @@ def main():
                             self.search_type = "fts_constrained"
                     res = _Res(rows, args.query)
                 else:
-                    # Use embedding-based semantic search (pgvector)
-                    from services.embedding_service import EmbeddingService
-                    embedding_svc = EmbeddingService(client)
-                    chunks = embedding_svc.search_similar_chunks(args.query, limit=args.limit * 3)
+                    # Use embedding-based semantic search (pgvector) - synchronous fallback
+                    from local_embedding_generator import LocalEmbeddingGenerator
+                    import asyncio
+                    embedding_gen = LocalEmbeddingGenerator()
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    query_embeddings = loop.run_until_complete(embedding_gen.generate_embeddings([args.query]))
+                    loop.close()
+
+                    if query_embeddings and query_embeddings[0]:
+                        chunks = client.search_chunks_by_similarity(
+                            query_embedding=query_embeddings[0],
+                            limit=args.limit * 3,
+                            similarity_threshold=0.5
+                        )
+                    else:
+                        chunks = []
+
                     class _Res:
                         def __init__(self, chunks, q):
                             self.chunks = chunks
                             self.query_normalized = q
-                            self.search_type = "semantic_vector"
+                            self.search_type = "semantic_vector_pgvector"
                     res = _Res(chunks, args.query)
                 print("=== RAG Results ===")
                 print(f"Query (normalized): {res.query_normalized}")
