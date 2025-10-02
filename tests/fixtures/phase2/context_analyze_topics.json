@@ -1,0 +1,32 @@
+{
+  "command": "/analyze topics",
+  "params": {
+    "window": "24h",
+    "lang": "en",
+    "sources": ["techchronicle.com","finledger.io","globalregulator.org"],
+    "topic": null,
+    "domains": null,
+    "query": null,
+    "k_final": 6,
+    "flags": {"rerank_enabled": true}
+  },
+  "retrieval": {
+    "docs": [
+      {"article_id":"tp-821","title":"Unified AI Transparency Benchmarks","url":"https://globalregulator.org/unified-benchmarks","date":"2025-09-29","lang":"en","score":0.80,"snippet":"A cross-border working group endorsed a baseline suite of transparency metrics including bias tracking and incident disclosure."},
+      {"article_id":"tp-822","title":"GPU Fleet Expansions Announced","url":"https://finledger.io/gpu-fleet-expansion","date":"2025-09-28","lang":"en","score":0.79,"snippet":"Cloud providers scale out data-center GPUs to serve increasing multimodal inference workloads across industries."},
+      {"article_id":"tp-823","title":"Healthcare AI Oversight Ramps Up","url":"https://techchronicle.com/healthcare-oversight","date":"2025-09-28","lang":"en","score":0.77,"snippet":"Providers introduce layered oversight for triage tools, combining alerts with clinician validation and post-deployment audits."},
+      {"article_id":"tp-824","title":"Retail Content Agents in Limited Release","url":"https://finledger.io/agents-limited-release","date":"2025-09-27","lang":"en","score":0.73,"snippet":"Retailers test agent frameworks to localise creative assets, measuring lift while enforcing brand guardrails and approvals."},
+      {"article_id":"tp-825","title":"Finance Firms Publish Model Cards","url":"https://techchronicle.com/publish-model-cards","date":"2025-09-29","lang":"en","score":0.78,"snippet":"Several institutions made model card templates public to speed internal review cycles and satisfy audit readiness requirements."},
+      {"article_id":"tp-826","title":"EU Registry Concept Gains Traction","url":"https://globalregulator.org/registry-concept","date":"2025-09-27","lang":"en","score":0.74,"snippet":"The proposed EU registry for high-impact AI would centralise evaluation summaries and remediation timelines for rapid supervisory review."}
+    ],
+    "window": "24h",
+    "lang": "en",
+    "sources": ["techchronicle.com","finledger.io","globalregulator.org"],
+    "k_final": 6,
+    "rerank_enabled": true
+  },
+  "models": {"primary": "claude-4.5", "fallback": ["gpt-5","gemini-2.5-pro"]},
+  "ab_test": {"experiment": null, "arm": null},
+  "limits": {"max_tokens": 4096, "budget_cents": 50, "timeout_s": 12},
+  "telemetry": {"correlation_id": "3e1c7b54-9e5b-4c4a-9a22-tp-ctx", "version": "phase2-orchestrator"}
+}

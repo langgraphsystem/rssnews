@@ -1,0 +1,32 @@
+{
+  "command": "/predict trends",
+  "params": {
+    "window": "24h",
+    "lang": "en",
+    "sources": ["techchronicle.com","finledger.io","globalregulator.org"],
+    "topic": "AI infrastructure scaling",
+    "domains": null,
+    "query": null,
+    "k_final": 6,
+    "flags": {"rerank_enabled": true}
+  },
+  "retrieval": {
+    "docs": [
+      {"article_id":"fc-831","title":"GPU Capacity Up 40% for Inference","url":"https://finledger.io/gpu-40-increase","date":"2025-09-28","lang":"en","score":0.81,"snippet":"Vendors confirm expanded GPU fleets to support the surge in inference workloads, reducing queue times for production rollouts."},
+      {"article_id":"fc-832","title":"Hyperscalers Add Multimodal SKUs","url":"https://finledger.io/multimodal-skus","date":"2025-09-28","lang":"en","score":0.78,"snippet":"Clouds introduce specialised SKUs for multimodal assistants, with memory and throughput tuned for image+text pipelines."},
+      {"article_id":"fc-833","title":"Retail Agents Drive Bursty Demand","url":"https://finledger.io/retail-bursty-demand","date":"2025-09-27","lang":"en","score":0.74,"snippet":"Campaign-driven usage spikes push providers to implement rapid scale-up/scale-down policies to meet seasonal load safely."},
+      {"article_id":"fc-834","title":"Finance Pilots Move to Prod","url":"https://techchronicle.com/pilots-to-prod","date":"2025-09-29","lang":"en","score":0.79,"snippet":"Select pilots graduate to production after passing evaluation gates, increasing steady-state demand on inference infrastructure."},
+      {"article_id":"fc-835","title":"Visibility into GPU Backlogs Improves","url":"https://finledger.io/backlog-visibility","date":"2025-09-28","lang":"en","score":0.73,"snippet":"Procurement teams report better visibility across suppliers, enabling earlier reservations and smoother capacity planning."},
+      {"article_id":"fc-836","title":"Registry Proposal Signals Compliance Push","url":"https://globalregulator.org/infra-compliance-signal","date":"2025-09-27","lang":"en","score":0.7,"snippet":"Regulatory pushes for documentation indirectly accelerate infrastructure investments to guarantee traceability and uptime."}
+    ],
+    "window": "24h",
+    "lang": "en",
+    "sources": ["techchronicle.com","finledger.io","globalregulator.org"],
+    "k_final": 6,
+    "rerank_enabled": true
+  },
+  "models": {"primary": "gpt-5", "fallback": ["claude-4.5","gemini-2.5-pro"]},
+  "ab_test": {"experiment": null, "arm": null},
+  "limits": {"max_tokens": 4096, "budget_cents": 50, "timeout_s": 12},
+  "telemetry": {"correlation_id": "4a6d9f21-b0d3-4c60-98f5-fc-ctx", "version": "phase2-orchestrator"}
+}

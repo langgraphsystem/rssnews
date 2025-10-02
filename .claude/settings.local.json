@@ -19,7 +19,10 @@
       "Bash(del test_analyze_cycle.py)",
       "Bash(git reset:*)",
       "Bash(find:*)",
-      "Bash(del test_trends_time_periods.py test_trends_command_integration.py)"
+      "Bash(del test_trends_time_periods.py test_trends_command_integration.py)",
+      "Bash(mkdir:*)",
+      "Bash(findstr:*)",
+      "Bash(git log:*)"
     ],
     "deny": [],
     "ask": []

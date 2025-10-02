@@ -1,0 +1,31 @@
+{
+  "command": "/analyze keywords",
+  "params": {
+    "window": "24h",
+    "lang": "en",
+    "sources": ["techchronicle.com","finledger.io","globalregulator.org"],
+    "topic": null,
+    "domains": null,
+    "query": "AI governance",
+    "k_final": 5,
+    "flags": {"rerank_enabled": true}
+  },
+  "retrieval": {
+    "docs": [
+      {"article_id":"kw-801","title":"Model Cards Become Standard in Finance","url":"https://techchronicle.com/model-cards-finance","date":"2025-09-29","lang":"en","score":0.84,"snippet":"Banks adopt unified model cards and documentation workflows to meet new oversight checklists for AI explainability and bias monitoring."},
+      {"article_id":"kw-802","title":"Transparency Benchmarks for AI","url":"https://globalregulator.org/transparency-benchmarks","date":"2025-09-29","lang":"en","score":0.80,"snippet":"Regulators align on minimum disclosure: dataset statements, incident logs, and quarterly fairness evaluations for critical AI deployments."},
+      {"article_id":"kw-803","title":"Retail A/B Tests AI Copy Generation","url":"https://finledger.io/retail-ab-gen","date":"2025-09-28","lang":"en","score":0.76,"snippet":"Large retailers run controlled experiments with generative copy, enforcing human review for tone and compliance across markets."},
+      {"article_id":"kw-804","title":"Healthcare Risk Controls for Triage Models","url":"https://techchronicle.com/triage-risk-controls","date":"2025-09-28","lang":"en","score":0.74,"snippet":"Hospitals add escalation rules and audit trails to triage assistants, reducing wait times while documenting edge-case handling."},
+      {"article_id":"kw-805","title":"EU Registry Proposal for High-Impact AI","url":"https://globalregulator.org/registry-proposal","date":"2025-09-27","lang":"en","score":0.73,"snippet":"Draft law would register high-impact AI providers and require publishing evaluation summaries and remediation timelines for incidents."}
+    ],
+    "window": "24h",
+    "lang": "en",
+    "sources": ["techchronicle.com","finledger.io","globalregulator.org"],
+    "k_final": 5,
+    "rerank_enabled": true
+  },
+  "models": {"primary": "gemini-2.5-pro", "fallback": ["claude-4.5","gpt-5"]},
+  "ab_test": {"experiment": null, "arm": null},
+  "limits": {"max_tokens": 4096, "budget_cents": 50, "timeout_s": 12},
+  "telemetry": {"correlation_id": "1b7a4d5c-7a2a-4f0e-9a1f-kw-ctx", "version": "phase2-orchestrator"}
+}

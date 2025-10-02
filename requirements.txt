@@ -30,9 +30,12 @@ python-dotenv==1.0.0
 
 # System monitoring
 psutil==5.9.6
+prometheus-client==0.20.0
+locust==2.30.0
 
 # Scheduling / automation
 schedule==1.2.0
+APScheduler==3.10.4
 
 # Date and time handling
 python-dateutil==2.9.0.post0

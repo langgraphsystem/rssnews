@@ -1,0 +1,31 @@
+{
+  "command": "/analyze competitors",
+  "params": {
+    "window": "24h",
+    "lang": "en",
+    "sources": ["techchronicle.com","finledger.io","globalregulator.org"],
+    "topic": null,
+    "domains": ["contoso.ai","fabrikam.cloud","northwind.io"],
+    "query": null,
+    "k_final": 5,
+    "flags": {"rerank_enabled": true}
+  },
+  "retrieval": {
+    "docs": [
+      {"article_id":"cp-841","title":"Contoso Launches Multimodal API","url":"https://contoso.ai/news/multimodal-api","date":"2025-09-28","lang":"en","score":0.79,"snippet":"Contoso introduced a multimodal API with latency targets under 300ms, focusing on retail and support automation."},
+      {"article_id":"cp-842","title":"Fabrikam Expands EU Regions","url":"https://fabrikam.cloud/blog/eu-expansion","date":"2025-09-28","lang":"en","score":0.76,"snippet":"Fabrikam added two EU regions with stricter data residency controls to address regulated customers."},
+      {"article_id":"cp-843","title":"Northwind Ships Governance Toolkit","url":"https://northwind.io/posts/governance-toolkit","date":"2025-09-29","lang":"en","score":0.8,"snippet":"Northwind released governance templates and incident trackers, aiming to shorten enterprise security reviews."},
+      {"article_id":"cp-844","title":"GPU Pricing Adjustments Announced","url":"https://finledger.io/gpu-pricing-adjust","date":"2025-09-27","lang":"en","score":0.72,"snippet":"Several vendors rebalanced GPU pricing tiers as capacity increased, offering discounts for steady, predictable workloads."},
+      {"article_id":"cp-845","title":"Benchmark Results for Text+Vision","url":"https://techchronicle.com/benchmark-text-vision","date":"2025-09-27","lang":"en","score":0.74,"snippet":"Independent tests show improved accuracy on captioning and OCR tasks, with performance varying by context length and image complexity."}
+    ],
+    "window": "24h",
+    "lang": "en",
+    "sources": ["techchronicle.com","finledger.io","globalregulator.org"],
+    "k_final": 5,
+    "rerank_enabled": true
+  },
+  "models": {"primary": "claude-4.5", "fallback": ["gpt-5","gemini-2.5-pro"]},
+  "ab_test": {"experiment": null, "arm": null},
+  "limits": {"max_tokens": 4096, "budget_cents": 50, "timeout_s": 12},
+  "telemetry": {"correlation_id": "5d0c1a90-7b87-4a83-9a64-cp-ctx", "version": "phase2-orchestrator"}
+}

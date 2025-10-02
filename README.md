@@ -2,6 +2,8 @@
 
 A modern RSS news aggregation and processing system using local LLM models for intelligent article chunking and semantic search.
 
+**Phase 3 Status:** ✅ 100% Complete (Agentic RAG, GraphRAG, Event Linking, Long-term Memory, A/B Testing)
+
 ## Architecture
 
 **Local LLM Processing Pipeline:**
@@ -13,6 +15,7 @@ A modern RSS news aggregation and processing system using local LLM models for i
 
 ## Features
 
+### Core System
 - ✅ **RSS Feed Management** - Auto-discovery and polling
 - ✅ **Smart Chunking** - AI-powered semantic segmentation
 - ✅ **Local LLM Models** - No external API dependencies
@@ -20,6 +23,14 @@ A modern RSS news aggregation and processing system using local LLM models for i
 - ✅ **Vector Search** - Semantic similarity search via embeddings
 - ✅ **Railway Deployment** - Cloud-ready with CloudFlare tunnel
 - ✅ **Duplicate Detection** - Content-based deduplication
+
+### Phase 3: Advanced AI (NEW)
+- ✅ **Agentic RAG** - Iterative retrieval with self-checking
+- ✅ **GraphRAG** - Knowledge graphs with advanced NER (spaCy/LLM)
+- ✅ **Event Linking** - Temporal clustering with causality reasoning
+- ✅ **Long-term Memory** - PostgreSQL + pgvector for semantic memory
+- ✅ **A/B Testing** - Experiment framework with metrics tracking
+- ✅ **Multi-Model Routing** - GPT-5, Claude 4.5, Gemini 2.5 Pro with fallbacks
 
 ## Local Models
 

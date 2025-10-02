@@ -1,0 +1,15 @@
+*** Begin Patch
+*** Update File: services/phase3_handlers.py
+@@
+-from core.orchestrator.phase3_orchestrator_new import Phase3Orchestrator
+-from core.ux.formatter import format_for_telegram
+-from core.rag.retrieval_client import get_retrieval_client
++from core.orchestrator.phase3_orchestrator_new import Phase3Orchestrator
++from core.ux.formatter import format_for_telegram
++from core.context.phase3_context_builder import get_phase3_context_builder
+@@
+-        self.orchestrator = Phase3Orchestrator()
+-        self.retrieval_client = get_retrieval_client()
++        self.orchestrator = Phase3Orchestrator()
++        self.context_builder = get_phase3_context_builder()
+*** End Patch

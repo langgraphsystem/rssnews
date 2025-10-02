@@ -1,0 +1,57 @@
+{
+  "title": "RSS Model Health",
+  "uid": "rss-models",
+  "schemaVersion": 38,
+  "version": 2,
+  "timezone": "browser",
+  "refresh": "30s",
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Model Latency p90 (s)",
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 0},
+      "fieldConfig": {"defaults": {"unit": "s"}},
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.9, sum(rate(rss_model_latency_seconds_bucket[$__interval])) by (model, task, le))",
+          "legendFormat": "{{model}} {{task}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Invocation Outcomes (req/min)",
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 8},
+      "fieldConfig": {"defaults": {"unit": "reqpm"}},
+      "targets": [
+        {
+          "expr": "sum(rate(rss_model_invocations_total[$__interval])) by (model, task, outcome) * 60",
+          "legendFormat": "{{model}} {{task}} {{outcome}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Model Cost (USD/min)",
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 16},
+      "fieldConfig": {"defaults": {"unit": "currencyUSD", "decimals": 2}},
+      "targets": [
+        {
+          "expr": "sum(rate(rss_model_cost_cents_total[$__interval])) by (model) / 100",
+          "legendFormat": "{{model}}"
+        }
+      ]
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "model",
+        "type": "query",
+        "datasource": "Prometheus",
+        "query": "label_values(rss_model_invocations_total, model)",
+        "refresh": 1
+      }
+    ]
+  }
+}

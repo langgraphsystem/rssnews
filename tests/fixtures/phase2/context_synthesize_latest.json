@@ -1,0 +1,32 @@
+{
+  "command": "/synthesize",
+  "params": {
+    "window": "24h",
+    "lang": "en",
+    "sources": ["techchronicle.com","finledger.io","globalregulator.org"],
+    "topic": null,
+    "domains": null,
+    "query": null,
+    "k_final": 6,
+    "flags": {"rerank_enabled": true}
+  },
+  "retrieval": {
+    "docs": [
+      {"article_id":"sy-851","title":"Finance Pilots Graduate to Production","url":"https://techchronicle.com/finance-prod","date":"2025-09-29","lang":"en","score":0.79,"snippet":"Select AI pilots moved to production after passing evaluation gates; teams prioritize monitoring and incident response upgrades."},
+      {"article_id":"sy-852","title":"EU Transparency Metrics Draft","url":"https://globalregulator.org/transparency-draft","date":"2025-09-29","lang":"en","score":0.78,"snippet":"Draft guidance lists minimum transparency metrics and requires quarterly fairness assessments for high-impact systems."},
+      {"article_id":"sy-853","title":"GPU Capacity Adds Headroom","url":"https://finledger.io/gpu-headroom","date":"2025-09-28","lang":"en","score":0.77,"snippet":"Expanded GPU availability lowers queue times and improves reliability for multimodal agent deployments in peak hours."},
+      {"article_id":"sy-854","title":"Healthcare Triage Oversight","url":"https://techchronicle.com/triage-oversight","date":"2025-09-28","lang":"en","score":0.75,"snippet":"Clinics add human oversight layers and escalation workflows to reduce risk from automated triage decisions."},
+      {"article_id":"sy-855","title":"Retail Agent Experiments Continue","url":"https://finledger.io/agent-experiments","date":"2025-09-27","lang":"en","score":0.73,"snippet":"Retailers keep iterating on agent prompts and guardrails to improve localization quality without sacrificing brand tone."},
+      {"article_id":"sy-856","title":"EU Registry Proposal Gains Support","url":"https://globalregulator.org/registry-support","date":"2025-09-27","lang":"en","score":0.72,"snippet":"Several member states back a registry for high-impact AI to accelerate supervisory reviews and incident remediation tracking."}
+    ],
+    "window": "24h",
+    "lang": "en",
+    "sources": ["techchronicle.com","finledger.io","globalregulator.org"],
+    "k_final": 6,
+    "rerank_enabled": true
+  },
+  "models": {"primary": "gpt-5", "fallback": ["claude-4.5","gemini-2.5-pro"]},
+  "ab_test": {"experiment": null, "arm": null},
+  "limits": {"max_tokens": 4096, "budget_cents": 50, "timeout_s": 12},
+  "telemetry": {"correlation_id": "6c2a8f11-2a44-4d32-9c77-sy-ctx", "version": "phase2-orchestrator"}
+}

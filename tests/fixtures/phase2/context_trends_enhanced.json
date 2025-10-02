@@ -1,0 +1,107 @@
+{
+  "command": "/trends enhanced",
+  "params": {
+    "window": "24h",
+    "lang": "en",
+    "sources": [
+      "techchronicle.com",
+      "finledger.io",
+      "globalregulator.org"
+    ],
+    "topic": null,
+    "domains": null,
+    "query": null,
+    "k_final": 6,
+    "flags": {
+      "rerank_enabled": true,
+      "synthesis": true
+    }
+  },
+  "retrieval": {
+    "docs": [
+      {
+        "article_id": "doc-701",
+        "title": "Banks Step Up AI Governance Rollouts",
+        "url": "https://techchronicle.com/banks-ai-governance",
+        "date": "2025-09-29",
+        "lang": "en",
+        "score": 0.84,
+        "snippet": "Major lenders expanded risk-triage pilots while adding quarterly bias reviews and detailed model cards to comply with updated supervisory guidance."
+      },
+      {
+        "article_id": "doc-702",
+        "title": "Regulators Issue Unified Transparency Benchmarks",
+        "url": "https://globalregulator.org/ai-transparency-benchmarks",
+        "date": "2025-09-29",
+        "lang": "en",
+        "score": 0.80,
+        "snippet": "The international oversight council released baseline metrics requiring 24-hour incident disclosures and evidence-backed evaluations for critical AI systems."
+      },
+      {
+        "article_id": "doc-703",
+        "title": "Hyperscalers Boost GPU Supply for Multimodal AI",
+        "url": "https://finledger.io/gpu-capacity-upgrade",
+        "date": "2025-09-28",
+        "lang": "en",
+        "score": 0.79,
+        "snippet": "Cloud vendors announced a 40% increase in inference-grade GPU capacity, citing enterprise demand for multimodal copilots across frontline operations."
+      },
+      {
+        "article_id": "doc-704",
+        "title": "Hospitals Trial Human-in-the-Loop AI Triage",
+        "url": "https://techchronicle.com/healthcare-ai-triage",
+        "date": "2025-09-28",
+        "lang": "en",
+        "score": 0.76,
+        "snippet": "Regional hospital networks deployed AI-supported triage with nurse validation, reporting shorter waits but highlighting the need for escalation training."
+      },
+      {
+        "article_id": "doc-705",
+        "title": "Retailers Deploy Generative Agents for Flash Campaigns",
+        "url": "https://finledger.io/retail-gen-agents",
+        "date": "2025-09-27",
+        "lang": "en",
+        "score": 0.73,
+        "snippet": "Global retailers tested generative content agents synchronized with sales telemetry to localise promotions and update offers every two hours."
+      },
+      {
+        "article_id": "doc-706",
+        "title": "EU Considers Mandatory AI Provider Registry",
+        "url": "https://globalregulator.org/eu-ai-registry",
+        "date": "2025-09-27",
+        "lang": "en",
+        "score": 0.75,
+        "snippet": "Draft legislation in Brussels would require high-impact AI providers to register model documentation, audit logs, and incident reports in a central EU system."
+      }
+    ],
+    "window": "24h",
+    "lang": "en",
+    "sources": [
+      "techchronicle.com",
+      "finledger.io",
+      "globalregulator.org"
+    ],
+    "k_final": 6,
+    "rerank_enabled": true
+  },
+  "models": {
+    "primary": "gpt-5",
+    "fallback": [
+      "claude-4.5",
+      "gemini-2.5-pro"
+    ]
+  },
+  "ab_test": {
+    "experiment": null,
+    "arm": null
+  },
+  "limits": {
+    "max_tokens": 4096,
+    "budget_cents": 50,
+    "timeout_s": 12
+  },
+  "telemetry": {
+    "correlation_id": "5f1f4a7d-3b2b-43c0-a0be-1cfa1ccf39df",
+    "version": "phase2-orchestrator"
+  }
+}

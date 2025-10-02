@@ -35,7 +35,8 @@ from bot_service.quality_ux import QualityUXHandler
 from bot_service.rate_limiter import rate_limiter, TelegramRateLimiter
 from bot_service.error_handler import TelegramErrorHandler, log_user_action, log_error
 from database.production_db_client import ProductionDBClient
-from services.trends_service import TrendsService
+from services.orchestrator import execute_analyze_command, execute_trends_command
+from services.phase4_handlers import get_phase4_handler_service
 
 logger = logging.getLogger(__name__)
 
@@ -100,13 +101,8 @@ class AdvancedRSSBot:
             logger.info("✅ GPT5Service singleton attached to bot")
         else:
             logger.warning("⚠️ No GPT5Service provided - GPT commands will be disabled")
-
-        # Store Claude Service
-        self.claude = claude_service
-        if self.claude:
-            logger.info("✅ Claude Service attached to bot")
-        else:
-            logger.warning("⚠️ No Claude Service provided - enhanced trends will fallback to basic format")
+        if claude_service:
+            logger.info("ℹ️ Claude service parameter ignored in Phase 1 orchestrator mode")
 
         try:
             logger.info("🔧 Initializing ranking API...")
@@ -129,13 +125,13 @@ class AdvancedRSSBot:
         self.formatter = MessageFormatter()
         self.command_handler = CommandHandler(self.ranking_api, self.db)
         self.quality_ux = QualityUXHandler(self.ranking_api, self.db)
-        self.trends_service = TrendsService(self.db)
 
         # User session management
         self.user_sessions = {}  # user_id -> session_data
         self.user_preferences = {}  # user_id -> preferences
         # Prevent duplicate sends per chat within a short window
         self._recent_messages = {}  # chat_id -> {'text': str, 'ts': float, 'parse_mode': str}
+        self._orchestrator_queries: Dict[str, Dict[str, Any]] = {}
 
         # Rate limiting and error handling
         self.rate_limiter = TelegramRateLimiter()
@@ -452,6 +448,44 @@ class AdvancedRSSBot:
                 return action, saved.get('data')
         return action, data
 
+    async def _send_orchestrator_payload(self, chat_id: str, payload: Dict[str, Any]) -> bool:
+        """Send orchestrator response payload to Telegram."""
+        if not payload:
+            return await self._send_message(chat_id, "❌ Пустой ответ от оркестратора.")
+
+        context = payload.get("context") or {}
+        if context.get("command") == "analyze":
+            query_key = context.get("query_key")
+            if query_key:
+                self._orchestrator_queries[query_key] = context
+                # Keep cache bounded
+                if len(self._orchestrator_queries) > 100:
+                    first_key = next(iter(self._orchestrator_queries))
+                    self._orchestrator_queries.pop(first_key, None)
+
+        buttons = payload.get("buttons") or []
+        markup = self._create_inline_keyboard(buttons) if buttons else None
+        parse_mode = payload.get("parse_mode", "Markdown")
+        text = payload.get("text") or "⚠️ Оркестратор вернул пустой ответ."
+
+        return await self._send_long_message(chat_id, text, markup, parse_mode=parse_mode)
+
+    async def _send_phase3_response(self, chat_id: str, response_dict: Dict[str, Any]) -> bool:
+        """Format Phase 3 BaseAnalysisResponse dict to Telegram and send."""
+        try:
+            from schemas.analysis_schemas import BaseAnalysisResponse
+            from core.ux.formatter import format_for_telegram
+            model = BaseAnalysisResponse.model_validate(response_dict)
+            payload = format_for_telegram(model)
+            buttons = payload.get('buttons') or []
+            markup = self._create_inline_keyboard(buttons) if buttons else None
+            parse_mode = payload.get('parse_mode', 'Markdown')
+            text = payload.get('text') or ''
+            return await self._send_long_message(chat_id, text, markup, parse_mode=parse_mode)
+        except Exception as e:
+            logger.error(f"Phase3 formatting failed: {e}")
+            return await self._send_message(chat_id, "❌ Phase 3 response formatting failed")
+
     def _prune_cb_store(self, max_age_seconds: int = 3600):
         now = time.time()
         to_del = [k for k, v in self._cb_store.items() if now - (v.get('ts') or now) > max_age_seconds]
@@ -588,78 +622,17 @@ class AdvancedRSSBot:
             return await self._send_message(chat_id, f"❌ Question processing failed: {e}")
 
     async def handle_trends_command(self, chat_id: str, user_id: str, args: List[str] = None) -> bool:
-        """Handle /trends command with optional time period and Claude enhancement"""
+        """Handle /trends command via orchestrator service."""
         try:
-            # Parse time window from args
-            if args and len(args) > 0:
-                time_window = args[0]
-            else:
-                time_window = "24h"
+            time_window = args[0] if args else "24h"
+            await self._send_message(chat_id, f"📈 Сбор тем за {time_window}...")
 
-            # Get user-friendly display name
-            display_window = self.trends_service._format_window_display(time_window)
+            payload = await execute_trends_command(window=time_window)
+            return await self._send_orchestrator_payload(chat_id, payload)
 
-            await self._send_message(chat_id, f"📈 Сбор тем и ключевых слов за {display_window}...")
-
-            # Step 1: Get basic trends data
-            trends_payload = await asyncio.to_thread(self.trends_service.build_trends, time_window, 600, 10)
-
-            # Step 2: Try to enhance with Claude analysis
-            message = None
-            claude_success = False
-
-            if self.claude and trends_payload.get("status") == "ok":
-                try:
-                    # Send "analyzing" message
-                    await self._send_message(chat_id, "🤖 Claude анализирует тренды...")
-
-                    # Prepare data for Claude
-                    claude_input = self.trends_service.prepare_for_claude(trends_payload, top_n=5)
-
-                    if "error" not in claude_input:
-                        # Get Claude analysis
-                        claude_analysis = await self.claude.analyze_trends(claude_input)
-
-                        # Format Claude enhanced message
-                        message = self.trends_service.format_claude_enhanced_trends(claude_analysis, time_window)
-                        claude_success = True
-                        logger.info("✅ Claude enhanced trends generated successfully")
-
-                    else:
-                        logger.warning(f"Claude input preparation failed: {claude_input.get('error')}")
-
-                except Exception as claude_error:
-                    logger.error(f"Claude analysis failed: {claude_error}")
-                    # Claude failed, will fallback to basic trends
-
-            # Step 3: Fallback to basic trends if Claude failed or unavailable
-            if not claude_success:
-                message = self.trends_service.format_trends_markdown(trends_payload, window=time_window)
-                logger.info("📊 Using basic trends format (Claude unavailable or failed)")
-
-            # Create buttons
-            buttons = [
-                [
-                    {"text": "🔄 Обновить", "callback_data": f"trends:refresh:{time_window}"},
-                    {"text": "📊 Аналитика", "callback_data": "analytics:full"}
-                ]
-            ]
-
-            # Add Claude toggle button if service is available
-            if self.claude:
-                claude_mode_button = "🧠 Claude OFF" if claude_success else "🧠 Claude ON"
-                claude_callback = f"trends:toggle_claude:{time_window}"
-                buttons.append([{"text": claude_mode_button, "callback_data": claude_callback}])
-
-            markup = self._create_inline_keyboard(buttons)
-
-            # Send the final message
-            return await self._send_long_message(chat_id, message, markup)
-
-        except Exception as e:
-            logger.error(f"Trends command failed: {e}")
-            return await self._send_message(chat_id, f"❌ Trends analysis failed: {e}")
-
+        except Exception as exc:
+            logger.error(f"Trends command failed: {exc}")
+            return await self._send_message(chat_id, f"❌ Trends command failed: {exc}")
     async def handle_quality_command(self, chat_id: str, user_id: str) -> bool:
         """Handle /quality command"""
         try:
@@ -739,49 +712,23 @@ class AdvancedRSSBot:
                 )
 
             elif action == "trends":
-                # Handle different trends actions: "refresh:1w", "toggle_claude:24h"
                 if data.startswith("refresh"):
-                    # Parse time window from callback data
-                    parts = data.split(":", 1)
-                    time_window = parts[1] if len(parts) > 1 else "24h"
-
-                    # Use the full trends command handler for consistency
-                    return await self.handle_trends_command(chat_id, user_id, [time_window])
-
-                elif data.startswith("toggle_claude"):
-                    # Toggle Claude mode for trends - not implemented yet, just refresh
-                    parts = data.split(":", 1)
-                    time_window = parts[1] if len(parts) > 1 else "24h"
-
-                    # For now, just refresh trends (Claude toggle could be implemented later)
+                    parts_refresh = data.split(":", 1)
+                    time_window = parts_refresh[1] if len(parts_refresh) > 1 else "24h"
                     return await self.handle_trends_command(chat_id, user_id, [time_window])
 
                 return False
 
             elif action == "analyze":
-                # e.g., "refresh|<query>|<length>|<timeframe>"
-                try:
-                    sub, rest = data.split('|', 1)
-                except ValueError:
-                    return False
-                if sub == 'refresh':
-                    try:
-                        parts2 = rest.split('|')
-                        q = parts2[0]
-                        ln = parts2[1] if len(parts2) > 1 else 'medium'
-                        tf = parts2[2] if len(parts2) > 2 else '7d'
-                        gr = parts2[3] if len(parts2) > 3 else '0'
-                    except Exception:
-                        return False
-                    # Reuse handler with same params
-                    args = [q]
-                    if ln:
-                        args.append(ln)
-                    if tf:
-                        args.append(tf)
-                    if gr == '1':
-                        args.append('grounded')
-                        args.append('sources')
+                # Callback format: refresh:<mode>:<window>:<query_key>
+                segments = data.split(":")
+                if segments and segments[0] == "refresh" and len(segments) >= 4:
+                    _, mode, window, query_key = segments[:4]
+                    context = self._orchestrator_queries.get(query_key)
+                    query = context.get("query") if context else None
+                    if not query:
+                        return await self._send_message(chat_id, "❌ Сессия истекла, повторите команду.")
+                    args = [mode, query, window]
                     return await self.handle_analyze_command(chat_id, user_id, args)
                 return False
 
@@ -891,10 +838,45 @@ class AdvancedRSSBot:
                     return await self.handle_search_command(chat_id, user_id, args, message_id)
 
                 elif command == 'ask':
-                    return await self.handle_ask_command(chat_id, user_id, args)
+                    # Phase 3: Agentic RAG with --depth parameter
+                    return await self.handle_ask_deep_command(chat_id, user_id, args)
 
                 elif command == 'trends':
                     return await self.handle_trends_command(chat_id, user_id, args)
+
+                elif command == 'events':
+                    # Phase 3: Event linking with causality
+                    return await self.handle_events_link_command(chat_id, user_id, args)
+
+                elif command == 'graph':
+                    # Phase 3: GraphRAG
+                    return await self.handle_graph_query_command(chat_id, user_id, args)
+
+                elif command == 'memory':
+                    # Phase 3: Long-term memory (suggest|store|recall)
+                    return await self.handle_memory_command(chat_id, user_id, args)
+
+                # Phase 4: Business Analytics & Optimization
+                elif command == 'dashboard':
+                    return await self.handle_dashboard_command(chat_id, user_id, args)
+
+                elif command == 'reports':
+                    return await self.handle_reports_command(chat_id, user_id, args)
+
+                elif command == 'schedule':
+                    return await self.handle_schedule_command(chat_id, user_id, args)
+
+                elif command == 'alerts':
+                    return await self.handle_alerts_command(chat_id, user_id, args)
+
+                elif command == 'optimize':
+                    return await self.handle_optimize_command(chat_id, user_id, args)
+
+                elif command == 'brief':
+                    return await self.handle_brief_command(chat_id, user_id, args)
+
+                elif command == 'pricing':
+                    return await self.handle_pricing_command(chat_id, user_id, args)
 
                 elif command == 'quality':
                     return await self.handle_quality_command(chat_id, user_id)
@@ -1204,332 +1186,518 @@ class AdvancedRSSBot:
             return await self._send_message(chat_id, f"❌ Config operation failed: {e}")
 
     async def handle_analyze_command(self, chat_id: str, user_id: str, args: List[str]) -> bool:
-        """Handle /analyze command - GPT-5 powered data analysis
-
-        Usage:
-          /analyze [query] [length?] [timeframe?]
-          length: short | medium | detailed | executive (optional)
-          timeframe: 1h, 6h, 12h, 1d, 3d, 7d, 1w, 2w, 1m, 3m (optional)
-        """
+        """Handle /analyze command using orchestrator service."""
         try:
-            start_ts = time.monotonic()
-            logger.info(f"🧪 [ANALYZE_CHECK] Start /analyze, raw_args={args}")
             if not args:
-                help_text = "🔬 **GPT-5 Data Analysis Help**\n\n"
-                help_text += "**Usage:** `/analyze [query] [length] [timeframe]`\n\n"
-                help_text += "**Examples:**\n"
-                help_text += "• `/analyze AI trends detailed 7d` - Detailed analysis for last 7 days\n"
-                help_text += "• `/analyze \"Immigration and Customs Enforcement\" executive 1w`\n"
-                help_text += "• `/analyze tech earnings short` - Short recent analysis\n\n"
-                help_text += "**Lengths:** short, medium, detailed, executive\n"
-                help_text += "**Timeframes:** 1h, 6h, 12h, 1d, 3d, 7d, 1w, 2w, 1m, 3m"
+                help_text = (
+                    "🔬 **Команда /analyze**\n\n"
+                    "Использование: /analyze [mode] <запрос> [временной_интервал]\n"
+                    "Режимы: keywords | sentiment | topics (по умолчанию keywords)\n"
+                    "Интервалы: 6h, 12h, 24h, 3d, 7d, 1m, 3m\n"
+                    "Пример: /analyze sentiment генеративный ИИ 7d"
+                )
                 return await self._send_message(chat_id, help_text)
 
-            # Parse: detect timeframe and optional length from the end
-            timeframe_tokens = {"1h","6h","12h","1d","3d","7d","1w","2w","1m","3m"}
-            length_tokens = {"short","medium","detailed","executive"}
-            flag_tokens = {"sources","grounded","citations"}
+            mode_tokens = {"keywords", "sentiment", "topics"}
+            timeframe_tokens = {"6h", "12h", "24h", "1d", "3d", "7d", "1w", "2w", "1m", "3m"}
 
-            tokens = [t.strip() for t in args]
-            timeframe = '7d'
-            length = 'medium'
-            grounded = False
+            tokens = [t.strip() for t in args if t.strip()]
+            mode = 'keywords'
+            if tokens and tokens[0].lower() in mode_tokens:
+                mode = tokens.pop(0).lower()
+
+            window = '24h'
             if tokens and tokens[-1].lower() in timeframe_tokens:
-                timeframe = tokens.pop().lower()
-            if tokens and tokens[-1].lower() in length_tokens:
-                length = tokens.pop().lower()
-            # Optional flags (can appear at end in any order)
-            while tokens and tokens[-1].lower() in flag_tokens:
-                tok = tokens.pop().lower()
-                if tok in ("sources","grounded","citations"):
-                    grounded = True
-            query = " ".join(tokens).strip() or args[0]
-            # Strip surrounding quotes if provided
-            if (query.startswith('"') and query.endswith('"')) or (query.startswith("'") and query.endswith("'")):
-                query = query[1:-1].strip()
+                window = tokens.pop().lower()
+            elif len(tokens) >= 2 and tokens[-2].lower() in timeframe_tokens:
+                # Support users placing timeframe before trailing punctuation
+                window = tokens.pop(-2).lower()
 
-            logger.info(f"🧪 [ANALYZE_CHECK] Parsed query='{query}', length='{length}', timeframe='{timeframe}', grounded={grounded}")
+            query = ' '.join(tokens).strip()
+            if not query:
+                return await self._send_message(chat_id, "❌ Укажите запрос для анализа.")
 
-            await self._send_message(chat_id, f"🔬 GPT-5 analyzing '{query}' ({length}) data for {timeframe}...")
-
-            # Get articles for analysis
-            articles = await self._get_articles_for_analysis(query, timeframe)
-            logger.info(f"🧪 [ANALYZE_CHECK] Articles fetched: count={len(articles) if articles else 0}")
-
-            if not articles:
-                logger.info("🧪 [ANALYZE_CHECK] No articles found; aborting")
-                return await self._send_message(chat_id, f"📭 No articles found for '{query}' in timeframe {timeframe}")
-
-            if not self.gpt5:
-                logger.warning("🧪 [ANALYZE_CHECK] GPT5Service is not attached")
-                return await self._send_message(chat_id, "❌ GPT-5 service not available")
-
-            # Length configurations for analysis style
-            length_config = {
-                'short': {'tokens': 250, 'style': 'brief bullet points'},
-                'medium': {'tokens': 500, 'style': 'structured paragraphs'},
-                'detailed': {'tokens': 900, 'style': 'comprehensive analysis'},
-                'executive': {'tokens': 350, 'style': 'executive summary with key actions'}
-            }
-            config = length_config.get(length, length_config['medium'])
-
-            # Use a single slice for prompt and sources to align [i] indices
-            prompt_slice = articles[:20]
-            # Use GPT-5 for analysis with structured prompt
-            analysis_prompt = build_analysis_prompt(
-                query=query,
-                articles=prompt_slice,
-                length=length,
-                grounded=grounded,
-                structure_first=True,
+            await self._send_message(
+                chat_id,
+                f"🔬 Анализирую '{query}' ({mode}) за {window}...",
             )
 
-            try:
-                try:
-                    chosen_model = self.gpt5.choose_model("analysis")
-                except Exception:
-                    chosen_model = "<unknown>"
-                logger.info(f"🧪 [ANALYZE_CHECK] Chosen model: {chosen_model}")
-                logger.info(f"🧪 [ANALYZE_CHECK] Prompt length: {len(analysis_prompt)}")
+            payload = await execute_analyze_command(mode=mode, query=query, window=window)
+            return await self._send_orchestrator_payload(chat_id, payload)
 
-                analysis = self.gpt5.send_analysis(analysis_prompt, max_output_tokens=config['tokens'])
-                logger.info(f"🧪 [ANALYZE_CHECK] Analysis text length: {len(analysis) if analysis else 0}")
+        except Exception as exc:
+            logger.error(f"Analyze command failed: {exc}")
+            return await self._send_message(chat_id, f"❌ Analyze command failed: {exc}")
 
-                if analysis and analysis.strip():
-                    # Build Table of Contents
-                    toc = (
-                        "📑 Table of contents\n"
-                        "- Executive summary\n"
-                        "- Key themes\n"
-                        "- Sentiment\n"
-                        "- Important developments\n"
-                        "- Predictions\n"
-                        "- Sources & Links\n"
-                        "- Metrics & Timeline\n\n"
-                    )
+    async def handle_ask_deep_command(self, chat_id: str, user_id: str, args: List[str]) -> bool:
+        """Handle /ask command - Phase 3 Agentic RAG with iterative retrieval"""
+        try:
+            if not args:
+                help_text = "🧠 **Phase 3 Agentic RAG Help**\n\n"
+                help_text += "**Usage:** `/ask <query> [--depth=1|2|3] [window]`\n\n"
+                help_text += "**Examples:**\n"
+                help_text += "• `/ask AI governance --depth=3` - Deep analysis\n"
+                help_text += "• `/ask crypto trends 1w` - Weekly trends\n\n"
+                help_text += "**Depth:**\n"
+                help_text += "• 1 = Quick answer (1 iteration)\n"
+                help_text += "• 2 = Standard (2 iterations)\n"
+                help_text += "• 3 = Deep (3 iterations with self-check)\n\n"
+                help_text += "**Windows:** 12h, 24h, 3d, 1w"
+                return await self._send_message(chat_id, help_text)
 
-                    # Top domains and key links/quotes (compact HTML sources later)
-                    def _domain_of(a: Dict[str, Any]) -> str:
-                        u = a.get('url') or ''
-                        net = urlparse(u).netloc if u else ''
-                        return (a.get('source_domain') or a.get('domain') or a.get('source') or net or 'unknown').lower()
-
-                    domains: Dict[str, int] = {}
-                    for a in articles:
-                        d = _domain_of(a)
-                        domains[d] = domains.get(d, 0) + 1
-                    top_domains = sorted(domains.items(), key=lambda x: x[1], reverse=True)[:5]
-
-                    # Prefer 5 most recent relevant links
-                    def _adate(a):
-                        dt = a.get('published_at')
-                        return dt if isinstance(dt, datetime) else (datetime.fromisoformat(dt) if isinstance(dt, str) and len(dt) >= 10 else datetime.min)
-
-                    # Keep source order consistent with prompt enumeration so [i] indices align
-                    showcase = prompt_slice[:7]
-                    # Prepare compact sources payload for HTML rendering
-                    sources_payload: List[Dict[str, Any]] = []
-                    for a in showcase:
-                        title = (a.get('title') or a.get('headline') or a.get('name') or 'Untitled').strip()[:160]
-                        url = a.get('url') or ''
-                        if url and not (url.startswith('http://') or url.startswith('https://')):
-                            continue
-                        src = (a.get('source') or a.get('domain') or a.get('source_domain') or '').lower()
-                        pub = a.get('published_at')
-                        if isinstance(pub, datetime):
-                            published_at = pub.isoformat()
-                        elif isinstance(pub, str):
-                            published_at = pub
-                        else:
-                            published_at = None
-                        sources_payload.append({
-                            'title': title,
-                            'url': url,
-                            'source_name': src,
-                            'published_at': published_at,
-                        })
-
-                    # Timeline by day
-                    from collections import Counter
-                    buckets = Counter()
-                    for a in articles:
-                        dt = a.get('published_at')
-                        if isinstance(dt, datetime):
-                            day = dt.date().isoformat()
-                        elif isinstance(dt, str) and len(dt) >= 10:
-                            day = dt[:10]
-                        else:
-                            continue
-                        buckets[day] += 1
-                    timeline_lines = [f"{day}: {cnt}" for day, cnt in sorted(buckets.items())]
-
-                    # Compact sources rendered as HTML links "Title — domain · YYYY-MM-DD"
-                    sources_section = self.formatter.render_sources_block(sources_payload)
-
-                    # Optional citations map if grounded — aligned with prompt_slice order
-                    if grounded:
-                        citations: Dict[str, str] = {}
-                        idx_i = 1
-                        for a in prompt_slice:
-                            u = a.get('url') or ''
-                            if u and (u.startswith('http://') or u.startswith('https://')):
-                                citations[str(idx_i)] = u
-                            idx_i += 1
-
-                    metrics_section = "\n".join([
-                        ("Top domains: " + ", ".join([f"{d} ({c})" for d, c in top_domains])) if top_domains else "Top domains: n/a",
-                        "<b>By day</b>",
-                        *timeline_lines
-                    ])
-
-                    header = f"🔬 <b>GPT-5 Analysis: {self.formatter.esc(query.upper())}</b>\n\n"
-                    header += f"📊 <b>Data:</b> {len(articles)} articles, {self.formatter.esc(timeframe)}\n\n"
-                    message = header + toc + analysis
-                    # Attach compact HTML sources and then metrics
-                    message = self.formatter.attach_sources(message, sources_payload)
-                    message += "\n\n" + metrics_section
+            # Parse depth parameter
+            depth = 3  # Default
+            query_tokens = []
+            for token in args:
+                if token.startswith('--depth='):
+                    try:
+                        depth = int(token.split('=')[1])
+                        depth = max(1, min(3, depth))  # Clamp to [1, 3]
+                    except:
+                        pass
                 else:
-                    # Build a data-only fallback report if model didn't return text
-                    def _domain_of(a: Dict[str, Any]) -> str:
-                        u = a.get('url') or ''
-                        net = urlparse(u).netloc if u else ''
-                        return (a.get('source_domain') or a.get('domain') or a.get('source') or net or 'unknown').lower()
+                    query_tokens.append(token)
 
-                    domains: Dict[str, int] = {}
-                    for a in articles:
-                        d = _domain_of(a)
-                        domains[d] = domains.get(d, 0) + 1
-                    top_domains = sorted(domains.items(), key=lambda x: x[1], reverse=True)[:5]
+            query = ' '.join(query_tokens).strip()
+            if not query:
+                return await self._send_message(chat_id, "❌ Please provide a query")
 
-                    def _adate(a):
-                        dt = a.get('published_at')
-                        return dt if isinstance(dt, datetime) else (datetime.fromisoformat(dt) if isinstance(dt, str) and len(dt) >= 10 else datetime.min)
+            await self._send_message(chat_id, f"🧠 Agentic RAG (depth={depth}): {query[:80]}...")
 
-                    # Keep same order as in prompt enumeration
-                    showcase = prompt_slice[:7]
-                    sources_payload: List[Dict[str, Any]] = []
-                    for a in showcase:
-                        title = (a.get('title') or a.get('headline') or a.get('name') or '').strip()[:160]
-                        url = a.get('url') or ''
-                        if url and not (url.startswith('http://') or url.startswith('https://')):
-                            continue
-                        src = (a.get('source') or a.get('domain') or a.get('source_domain') or '').lower()
-                        pub = a.get('published_at')
-                        if isinstance(pub, datetime):
-                            published_at = pub.isoformat()
-                        elif isinstance(pub, str):
-                            published_at = pub
-                        else:
-                            published_at = None
-                        sources_payload.append({
-                            'title': title,
-                            'url': url,
-                            'source_name': src,
-                            'published_at': published_at,
-                        })
+            # Use Phase3Handlers
+            from services.phase3_handlers import execute_ask_command
 
-                    from collections import Counter
-                    buckets = Counter()
-                    for a in articles:
-                        dt = a.get('published_at')
-                        if isinstance(dt, datetime):
-                            day = dt.date().isoformat()
-                        elif isinstance(dt, str) and len(dt) >= 10:
-                            day = dt[:10]
-                        else:
-                            continue
-                        buckets[day] += 1
-                    timeline_lines = [f"{day}: {cnt}" for day, cnt in sorted(buckets.items())]
+            payload = await execute_ask_command(
+                query=query,
+                depth=depth,
+                window="24h",
+                lang="auto",
+                k_final=5,
+                correlation_id=f"ask-{user_id}"
+            )
 
-                    header = f"🔬 <b>GPT-5 Analysis (data-only fallback): {self.formatter.esc(query.upper())}</b>\n\n"
-                    header += f"📊 <b>Data:</b> {len(articles)} articles, {self.formatter.esc(timeframe)}\n\n"
-                    toc = (
-                        "📑 Table of contents\n"
-                        "- Sources\n"
-                        "- Metrics & Timeline\n\n"
-                    )
-                    sources_section = self.formatter.render_sources_block(sources_payload)
-                    metrics_section = "\n".join([
-                        ("Top domains: " + ", ".join([f"{d} ({c})" for d, c in top_domains])) if top_domains else "Top domains: n/a",
-                        "<b>By day</b>",
-                        *timeline_lines
-                    ])
-                    message = header + toc
-                    message = self.formatter.attach_sources(message, sources_payload)
-                    message += "\n\n" + metrics_section
-
-                # Persist brief report into diagnostics (optional)
-                try:
-                    details = {
-                        'query': query,
-                        'timeframe': timeframe,
-                        'length': length,
-                        'grounded': grounded,
-                        'articles': len(articles),
-                        'top_domains': top_domains if 'top_domains' in locals() else [],
-                        'timeline': dict(buckets) if 'buckets' in locals() else {},
-                        'preview': (analysis or '')[:500]
-                    }
-                    with self.db._cursor() as cur:
-                        cur.execute(
-                            """
-                            INSERT INTO diagnostics (level, component, message, details)
-                            VALUES (%s, %s, %s, %s)
-                            """,
-                            ('INFO', 'analyze', f"analysis:{query}", json.dumps(details))
-                        )
-                except Exception as diag_err:
-                    logger.debug(f"Diagnostics write skipped: {diag_err}")
-
-                # Persist full report into analysis_reports
-                try:
-                    sources_payload = []
-                    for a in showcase:
-                        sources_payload.append({
-                            'title': a.get('title') or a.get('headline') or a.get('name'),
-                            'url': a.get('url'),
-                            'source': a.get('source') or a.get('domain') or a.get('source_domain')
-                        })
-                    self.db.save_analysis_report(
-                        query=query,
-                        timeframe=timeframe,
-                        length=length,
-                        grounded=grounded,
-                        articles_count=len(articles),
-                        report_text=message,
-                        top_domains=top_domains if 'top_domains' in locals() else [],
-                        timeline=dict(buckets) if 'buckets' in locals() else {},
-                        sources=sources_payload,
-                        user_id=user_id,
-                        chat_id=chat_id,
-                    )
-                except Exception as rep_err:
-                    logger.debug(f"Report save skipped: {rep_err}")
-
-                # Buttons: Refresh with same params
-                try:
-                    btn_cb = f"analyze:refresh|{query}|{length}|{timeframe}|{'1' if grounded else '0'}"
-                    buttons = [[{"text": "🔄 Refresh", "callback_data": btn_cb}]]
-                    markup = self._create_inline_keyboard(buttons)
-                except Exception:
-                    markup = None
-
-                result = await self._send_long_message(chat_id, message, markup, parse_mode="HTML")
-                elapsed_ms = int((time.monotonic() - start_ts) * 1000)
-                logger.info(f"🧪 [ANALYZE_CHECK] Finished /analyze in {elapsed_ms}ms")
-                return result
-
-            except Exception as gpt5_error:
-                logger.error(f"GPT-5 analysis error: {gpt5_error}")
-                from bot_service.error_handler import log_error
-                log_error(gpt5_error, user_id, chat_id, 'analyze_command')
-                elapsed_ms = int((time.monotonic() - start_ts) * 1000)
-                logger.error(f"🧪 [ANALYZE_CHECK] Failed /analyze in {elapsed_ms}ms: {gpt5_error}")
-                return await self._send_message(chat_id, "❌ GPT-5 analysis failed. Please try again.")
+            return await self._send_orchestrator_payload(chat_id, payload)
 
         except Exception as e:
-            logger.error(f"Analyze command failed: {e}")
-            return await self._send_message(chat_id, f"❌ Analysis failed: {e}")
+            logger.error(f"/ask failed: {e}", exc_info=True)
+            return await self._send_message(chat_id, f"❌ /ask failed: {e}")
+
+    async def handle_events_link_command(self, chat_id: str, user_id: str, args: List[str]) -> bool:
+        """Handle /events command - Phase 3 event linking with causality"""
+        try:
+            if not args:
+                help_text = "🗓️ **Phase 3 Event Linking Help**\n\n"
+                help_text += "**Usage:** `/events [topic] [window]`\n\n"
+                help_text += "**Examples:**\n"
+                help_text += "• `/events AI regulation` - Link AI regulation events\n"
+                help_text += "• `/events Ukraine 1w` - Week of Ukraine events\n\n"
+                help_text += "**Windows:** 6h, 12h, 24h, 3d, 1w"
+                return await self._send_message(chat_id, help_text)
+
+            topic = ' '.join(args).strip()
+            window = "12h"  # Default
+
+            # Parse window from end
+            tokens = topic.split()
+            if tokens and tokens[-1] in ["6h", "12h", "24h", "3d", "1w"]:
+                window = tokens[-1]
+                topic = " ".join(tokens[:-1])
+
+            await self._send_message(chat_id, f"🗓️ Linking events: {topic[:60]}...")
+
+            # Use Phase3Handlers
+            from services.phase3_handlers import execute_events_command
+
+            payload = await execute_events_command(
+                topic=topic or None,
+                window=window,
+                lang="auto",
+                k_final=10,
+                correlation_id=f"events-{user_id}"
+            )
+
+            return await self._send_orchestrator_payload(chat_id, payload)
+
+        except Exception as e:
+            logger.error(f"/events failed: {e}", exc_info=True)
+            return await self._send_message(chat_id, f"❌ /events failed: {e}")
+
+    async def handle_graph_query_command(self, chat_id: str, user_id: str, args: List[str]) -> bool:
+        """Handle /graph command - Phase 3 knowledge graph construction"""
+        try:
+            if not args:
+                help_text = "🧭 **Phase 3 GraphRAG Help**\n\n"
+                help_text += "**Usage:** `/graph <query> [--hops=2|3|4] [window]`\n\n"
+                help_text += "**Examples:**\n"
+                help_text += "• `/graph OpenAI partnerships --hops=3`\n"
+                help_text += "• `/graph AI companies 1w`\n\n"
+                help_text += "**Hops:**\n"
+                help_text += "• 2 = Direct connections\n"
+                help_text += "• 3 = Extended network (default)\n"
+                help_text += "• 4 = Deep connections\n\n"
+                help_text += "**Windows:** 24h, 3d, 1w, 2w"
+                return await self._send_message(chat_id, help_text)
+
+            # Parse hops parameter
+            hops = 3  # Default
+            query_tokens = []
+            for token in args:
+                if token.startswith('--hops='):
+                    try:
+                        hops = int(token.split('=')[1])
+                        hops = max(2, min(4, hops))  # Clamp to [2, 4]
+                    except:
+                        pass
+                else:
+                    query_tokens.append(token)
+
+            query = ' '.join(query_tokens).strip()
+            if not query:
+                return await self._send_message(chat_id, "❌ Please provide a query")
+
+            await self._send_message(chat_id, f"🧭 Building knowledge graph (hops={hops}): {query[:60]}...")
+
+            # Use Phase3Handlers
+            from services.phase3_handlers import execute_graph_command
+
+            payload = await execute_graph_command(
+                query=query,
+                hops=hops,
+                window="24h",
+                lang="auto",
+                k_final=10,
+                correlation_id=f"graph-{user_id}"
+            )
+
+            return await self._send_orchestrator_payload(chat_id, payload)
+
+        except Exception as e:
+            logger.error(f"/graph failed: {e}", exc_info=True)
+            return await self._send_message(chat_id, f"❌ /graph failed: {e}")
+
+    async def handle_memory_command(self, chat_id: str, user_id: str, args: List[str]) -> bool:
+        """Handle /memory command - Phase 3 long-term memory (suggest|store|recall)"""
+        try:
+            if not args:
+                help_text = "🧠 **Phase 3 Memory Help**\n\n"
+                help_text += "**Usage:** `/memory <operation> [query] [window]`\n\n"
+                help_text += "**Operations:**\n"
+                help_text += "• `suggest` - Get memory suggestions from context\n"
+                help_text += "• `store` - Store memory explicitly\n"
+                help_text += "• `recall` - Recall memories by query\n\n"
+                help_text += "**Examples:**\n"
+                help_text += "• `/memory suggest` - Analyze recent context\n"
+                help_text += "• `/memory recall AI trends` - Find related memories\n"
+                help_text += "• `/memory store Important fact about...`\n\n"
+                help_text += "**Windows:** 1d, 3d, 1w, 2w, 1m"
+                return await self._send_message(chat_id, help_text)
+
+            operation = args[0].lower()
+            if operation not in ['suggest', 'store', 'recall']:
+                return await self._send_message(
+                    chat_id,
+                    f"❌ Invalid operation: {operation}. Use: suggest, store, or recall"
+                )
+
+            query = " ".join(args[1:]) if len(args) > 1 else None
+            window = "1w"  # Default window
+
+            # Parse window from end of args
+            if query:
+                tokens = query.split()
+                if tokens and tokens[-1] in ["1d", "3d", "1w", "2w", "1m"]:
+                    window = tokens[-1]
+                    query = " ".join(tokens[:-1])
+
+            await self._send_message(chat_id, f"🧠 Executing /memory {operation}...")
+
+            # Use Phase3Handlers
+            from services.phase3_handlers import execute_memory_command
+
+            payload = await execute_memory_command(
+                operation=operation,
+                query=query,
+                window=window,
+                user_id=user_id,
+                correlation_id=f"memory-{user_id}-{operation}"
+            )
+
+            return await self._send_orchestrator_payload(chat_id, payload)
+
+        except Exception as e:
+            logger.error(f"/memory failed: {e}", exc_info=True)
+            return await self._send_message(chat_id, f"❌ /memory failed: {e}")
+
+    # ==================== PHASE 4 HANDLERS ====================
+
+    async def handle_dashboard_command(self, chat_id: str, user_id: str, args: List[str]) -> bool:
+        """Handle /dashboard live|custom command"""
+        try:
+            phase4_service = get_phase4_handler_service()
+
+            mode = args[0] if args else "live"
+            metrics = None
+            window = "24h"
+
+            # Parse args for custom mode
+            if mode == "custom" and len(args) > 1:
+                for arg in args[1:]:
+                    if arg.startswith("metrics="):
+                        metrics = arg.split("=")[1].split(",")
+                    elif arg in ["6h", "12h", "24h", "1w"]:
+                        window = arg
+
+            await self._send_message(chat_id, f"📊 Loading dashboard ({mode})...")
+
+            payload = await phase4_service.handle_dashboard_command(
+                mode=mode,
+                metrics=metrics,
+                window=window,
+                lang="ru",
+                correlation_id=f"dashboard-{user_id}"
+            )
+
+            return await self._send_phase4_response(chat_id, payload)
+
+        except Exception as e:
+            logger.error(f"/dashboard failed: {e}", exc_info=True)
+            return await self._send_message(chat_id, f"❌ /dashboard failed: {e}")
+
+    async def handle_reports_command(self, chat_id: str, user_id: str, args: List[str]) -> bool:
+        """Handle /reports generate command"""
+        try:
+            phase4_service = get_phase4_handler_service()
+
+            action = args[0] if args else "generate"
+            period = "weekly"
+            audience = None
+
+            if len(args) > 1:
+                if "monthly" in args[1]:
+                    period = "monthly"
+                elif "weekly" in args[1]:
+                    period = "weekly"
+
+            for arg in args:
+                if arg.startswith("audience="):
+                    audience = arg.split("=")[1]
+
+            await self._send_message(chat_id, f"📄 Generating {period} report...")
+
+            payload = await phase4_service.handle_reports_command(
+                action=action,
+                period=period,
+                audience=audience,
+                window="1w" if period == "weekly" else "1m",
+                lang="ru",
+                correlation_id=f"reports-{user_id}"
+            )
+
+            return await self._send_phase4_response(chat_id, payload)
+
+        except Exception as e:
+            logger.error(f"/reports failed: {e}", exc_info=True)
+            return await self._send_message(chat_id, f"❌ /reports failed: {e}")
+
+    async def handle_schedule_command(self, chat_id: str, user_id: str, args: List[str]) -> bool:
+        """Handle /schedule report command"""
+        try:
+            phase4_service = get_phase4_handler_service()
+
+            action = "setup"
+            cron = "0 9 * * 1"  # Default: Monday 9 AM
+            period = "weekly"
+
+            for arg in args:
+                if arg.startswith("cron="):
+                    cron = arg.split("=")[1].strip('"\'')
+                elif arg in ["weekly", "monthly"]:
+                    period = arg
+
+            await self._send_message(chat_id, "⏰ Setting up report schedule...")
+
+            payload = await phase4_service.handle_schedule_command(
+                action=action,
+                cron=cron,
+                period=period,
+                lang="ru",
+                correlation_id=f"schedule-{user_id}"
+            )
+
+            return await self._send_phase4_response(chat_id, payload)
+
+        except Exception as e:
+            logger.error(f"/schedule failed: {e}", exc_info=True)
+            return await self._send_message(chat_id, f"❌ /schedule failed: {e}")
+
+    async def handle_alerts_command(self, chat_id: str, user_id: str, args: List[str]) -> bool:
+        """Handle /alerts setup|test command"""
+        try:
+            phase4_service = get_phase4_handler_service()
+
+            action = args[0] if args else "setup"
+            conditions = []
+
+            for arg in args[1:]:
+                if "=" in arg or ">" in arg or "<" in arg:
+                    conditions.append(arg)
+
+            await self._send_message(chat_id, f"🔔 Configuring alerts ({action})...")
+
+            payload = await phase4_service.handle_alerts_command(
+                action=action,
+                conditions=conditions,
+                lang="ru",
+                correlation_id=f"alerts-{user_id}"
+            )
+
+            return await self._send_phase4_response(chat_id, payload)
+
+        except Exception as e:
+            logger.error(f"/alerts failed: {e}", exc_info=True)
+            return await self._send_message(chat_id, f"❌ /alerts failed: {e}")
+
+    async def handle_optimize_command(self, chat_id: str, user_id: str, args: List[str]) -> bool:
+        """Handle /optimize listing|campaign command"""
+        try:
+            phase4_service = get_phase4_handler_service()
+
+            if not args:
+                return await self._send_message(chat_id, "❌ Usage: /optimize <listing|campaign> [options]")
+
+            optimize_type = args[0]
+
+            if optimize_type == "listing":
+                goal = "ctr"
+                product = None
+
+                for arg in args[1:]:
+                    if arg.startswith("goal="):
+                        goal = arg.split("=")[1]
+                    elif arg.startswith("product="):
+                        product = arg.split("=")[1].strip('"\'')
+
+                await self._send_message(chat_id, f"🎯 Optimizing listing (goal: {goal})...")
+
+                payload = await phase4_service.handle_optimize_listing_command(
+                    goal=goal,
+                    product=product,
+                    window="1w",
+                    lang="ru",
+                    correlation_id=f"optimize-listing-{user_id}"
+                )
+
+            elif optimize_type == "campaign":
+                channel = "web"
+                metrics = None
+
+                for arg in args[1:]:
+                    if arg.startswith("channel="):
+                        channel = arg.split("=")[1]
+                    elif arg.startswith("metrics="):
+                        metrics = arg.split("=")[1].split(",")
+
+                await self._send_message(chat_id, f"🚀 Optimizing campaign ({channel})...")
+
+                payload = await phase4_service.handle_optimize_campaign_command(
+                    channel=channel,
+                    metrics=metrics,
+                    window="1w",
+                    lang="ru",
+                    correlation_id=f"optimize-campaign-{user_id}"
+                )
+            else:
+                return await self._send_message(chat_id, f"❌ Unknown optimize type: {optimize_type}")
+
+            return await self._send_phase4_response(chat_id, payload)
+
+        except Exception as e:
+            logger.error(f"/optimize failed: {e}", exc_info=True)
+            return await self._send_message(chat_id, f"❌ /optimize failed: {e}")
+
+    async def handle_brief_command(self, chat_id: str, user_id: str, args: List[str]) -> bool:
+        """Handle /brief assets command"""
+        try:
+            phase4_service = get_phase4_handler_service()
+
+            channels = None
+            objective = "awareness"
+
+            for arg in args:
+                if arg.startswith("channels="):
+                    channels = arg.split("=")[1].split(",")
+                elif arg.startswith("objective="):
+                    objective = arg.split("=")[1]
+
+            await self._send_message(chat_id, "📝 Generating asset brief...")
+
+            payload = await phase4_service.handle_brief_command(
+                channels=channels,
+                objective=objective,
+                window="1w",
+                lang="ru",
+                correlation_id=f"brief-{user_id}"
+            )
+
+            return await self._send_phase4_response(chat_id, payload)
+
+        except Exception as e:
+            logger.error(f"/brief failed: {e}", exc_info=True)
+            return await self._send_message(chat_id, f"❌ /brief failed: {e}")
+
+    async def handle_pricing_command(self, chat_id: str, user_id: str, args: List[str]) -> bool:
+        """Handle /pricing advisor command"""
+        try:
+            phase4_service = get_phase4_handler_service()
+
+            product = None
+            plan = None
+            targets = {}
+
+            for arg in args:
+                if arg.startswith("product="):
+                    product = arg.split("=")[1].strip('"\'')
+                elif arg.startswith("plan="):
+                    plan = arg.split("=")[1].strip('"\'')
+                elif arg.startswith("targets="):
+                    # Parse targets like "roi_min:300,cac_max:50"
+                    targets_str = arg.split("=")[1]
+                    for target in targets_str.split(","):
+                        if ":" in target:
+                            key, value = target.split(":")
+                            targets[key] = float(value)
+
+            await self._send_message(chat_id, "💰 Analyzing pricing...")
+
+            payload = await phase4_service.handle_pricing_command(
+                product=product,
+                plan=plan,
+                targets=targets or {"roi_min": 2.0, "cac_max": 100.0},
+                window="1m",
+                lang="ru",
+                correlation_id=f"pricing-{user_id}"
+            )
+
+            return await self._send_phase4_response(chat_id, payload)
+
+        except Exception as e:
+            logger.error(f"/pricing failed: {e}", exc_info=True)
+            return await self._send_message(chat_id, f"❌ /pricing failed: {e}")
+
+    async def _send_phase4_response(self, chat_id: str, payload: Dict[str, Any]) -> bool:
+        """Send Phase 4 orchestrator response to Telegram"""
+        if not payload:
+            return await self._send_message(chat_id, "❌ Empty Phase 4 response.")
+
+        text = payload.get("text", "⚠️ Phase 4 returned empty text.")
+        buttons = payload.get("buttons", [])
+        parse_mode = payload.get("parse_mode", "Markdown")
+
+        markup = self._create_inline_keyboard(buttons) if buttons else None
+
+        return await self._send_long_message(chat_id, text, markup, parse_mode=parse_mode)
+
+    # ==================== END PHASE 4 HANDLERS ====================
 
     async def handle_summarize_command(self, chat_id: str, user_id: str, args: List[str]) -> bool:
         """Handle /summarize command - GPT-5 content summarization"""
@@ -2174,3 +2342,9 @@ async def main():
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     asyncio.run(main())
+
+
+
+
+
+

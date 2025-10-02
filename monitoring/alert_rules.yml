@@ -1,0 +1,51 @@
+groups:
+  - name: rssnews-orchestrator
+    rules:
+      - alert: HighOrchestratorLatency
+        expr: histogram_quantile(0.95, sum(rate(rss_orchestrator_latency_seconds_bucket[5m])) by (command, le)) > 12
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Orchestrator latency above 12s for {{ $labels.command }}"
+          description: "The 95th percentile latency exceeded the 12 second SLO for more than 5 minutes."
+
+      - alert: OrchestratorErrorRate
+        expr: |
+          sum(rate(rss_orchestrator_errors_total[5m])) by (command)
+            /
+          clamp_min(sum(rate(rss_orchestrator_requests_total[5m])) by (command), 1)
+            > 0.02
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Orchestrator error rate high for {{ $labels.command }}"
+          description: "Error rate exceeded 2% over a 5 minute window."
+
+      - alert: EvidenceCoverageLow
+        expr: rss_orchestrator_evidence_coverage_ratio < 0.95
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Evidence coverage below target for {{ $labels.command }}"
+          description: "Evidence coverage fell below the 95% SLO."
+
+      - alert: CommandCostExceeded
+        expr: histogram_quantile(0.99, sum(rate(rss_command_cost_cents_bucket[10m])) by (command, le)) > 50
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Command cost exceeded $0.50 for {{ $labels.command }}"
+          description: "99th percentile command cost is above the $0.50 SLO."
+
+      - alert: MissingOrchestratorMetrics
+        expr: absent(rss_orchestrator_requests_total)
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Orchestrator metrics missing"
+          description: "Prometheus has not scraped orchestrator metrics for 10 minutes."

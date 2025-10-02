@@ -1,0 +1,31 @@
+{
+  "command": "/analyze sentiment",
+  "params": {
+    "window": "24h",
+    "lang": "en",
+    "sources": ["techchronicle.com","finledger.io","globalregulator.org"],
+    "topic": null,
+    "domains": null,
+    "query": "AI adoption outlook",
+    "k_final": 5,
+    "flags": {"rerank_enabled": true}
+  },
+  "retrieval": {
+    "docs": [
+      {"article_id":"se-811","title":"Banks Cite Positive ROI from AI Pilots","url":"https://techchronicle.com/ai-roi-banks","date":"2025-09-29","lang":"en","score":0.82,"snippet":"Several banks reported faster case resolution and improved cost-to-serve after limited-scale AI pilot rollouts in operations."},
+      {"article_id":"se-812","title":"GPU Capacity Expansion Eases Bottlenecks","url":"https://finledger.io/gpu-bottlenecks-ease","date":"2025-09-28","lang":"en","score":0.78,"snippet":"Cloud providers increased inference GPU availability, reducing queue times for new deployments of conversational and multimodal agents."},
+      {"article_id":"se-813","title":"Incident Reporting Rules Tighten","url":"https://globalregulator.org/incident-reporting","date":"2025-09-29","lang":"en","score":0.77,"snippet":"New guidance mandates 24-hour incident reporting for material failures, prompting firms to strengthen monitoring and response playbooks."},
+      {"article_id":"se-814","title":"Staff Upskilling for AI Triage","url":"https://techchronicle.com/staff-upskilling-triage","date":"2025-09-28","lang":"en","score":0.74,"snippet":"Clinics expand training programs to validate AI decisions and escalate ambiguous cases, emphasizing safety over speed."},
+      {"article_id":"se-815","title":"Retail Experiments Show Mixed Conversion Gains","url":"https://finledger.io/retail-conversion-mixed","date":"2025-09-27","lang":"en","score":0.71,"snippet":"Generative copy improved conversions in several categories, but seasonal factors and data coverage impacted overall uplift consistency."}
+    ],
+    "window": "24h",
+    "lang": "en",
+    "sources": ["techchronicle.com","finledger.io","globalregulator.org"],
+    "k_final": 5,
+    "rerank_enabled": true
+  },
+  "models": {"primary": "gpt-5", "fallback": ["claude-4.5","gemini-2.5-pro"]},
+  "ab_test": {"experiment": null, "arm": null},
+  "limits": {"max_tokens": 4096, "budget_cents": 50, "timeout_s": 12},
+  "telemetry": {"correlation_id": "2acd2d2a-8c1b-45a1-9d8f-se-ctx", "version": "phase2-orchestrator"}
+}
