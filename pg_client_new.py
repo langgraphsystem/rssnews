@@ -818,43 +818,32 @@ class PgClient:
 
     def update_chunk_embedding(self, chunk_id: int, embedding: List[float]) -> bool:
         """Update embedding vector for single chunk.
-        Handles both pgvector(3072) and TEXT columns automatically.
+        Automatically saves to BOTH embedding (TEXT) and embedding_vector (pgvector) if available.
         """
         try:
             with self._cursor() as cur:
-                # Check current column type by trying to insert
-                try:
-                    # Try pgvector first - pad 768 to 3072 if needed
-                    if len(embedding) == 768:
-                        # Pad to 3072 for pgvector compatibility
-                        padded_embedding = embedding + [0.0] * (3072 - 768)
-                        logger.debug(f"Padding embedding from 768 to 3072 dimensions")
-                    else:
-                        padded_embedding = embedding
+                # Prepare vector string for both formats
+                vec_str = '[' + ','.join(str(float(x)) for x in embedding) + ']'
 
-                    vec_str = '[' + ','.join(str(float(x)) for x in padded_embedding) + ']'
+                # Always update TEXT embedding (backwards compatibility)
+                cur.execute(
+                    "UPDATE article_chunks SET embedding = %s WHERE id = %s",
+                    (vec_str, chunk_id)
+                )
+
+                # Try to also update pgvector column if it exists
+                try:
                     cur.execute(
-                        """
-                        UPDATE article_chunks
-                        SET embedding = %s::vector
-                        WHERE id = %s
-                        """,
+                        "UPDATE article_chunks SET embedding_vector = %s::vector WHERE id = %s",
                         (vec_str, chunk_id)
                     )
-                    return True
-                except Exception as e1:
-                    # Fallback to TEXT storage
-                    logger.debug(f"pgvector failed, using TEXT storage: {e1}")
-                    vec_str = '[' + ','.join(str(float(x)) for x in embedding) + ']'
-                    cur.execute(
-                        """
-                        UPDATE article_chunks
-                        SET embedding = %s
-                        WHERE id = %s
-                        """,
-                        (vec_str, chunk_id)
-                    )
-                    return True
+                    logger.debug(f"Chunk {chunk_id}: Updated both TEXT and pgvector columns")
+                except Exception as e_pg:
+                    # pgvector column doesn't exist or wrong dimension - not a critical error
+                    logger.debug(f"Chunk {chunk_id}: pgvector update skipped ({e_pg})")
+
+                return True
+
         except Exception as e:
             logger.error(f"Failed to update embedding for chunk {chunk_id}: {e}")
             return False
