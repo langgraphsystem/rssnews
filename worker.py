@@ -3,7 +3,6 @@ Enhanced article worker with new parsing pipeline
 """
 
 import os
-import json
 import logging
 import uuid
 import asyncio
@@ -233,10 +232,7 @@ class ArticleWorker:
                         })
 
                     try:
-                        # Generate embeddings for chunks (worker-level for immediate availability)
-                        if os.getenv("ENABLE_LOCAL_EMBEDDINGS", "true").lower() == "true":
-                            await self._generate_chunk_embeddings(smart_chunks)
-
+                        # Save chunks without generating embeddings at worker level
                         self.db.upsert_article_chunks(str(article_id), 1, smart_chunks)
                         self.db.mark_chunking_completed(str(article_id), 1)
                         logger.info(f"Saved {len(smart_chunks)} chunks to database for article {article_id}")
@@ -297,35 +293,6 @@ class ArticleWorker:
                 logger.error(f"Failed to update error status: {update_e}")
         
         return result
-
-    async def _generate_chunk_embeddings(self, chunks: List[Dict[str, Any]]) -> None:
-        """Generate embeddings for chunks using embeddinggemma"""
-        try:
-            from local_embedding_generator import LocalEmbeddingGenerator
-
-            generator = LocalEmbeddingGenerator()
-
-            # Extract texts from chunks
-            texts = [chunk.get('text', '') for chunk in chunks]
-
-            logger.info(f"Generating embeddings for {len(texts)} chunks...")
-            embeddings = await generator.generate_embeddings(texts)
-
-            # Add embeddings to chunks
-            embeddings_added = 0
-            for i, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
-                if embedding:
-                    # Convert embedding to JSON string for PostgreSQL
-                    chunk['embedding'] = json.dumps(embedding)
-                    embeddings_added += 1
-                else:
-                    logger.warning(f"No embedding generated for chunk {i}")
-
-            logger.info(f"Added {embeddings_added}/{len(chunks)} embeddings to chunks")
-
-        except Exception as e:
-            logger.error(f"Failed to generate embeddings: {e}")
-            # Continue without embeddings rather than failing the entire article
 
     def close(self):
         """Clean up resources"""

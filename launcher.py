@@ -7,9 +7,11 @@ services can share the same repository and root railway.toml.
 Supported SERVICE_MODE values:
   - poll               -> python main.py poll --workers {POLL_WORKERS} --batch-size {POLL_BATCH}
   - work               -> python main.py work [--simplified] --workers {WORK_WORKERS} --batch-size {WORK_BATCH}
+  - work-continuous    -> python services/work_continuous_service.py --interval {WORK_CONTINUOUS_INTERVAL} --batch {WORK_CONTINUOUS_BATCH}
   - embedding          -> python main.py services run-once --services embedding --embedding-batch {EMBEDDING_BATCH}
   - chunking           -> python main.py services run-once --services chunking --chunking-batch {CHUNKING_BATCH}
-  - openai-migration   -> python services/openai_embedding_migration_service.py continuous --interval {MIGRATION_INTERVAL}
+  - chunk-continuous   -> python services/chunk_continuous_service.py --interval {CHUNK_CONTINUOUS_INTERVAL} --batch {CHUNK_CONTINUOUS_BATCH}
+  - openai-migration   -> python services/openai_embedding_migration_service.py --interval {MIGRATION_INTERVAL}
 
 Default SERVICE_MODE: openai-migration (keeps backward compatibility until services set explicit modes).
 """
@@ -31,8 +33,14 @@ def build_command() -> str:
     work_batch = os.getenv("WORK_BATCH", "50")
     work_simplified = os.getenv("WORK_SIMPLIFIED", "false").lower() == "true"
 
+    work_continuous_interval = os.getenv("WORK_CONTINUOUS_INTERVAL", "30")
+    work_continuous_batch = os.getenv("WORK_CONTINUOUS_BATCH", "50")
+
     emb_batch = os.getenv("EMBEDDING_BATCH", "1000")
+
     chunk_batch = os.getenv("CHUNKING_BATCH", "100")
+    chunk_continuous_interval = os.getenv("CHUNK_CONTINUOUS_INTERVAL", "30")
+    chunk_continuous_batch = os.getenv("CHUNK_CONTINUOUS_BATCH", "100")
 
     mig_interval = os.getenv("MIGRATION_INTERVAL", "60")
 
@@ -43,17 +51,23 @@ def build_command() -> str:
         simplified_flag = " --simplified" if work_simplified else ""
         return f"python main.py work{simplified_flag} --workers {work_workers} --batch-size {work_batch}"
 
+    if mode == "work-continuous":
+        return f"python services/work_continuous_service.py --interval {work_continuous_interval} --batch {work_continuous_batch}"
+
     if mode == "embedding":
         return f"python main.py services run-once --services embedding --embedding-batch {emb_batch}"
 
     if mode == "chunking":
         return f"python main.py services run-once --services chunking --chunking-batch {chunk_batch}"
 
+    if mode == "chunk-continuous":
+        return f"python services/chunk_continuous_service.py --interval {chunk_continuous_interval} --batch {chunk_continuous_batch}"
+
     if mode == "openai-migration":
-        return f"python services/openai_embedding_migration_service.py continuous --interval {mig_interval}"
+        return f"python services/openai_embedding_migration_service.py --interval {mig_interval}"
 
     # Fallback: print help and exit non-zero
-    print(f"Unsupported SERVICE_MODE='{mode}'. Supported: poll|work|embedding|chunking|openai-migration", file=sys.stderr)
+    print(f"Unsupported SERVICE_MODE='{mode}'. Supported: poll|work|work-continuous|embedding|chunking|chunk-continuous|openai-migration", file=sys.stderr)
     sys.exit(2)
 
 

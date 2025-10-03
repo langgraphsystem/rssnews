@@ -36,7 +36,8 @@
       "Bash(railway up:*)",
       "Bash(railway logs:*)",
       "Bash(if exist nul del /f nul)",
-      "Bash(railway run:*)"
+      "Bash(railway run:*)",
+      "Bash(grep:*)"
     ],
     "deny": [],
     "ask": []
