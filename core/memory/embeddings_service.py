@@ -132,10 +132,10 @@ class EmbeddingsService:
     async def _embed_openai(self, texts: List[str]) -> List[List[float]]:
         """Generate embeddings using OpenAI"""
         try:
-            # Use text-embedding-ada-002 (1536 dimensions)
+            # Use text-embedding-3-large (3072 dimensions)
             response = self._client.embeddings.create(
                 input=texts,
-                model="text-embedding-ada-002"
+                model="text-embedding-3-large"
             )
 
             embeddings = [data.embedding for data in response.data]
@@ -185,11 +185,11 @@ class EmbeddingsService:
     def get_dimensions(self) -> int:
         """Get embedding dimensions for this provider"""
         dimensions = {
-            "openai": 1536,  # text-embedding-ada-002
+            "openai": 3072,  # text-embedding-3-large
             "cohere": 1024,  # embed-english-v3.0
             "local": 384     # all-MiniLM-L6-v2
         }
-        return dimensions.get(self.provider, 1536)
+        return dimensions.get(self.provider, 3072)
 
     @staticmethod
     def cosine_similarity(vec1: List[float], vec2: List[float]) -> float:

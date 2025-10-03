@@ -20,7 +20,7 @@ from ranking_service.scorer import ProductionScorer, ScoringWeights
 from ranking_service.deduplication import DeduplicationEngine
 from ranking_service.diversification import MMRDiversifier
 from ranking_service.explainability import ExplainabilityEngine
-from local_embedding_generator import LocalEmbeddingGenerator
+from openai_embedding_generator import OpenAIEmbeddingGenerator
 from caching_service import CachingService
 
 logger = logging.getLogger(__name__)
@@ -65,7 +65,7 @@ class RankingAPI:
         self.dedup_engine = DeduplicationEngine()
         self.diversifier = MMRDiversifier()
         self.explainer = ExplainabilityEngine()
-        self.embedding_generator = LocalEmbeddingGenerator()
+        self.embedding_generator = OpenAIEmbeddingGenerator()
         self.cache = CachingService()
 
         # Load dynamic weights from database

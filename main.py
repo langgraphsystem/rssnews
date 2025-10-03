@@ -353,9 +353,9 @@ def main():
                     res = _Res(rows, args.query)
                 else:
                     # Use embedding-based semantic search (pgvector) - synchronous fallback
-                    from local_embedding_generator import LocalEmbeddingGenerator
+                    from openai_embedding_generator import OpenAIEmbeddingGenerator
                     import asyncio
-                    embedding_gen = LocalEmbeddingGenerator()
+                    embedding_gen = OpenAIEmbeddingGenerator()
                     loop = asyncio.new_event_loop()
                     asyncio.set_event_loop(loop)
                     query_embeddings = loop.run_until_complete(embedding_gen.generate_embeddings([args.query]))

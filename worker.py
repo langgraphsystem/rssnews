@@ -233,7 +233,7 @@ class ArticleWorker:
                         })
 
                     try:
-                        # Generate embeddings for chunks
+                        # Generate embeddings for chunks (worker-level for immediate availability)
                         if os.getenv("ENABLE_LOCAL_EMBEDDINGS", "true").lower() == "true":
                             await self._generate_chunk_embeddings(smart_chunks)
 
