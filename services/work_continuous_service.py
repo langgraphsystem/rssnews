@@ -48,19 +48,17 @@ class WorkContinuousService:
                 cur.execute("SELECT COUNT(*) FROM raw")
                 total = cur.fetchone()[0]
 
-                # Pending articles (no fulltext)
-                cur.execute("""
-                    SELECT COUNT(*)
-                    FROM raw
-                    WHERE id NOT IN (
-                        SELECT raw_id FROM fulltext WHERE raw_id IS NOT NULL
-                    )
-                """)
+                # Pending articles (status = 'pending')
+                cur.execute("SELECT COUNT(*) FROM raw WHERE status = 'pending'")
                 pending = cur.fetchone()[0]
 
                 # Processing articles
                 cur.execute("SELECT COUNT(*) FROM raw WHERE status = 'processing'")
                 processing = cur.fetchone()[0]
+
+                # Processed articles (stored/duplicate)
+                cur.execute("SELECT COUNT(*) FROM raw WHERE status IN ('stored', 'duplicate')")
+                processed = cur.fetchone()[0]
 
                 # Error articles
                 cur.execute("SELECT COUNT(*) FROM raw WHERE status = 'error'")
@@ -70,8 +68,9 @@ class WorkContinuousService:
                     'total': total,
                     'pending': pending,
                     'processing': processing,
+                    'processed': processed,
                     'errors': errors,
-                    'completion': round(100 * (total - pending) / total, 2) if total > 0 else 0
+                    'completion': round(100 * processed / total, 2) if total > 0 else 0
                 }
 
                 return stats

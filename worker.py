@@ -201,43 +201,8 @@ class ArticleWorker:
             
             self.db.update_article(article_id, **article_updates)
             
-            # Smart chunking with local LLM (required) - работает для всех статей с текстом
-            smart_chunks = None
-            if os.getenv("ENABLE_LOCAL_CHUNKING") and parsed_article.full_text and len(parsed_article.full_text.strip()) > 50:
-                from local_llm_chunker import LocalLLMChunker
-                chunker = LocalLLMChunker()
-                smart_chunks = await chunker.create_chunks(
-                    text=parsed_article.full_text,
-                    metadata={
-                        'title': parsed_article.title,
-                        'category': parsed_article.section,
-                        'language': parsed_article.language,
-                        'source': parsed_article.source
-                    }
-                )
-                logger.info(f"Created {len(smart_chunks)} smart chunks for article {article_id}")
-
-                # Save chunks directly to database
-                if smart_chunks:
-                    # Add required metadata to each chunk
-                    for chunk in smart_chunks:
-                        chunk.update({
-                            'url': parsed_article.canonical_url or article_url,
-                            'title_norm': parsed_article.title or '',
-                            'source_domain': parsed_article.source,
-                            'published_at': parsed_article.published_at,
-                            'language': parsed_article.language,
-                            'category': parsed_article.section,
-                            'tags_norm': parsed_article.keywords or [],
-                        })
-
-                    try:
-                        # Save chunks without generating embeddings at worker level
-                        self.db.upsert_article_chunks(str(article_id), 1, smart_chunks)
-                        self.db.mark_chunking_completed(str(article_id), 1)
-                        logger.info(f"Saved {len(smart_chunks)} chunks to database for article {article_id}")
-                    except Exception as e:
-                        logger.error(f"Failed to save chunks for article {article_id}: {e}")
+            # Note: Chunking is handled by a dedicated service now (ChunkingService).
+            # Worker does not perform chunking to avoid duplication and reduce latency.
 
             # Add to articles index for deduplication
             if parsed_article.status == 'stored' and parsed_article.text_hash:
