@@ -11,7 +11,7 @@ db = PgClient()
 # Check latest embeddings
 query = """
 SELECT
-    chunk_id,
+    id,
     LENGTH(embedding::text) as text_len,
     vector_dims(embedding) as pgvector_dims,
     created_at
