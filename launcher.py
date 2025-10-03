@@ -12,6 +12,7 @@ Supported SERVICE_MODE values:
   - chunking           -> python main.py services run-once --services chunking --chunking-batch {CHUNKING_BATCH}
   - chunk-continuous   -> python services/chunk_continuous_service.py --interval {CHUNK_CONTINUOUS_INTERVAL} --batch {CHUNK_CONTINUOUS_BATCH}
   - openai-migration   -> python services/openai_embedding_migration_service.py --interval {MIGRATION_INTERVAL}
+  - bot                -> python start_telegram_bot.py
 
 Default SERVICE_MODE: openai-migration (keeps backward compatibility until services set explicit modes).
 """
@@ -66,8 +67,11 @@ def build_command() -> str:
     if mode == "openai-migration":
         return f"python services/openai_embedding_migration_service.py --interval {mig_interval}"
 
+    if mode == "bot":
+        return "python start_telegram_bot.py"
+
     # Fallback: print help and exit non-zero
-    print(f"Unsupported SERVICE_MODE='{mode}'. Supported: poll|work|work-continuous|embedding|chunking|chunk-continuous|openai-migration", file=sys.stderr)
+    print(f"Unsupported SERVICE_MODE='{mode}'. Supported: poll|work|work-continuous|embedding|chunking|chunk-continuous|openai-migration|bot", file=sys.stderr)
     sys.exit(2)
 
 
