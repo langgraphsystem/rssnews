@@ -1,0 +1,7 @@
+[build]
+builder = "nixpacks"
+
+[deploy]
+startCommand = "python services/openai_embedding_migration_service.py continuous --interval 60"
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 10
