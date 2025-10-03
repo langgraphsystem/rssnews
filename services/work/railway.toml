@@ -1,0 +1,10 @@
+[build]
+builder = "nixpacks"
+
+[deploy]
+# NOTE: Ensure the Railway service Root Directory includes the project code (repo root)
+# or override Start Command in the dashboard to this value.
+startCommand = "python main.py work --workers 10 --batch-size 50"
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 10
+

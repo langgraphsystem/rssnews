@@ -1,0 +1,9 @@
+[build]
+builder = "nixpacks"
+
+[deploy]
+# OpenAI migration service for embeddings (3072-dim)
+startCommand = "python services/openai_embedding_migration_service.py continuous --interval 60"
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 10
+

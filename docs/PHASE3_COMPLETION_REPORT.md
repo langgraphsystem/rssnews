@@ -107,7 +107,7 @@ CREATE TABLE memory_records (
     id UUID PRIMARY KEY,
     type VARCHAR(32),  -- 'episodic' or 'semantic'
     content TEXT,
-    embedding vector(1536),  -- pgvector for similarity search
+    embedding vector(3072),  -- pgvector for similarity search (OpenAI text-embedding-3-large)
     importance FLOAT,
     ttl_days INTEGER,
     expires_at TIMESTAMP,

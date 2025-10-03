@@ -14,8 +14,8 @@ CREATE TABLE IF NOT EXISTS memory_records (
     -- Content
     content TEXT NOT NULL,
 
-    -- Vector embedding for semantic search (1536 dimensions for OpenAI ada-002)
-    embedding vector(1536),
+    -- Vector embedding for semantic search (3072 dimensions for OpenAI text-embedding-3-large)
+    embedding vector(3072),
 
     -- Metadata
     importance FLOAT NOT NULL DEFAULT 0.5 CHECK (importance >= 0.0 AND importance <= 1.0),
@@ -171,7 +171,7 @@ GROUP BY user_id, type;
 -- Comments
 COMMENT ON TABLE memory_records IS 'Long-term memory storage with vector embeddings for semantic search';
 COMMENT ON COLUMN memory_records.type IS 'Memory type: episodic (event-based) or semantic (fact-based)';
-COMMENT ON COLUMN memory_records.embedding IS 'Vector embedding (1536-dim) for semantic similarity search';
+COMMENT ON COLUMN memory_records.embedding IS 'Vector embedding (3072-dim) for semantic similarity search';
 COMMENT ON COLUMN memory_records.importance IS 'Importance score [0.0, 1.0] for prioritization';
 COMMENT ON COLUMN memory_records.ttl_days IS 'Time-to-live in days before expiration';
 COMMENT ON COLUMN memory_records.refs IS 'Array of article IDs or URLs referenced';

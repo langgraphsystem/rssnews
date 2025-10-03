@@ -6,6 +6,8 @@ Supports OpenAI, Cohere, and local models.
 import hashlib
 import logging
 import os
+import asyncio
+import random
 from typing import List, Optional
 import numpy as np
 
@@ -42,15 +44,31 @@ class EmbeddingsService:
             raise ValueError(f"Unsupported provider: {self.provider}")
 
     def _init_openai(self):
-        """Initialize OpenAI client"""
+        """Initialize async OpenAI client and model selection"""
         try:
-            from openai import OpenAI
+            # Async client for non-blocking calls
+            from openai import AsyncOpenAI  # type: ignore
+
             api_key = self.api_key or os.getenv("OPENAI_API_KEY")
             if not api_key:
                 raise ValueError("OpenAI API key not provided")
 
-            self._client = OpenAI(api_key=api_key)
-            logger.info("OpenAI embeddings client initialized")
+            # Preferred embeddings model (default: text-embedding-3-large, 3072-dim)
+            self.openai_embedding_model = os.getenv(
+                "OPENAI_EMBEDDING_MODEL",
+                os.getenv("EMBEDDINGS_OPENAI_MODEL", "text-embedding-3-large")
+            )
+
+            # Batch and retry settings
+            self.openai_batch_size = int(os.getenv("OPENAI_EMBEDDING_BATCH_SIZE", "100"))
+            self.openai_max_retries = int(os.getenv("OPENAI_EMBEDDING_MAX_RETRIES", "3"))
+            self.openai_timeout_s = float(os.getenv("EMBEDDING_TIMEOUT", "30"))
+
+            self._aclient = AsyncOpenAI(api_key=api_key)
+            logger.info(
+                f"OpenAI async client initialized (model={self.openai_embedding_model}, "
+                f"batch={self.openai_batch_size}, retries={self.openai_max_retries})"
+            )
 
         except ImportError:
             logger.error("OpenAI library not installed. Install with: pip install openai")
@@ -130,22 +148,53 @@ class EmbeddingsService:
             raise ValueError(f"Unsupported provider: {self.provider}")
 
     async def _embed_openai(self, texts: List[str]) -> List[List[float]]:
-        """Generate embeddings using OpenAI"""
-        try:
-            # Use text-embedding-3-large (3072 dimensions)
-            response = self._client.embeddings.create(
-                input=texts,
-                model="text-embedding-3-large"
-            )
+        """Generate embeddings using OpenAI with async client, batching, and retries"""
+        if not texts:
+            return []
 
-            embeddings = [data.embedding for data in response.data]
-            logger.info(f"Generated {len(embeddings)} OpenAI embeddings")
+        model_name = getattr(self, "openai_embedding_model", None) or os.getenv(
+            "OPENAI_EMBEDDING_MODEL",
+            os.getenv("EMBEDDINGS_OPENAI_MODEL", "text-embedding-3-large")
+        )
 
-            return embeddings
+        batch_size = max(1, int(getattr(self, "openai_batch_size", 100)))
+        max_retries = max(0, int(getattr(self, "openai_max_retries", 3)))
+        timeout_s = float(getattr(self, "openai_timeout_s", 30.0))
 
-        except Exception as e:
-            logger.error(f"OpenAI embedding generation failed: {e}")
-            raise
+        results: List[List[float]] = []
+
+        # Helper: embed single batch with retries/backoff
+        async def embed_batch(batch_inputs: List[str]) -> List[List[float]]:
+            delay = 1.0
+            attempt = 0
+            last_err: Optional[Exception] = None
+            while attempt <= max_retries:
+                try:
+                    coro = self._aclient.embeddings.create(model=model_name, input=batch_inputs)
+                    resp = await asyncio.wait_for(coro, timeout=timeout_s)
+                    return [d.embedding for d in resp.data]
+                except Exception as e:  # rate limit / transient
+                    last_err = e
+                    attempt += 1
+                    if attempt > max_retries:
+                        break
+                    # Exponential backoff with jitter
+                    jitter = random.uniform(0, 0.25 * delay)
+                    await asyncio.sleep(delay + jitter)
+                    delay = min(delay * 2, 20.0)
+            # Exhausted retries
+            raise last_err or RuntimeError("OpenAI embeddings failed without exception detail")
+
+        # Process all texts in batches
+        for i in range(0, len(texts), batch_size):
+            batch_inputs = texts[i:i + batch_size]
+            batch_embeddings = await embed_batch(batch_inputs)
+            results.extend(batch_embeddings)
+
+        logger.info(
+            f"Generated {len(results)} OpenAI embeddings (model={model_name}, batches={(len(texts)+batch_size-1)//batch_size})"
+        )
+        return results
 
     async def _embed_cohere(self, texts: List[str]) -> List[List[float]]:
         """Generate embeddings using Cohere"""
@@ -184,12 +233,18 @@ class EmbeddingsService:
 
     def get_dimensions(self) -> int:
         """Get embedding dimensions for this provider"""
-        dimensions = {
-            "openai": 3072,  # text-embedding-3-large
-            "cohere": 1024,  # embed-english-v3.0
-            "local": 384     # all-MiniLM-L6-v2
-        }
-        return dimensions.get(self.provider, 3072)
+        # Determine dimensions dynamically per provider/model
+        if self.provider == "openai":
+            model_name = getattr(self, "openai_embedding_model", None) or os.getenv(
+                "OPENAI_EMBEDDING_MODEL",
+                os.getenv("EMBEDDINGS_OPENAI_MODEL", "text-embedding-3-large")
+            )
+            return 3072 if model_name == "text-embedding-3-large" else 1536
+        if self.provider == "cohere":
+            return 1024
+        if self.provider == "local":
+            return 384
+        return 1536
 
     @staticmethod
     def cosine_similarity(vec1: List[float], vec2: List[float]) -> float:

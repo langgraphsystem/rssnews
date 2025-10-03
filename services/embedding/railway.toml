@@ -1,0 +1,10 @@
+[build]
+builder = "nixpacks"
+
+[deploy]
+# NOTE: This runs the local embedding service once per deploy; for continuous mode use service manager.
+# Ensure the Railway service Root Directory includes the project code (repo root)
+startCommand = "python main.py services run-once --services embedding --embedding-batch 1000"
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 10
+
