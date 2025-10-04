@@ -364,6 +364,95 @@ class RankingAPI:
                 applied_filters={'error': str(e)}
             )
 
+    async def retrieve_for_analysis(
+        self,
+        query: Optional[str] = None,
+        window: str = "24h",
+        lang: str = "auto",
+        sources: Optional[List[str]] = None,
+        k_final: int = 5,
+        use_rerank: bool = False
+    ) -> List[Dict[str, Any]]:
+        """
+        Retrieve documents for analysis (trends/analyze commands)
+
+        Args:
+            query: Optional search query (None for trends without query)
+            window: Time window (6h, 12h, 24h, 1d, 3d, 1w, 2w, 1m, 3m, 6m, 1y)
+            lang: Language filter (ru, en, auto)
+            sources: Optional list of source domains to filter
+            k_final: Number of documents to return
+            use_rerank: Whether to use reranking (not implemented yet)
+
+        Returns:
+            List of document dictionaries with metadata
+        """
+        try:
+            # Parse time window to hours
+            window_hours = {
+                "1h": 1, "6h": 6, "12h": 12,
+                "24h": 24, "1d": 24, "3d": 72,
+                "1w": 168, "2w": 336, "1m": 720,
+                "3m": 2160, "6m": 4320, "1y": 8760
+            }.get(window, 24)
+
+            # Build time filter
+            time_filter = f"NOW() - INTERVAL '{window_hours} hours'"
+
+            # Build filters dict
+            filters = {}
+            if sources:
+                filters['sources'] = sources
+            if lang and lang != 'auto':
+                filters['lang'] = lang
+
+            # If query provided, use hybrid search
+            if query:
+                query_normalized = self._normalize_query(query)
+
+                # Generate embedding
+                query_embeddings = await self.embedding_generator.generate_embeddings([query_normalized])
+                if not query_embeddings or not query_embeddings[0]:
+                    logger.warning("Failed to generate query embedding for retrieve_for_analysis")
+                    return []
+
+                query_embedding = query_embeddings[0]
+
+                # Search with time filter
+                results = self.db.search_with_time_filter(
+                    query=query_normalized,
+                    query_embedding=query_embedding,
+                    time_filter=time_filter,
+                    limit=k_final * 2,  # Get more candidates
+                    filters=filters
+                )
+            else:
+                # No query - get recent articles for trends
+                results = self.db.get_recent_articles(
+                    hours=window_hours,
+                    limit=k_final * 3,  # Get more for clustering
+                    filters=filters
+                )
+
+            # Apply scoring
+            if results:
+                scored_results = self.scorer.score_and_rank(results, query or "")
+
+                # Apply deduplication
+                if len(scored_results) > 1:
+                    deduplicated = self.dedup_engine.canonicalize_articles(scored_results)
+                else:
+                    deduplicated = scored_results
+
+                # Return top k_final
+                return deduplicated[:k_final]
+
+            return []
+
+        except Exception as e:
+            logger.error(f"retrieve_for_analysis failed: {e}", exc_info=True)
+            return []
+
     async def ask(self, query: str, limit_context: int = 5,
                  user_id: str = None) -> Dict[str, Any]:
         """RAG-style question answering with context"""

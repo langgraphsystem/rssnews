@@ -571,24 +571,45 @@ class ProductionDBClient(PgClient):
     # Article Retrieval for Analysis
     # ============================================================================
 
-    async def get_recent_articles(self, hours: int = 24, limit: int = 50) -> List[Dict[str, Any]]:
+    async def get_recent_articles(
+        self, hours: int = 24, limit: int = 50, filters: Dict[str, Any] = None
+    ) -> List[Dict[str, Any]]:
         """Get recent articles for analysis (async version)"""
-        return await asyncio.to_thread(self._get_recent_articles_sync, hours, limit)
+        return await asyncio.to_thread(self._get_recent_articles_sync, hours, limit, filters)
 
-    def _get_recent_articles_sync(self, hours: int = 24, limit: int = 50) -> List[Dict[str, Any]]:
+    def _get_recent_articles_sync(
+        self, hours: int = 24, limit: int = 50, filters: Dict[str, Any] = None
+    ) -> List[Dict[str, Any]]:
         """Get recent articles for analysis (sync version)"""
         try:
             with self._cursor() as cur:
-                cur.execute("""
+                # Build WHERE clauses
+                where_clauses = [
+                    "ai.published_at >= NOW() - (%s || ' hours')::interval",
+                    "ai.title_norm IS NOT NULL"
+                ]
+                params = [int(hours)]
+
+                # Add source filter if provided
+                if filters and filters.get('sources'):
+                    placeholders = ','.join(['%s'] * len(filters['sources']))
+                    where_clauses.append(f"ai.source IN ({placeholders})")
+                    params.extend(filters['sources'])
+
+                params.append(limit)
+                where_sql = " AND ".join(where_clauses)
+
+                query = f"""
                     SELECT
                         ai.article_id, ai.url, ai.source,
                         ai.title_norm, ai.clean_text, ai.published_at
                     FROM articles_index ai
-                    WHERE ai.published_at >= NOW() - (%s || ' hours')::interval
-                      AND ai.title_norm IS NOT NULL
+                    WHERE {where_sql}
                     ORDER BY ai.published_at DESC NULLS LAST
                     LIMIT %s
-                """, (int(hours), limit))
+                """
+
+                cur.execute(query, params)
 
                 cols = [d[0] for d in cur.description]
                 rows = cur.fetchall()
@@ -596,6 +617,84 @@ class ProductionDBClient(PgClient):
 
         except Exception as e:
             logger.error(f"Failed to get recent articles: {e}")
+            return []
+
+    async def search_with_time_filter(
+        self,
+        query: str,
+        query_embedding: List[float],
+        time_filter: str,
+        limit: int = 20,
+        filters: Dict[str, Any] = None
+    ) -> List[Dict[str, Any]]:
+        """Search articles with time filtering (async version)"""
+        return await asyncio.to_thread(
+            self._search_with_time_filter_sync,
+            query, query_embedding, time_filter, limit, filters
+        )
+
+    def _search_with_time_filter_sync(
+        self,
+        query: str,
+        query_embedding: List[float],
+        time_filter: str,
+        limit: int = 20,
+        filters: Dict[str, Any] = None
+    ) -> List[Dict[str, Any]]:
+        """Search articles with time filtering using pgvector (sync version)"""
+        try:
+            with self._cursor() as cur:
+                # Convert embedding to pgvector format
+                vector_str = '[' + ','.join(str(x) for x in query_embedding) + ']'
+
+                # Build WHERE clauses
+                where_clauses = [f"ac.published_at >= {time_filter}"]
+                params = [vector_str, vector_str, limit]
+
+                if filters:
+                    if filters.get('sources'):
+                        placeholders = ','.join(['%s'] * len(filters['sources']))
+                        where_clauses.append(f"ac.source_domain IN ({placeholders})")
+                        params[2:2] = filters['sources']
+
+                where_sql = " AND ".join(where_clauses)
+
+                # Execute hybrid search with time filter
+                query_sql = f"""
+                    SELECT
+                        ac.id, ac.article_id, ac.chunk_index, ac.text,
+                        ac.url, ac.title_norm, ac.source_domain, ac.published_at,
+                        1 - (ac.embedding_vector <=> %s::vector) AS similarity
+                    FROM article_chunks ac
+                    WHERE ac.embedding_vector IS NOT NULL
+                      AND {where_sql}
+                    ORDER BY ac.embedding_vector <=> %s::vector
+                    LIMIT %s
+                """
+
+                cur.execute(query_sql, params)
+
+                results = []
+                for row in cur.fetchall():
+                    results.append({
+                        'id': row[0],
+                        'article_id': row[1],
+                        'chunk_index': row[2],
+                        'text': row[3],
+                        'url': row[4],
+                        'title_norm': row[5],
+                        'source_domain': row[6],
+                        'published_at': str(row[7]) if row[7] else None,
+                        'similarity': float(row[8]),
+                        'semantic_score': float(row[8]),
+                        'fts_score': 0.5  # Default FTS score
+                    })
+
+                logger.debug(f"search_with_time_filter returned {len(results)} results")
+                return results
+
+        except Exception as e:
+            logger.error(f"search_with_time_filter failed: {e}", exc_info=True)
             return []
 
     # ============================================================================
