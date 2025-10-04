@@ -136,6 +136,9 @@ class DeduplicationEngine:
 
     def find_duplicates(self, articles: List[Dict[str, Any]]) -> Dict[str, List[str]]:
         """Find duplicate articles using MinHash LSH"""
+        # Reset LSH for each deduplication session to avoid key collision errors
+        self.lsh = MinHashLSH(threshold=self.config.lsh_threshold,
+                             num_perm=self.config.num_perm)
         duplicate_groups = {}
         processed_hashes = {}
 

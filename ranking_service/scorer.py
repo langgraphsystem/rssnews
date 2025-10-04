@@ -82,13 +82,16 @@ class ProductionScorer:
             return 0.0
 
         tau = tau_hours or self.weights.tau_hours
-        now = datetime.utcnow()
+        from datetime import timezone
+        now = datetime.now(timezone.utc)
 
-        # Handle timezone-naive datetimes
+        # Handle timezone-naive datetimes - make both timezone-aware or both naive
         if published_at.tzinfo is None:
-            published_at = published_at.replace(tzinfo=None)
-        if now.tzinfo is None:
+            # If published_at is naive, make now naive too
             now = now.replace(tzinfo=None)
+        elif now.tzinfo is None:
+            # If published_at is aware but now is naive, make now aware
+            now = now.replace(tzinfo=timezone.utc)
 
         age_hours = (now - published_at).total_seconds() / 3600
 
