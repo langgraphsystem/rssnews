@@ -93,8 +93,8 @@ class BaseAnalysisResponse(BaseModel):
     """Base response structure — unified skeleton for all commands"""
     header: str = Field(..., max_length=100)
     tldr: str = Field(..., max_length=220)
-    insights: List[Insight] = Field(..., min_length=1, max_length=5)
-    evidence: List[Evidence] = Field(..., min_length=1)
+    insights: List[Insight] = Field(default_factory=list, max_length=5)  # Allow empty, up to 5
+    evidence: List[Evidence] = Field(default_factory=list)  # Allow empty
     result: Dict[str, Any]  # Agent-specific, validated separately
     meta: Meta
     warnings: List[str] = Field(default_factory=list)
@@ -524,12 +524,18 @@ class PolicyValidator:
 
     @staticmethod
     def validate_evidence_required(insights: List[Insight]) -> None:
+        # Only validate if insights exist
+        if not insights:
+            return
         for insight in insights:
             if not insight.evidence_refs:
                 raise ValueError(f"Insight '{insight.text}' missing required evidence_refs")
 
     @staticmethod
     def validate_all_evidence_safe(evidence: List[Evidence]) -> None:
+        # Only validate if evidence exists
+        if not evidence:
+            return
         for ev in evidence:
             if not PolicyValidator.is_safe_domain(ev.url):
                 raise ValueError(f"Evidence from blacklisted domain: {ev.url}")
