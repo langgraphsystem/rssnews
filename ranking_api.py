@@ -170,11 +170,11 @@ class RankingAPI:
 
             query_embedding = query_embeddings[0]
 
-            # Search by similarity
+            # Search by similarity (no threshold - get top results)
             results = self.db.search_chunks_by_similarity(
                 query_embedding=query_embedding,
                 limit=limit * 3,  # Get more candidates
-                similarity_threshold=0.3  # Lower threshold for more results
+                similarity_threshold=0.0  # No threshold - get all results sorted by similarity
             )
 
             # Add semantic scores

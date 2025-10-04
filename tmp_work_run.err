@@ -1,0 +1,20 @@
+2025-10-04 18:56:49,952 - pg_client_new - INFO - DB pool initialized
+2025-10-04 18:56:49,964 - __main__ - INFO - Starting Work Continuous Service (interval: 2s, batch: 5)
+2025-10-04 18:56:49,973 - __main__ - INFO - === Iteration 1 ===
+2025-10-04 18:56:50,257 - __main__ - INFO - Backlog: 673 pending articles (76.13% complete)
+2025-10-04 18:56:50,269 - __main__ - INFO - Processing batch of articles...
+2025-10-04 18:56:50,270 - worker - INFO - Starting article processing
+2025-10-04 18:56:50,314 - worker - INFO - Processing 5 pending articles
+2025-10-04 18:56:51,035 - parser.extract - INFO - Extracted article: Google News... (38168 words, status: stored)
+2025-10-04 18:56:53,116 - parser.extract - INFO - Extracted article: Google News... (38166 words, status: stored)
+2025-10-04 18:56:55,351 - parser.extract - INFO - Extracted article: Google News... (38168 words, status: stored)
+2025-10-04 18:56:56,781 - parser.extract - INFO - Extracted article: Rep. Adam Smith says "we've got a long way to go" ... (0 words, status: partial)
+2025-10-04 18:56:57,361 - parser.extract - INFO - Extracted article: Breaking down Hamas' partial acceptance of Trump's... (0 words, status: partial)
+2025-10-04 18:56:57,424 - worker - INFO - Processing complete: 3/5 successful, 0 duplicates, 0 errors
+2025-10-04 18:56:57,527 - __main__ - INFO - Processed 5 articles: 3 successful, 0 duplicates, 0 errors
+2025-10-04 18:56:57,527 - __main__ - INFO - Waiting 2s until next check...
+2025-10-04 18:56:59,529 - __main__ - INFO - === Iteration 2 ===
+2025-10-04 18:56:59,784 - __main__ - INFO - Backlog: 668 pending articles (76.14% complete)
+2025-10-04 18:56:59,796 - __main__ - INFO - Processing batch of articles...
+2025-10-04 18:56:59,796 - worker - INFO - Starting article processing
+2025-10-04 18:56:59,847 - worker - INFO - Processing 5 pending articles

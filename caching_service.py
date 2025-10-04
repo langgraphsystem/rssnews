@@ -42,10 +42,10 @@ class CachingService:
             logger.info("✅ Redis connection established")
 
         except ImportError:
-            logger.error("❌ Redis package not installed. Run: pip install redis>=5.0,<6")
+            logger.warning("⚠️  Redis package not installed - caching disabled (optional)")
             self.redis_client = None
         except Exception as e:
-            logger.error(f"❌ Redis connection failed: {e}")
+            logger.warning(f"⚠️  Redis unavailable - caching disabled (optional): {type(e).__name__}")
             self.redis_client = None
 
     def is_available(self) -> bool:

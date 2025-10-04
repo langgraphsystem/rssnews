@@ -37,6 +37,7 @@ from bot_service.error_handler import TelegramErrorHandler, log_user_action, log
 from database.production_db_client import ProductionDBClient
 from services.orchestrator import execute_analyze_command, execute_trends_command
 from services.phase4_handlers import get_phase4_handler_service
+from services.simple_search_service import SimpleSearchService
 
 logger = logging.getLogger(__name__)
 
@@ -119,6 +120,14 @@ class AdvancedRSSBot:
         except Exception as e:
             logger.error(f"❌ Failed to initialize database client: {e}")
             raise
+
+        try:
+            logger.info("🔍 Initializing simple search service (fallback)...")
+            self.simple_search = SimpleSearchService()
+            logger.info("✅ Simple search service initialized")
+        except Exception as e:
+            logger.warning(f"⚠️  Simple search service initialization failed: {e}")
+            self.simple_search = None
 
         # Initialize components
         logger.info("📝 Initializing formatters and handlers...")
@@ -507,35 +516,58 @@ class AdvancedRSSBot:
             query = ' '.join(args)
             session_id = self._generate_session_id(user_id)
 
-            # Create search request
-            search_request = SearchRequest(
-                query=query,
-                method='hybrid',
-                limit=10,
-                user_id=user_id,
-                session_id=session_id,
-                explain=True
-            )
-
             # Perform search
             await self._send_message(chat_id, "🔍 Searching...")
 
-            response = await self.ranking_api.search(search_request)
+            # Try SimpleSearchService first (more reliable), fallback to RankingAPI
+            results = []
+            use_simple = os.getenv('USE_SIMPLE_SEARCH', 'true').lower() == 'true'
 
-            if not response.results:
-                no_results = self.formatter.format_no_results(query)
-                return await self._send_message(chat_id, no_results)
+            if use_simple and self.simple_search:
+                try:
+                    logger.info(f"Using SimpleSearchService for query: {query}")
+                    simple_results = await self.simple_search.search(query, limit=10)
 
-            # Apply soft relevance filter on results for better ranking
-            try:
-                filtered = self.command_handler._soft_relevance_filter(query, response.results)
-                if filtered:
-                    response.results = filtered
-            except Exception as _soft_err:
-                logger.debug(f"Soft relevance filter skipped: {_soft_err}")
+                    if simple_results:
+                        # Format using SimpleSearchService formatter
+                        message = self.simple_search.format_results_for_telegram(
+                            simple_results, query, max_results=5
+                        )
+                        logger.info(f"SimpleSearchService returned {len(simple_results)} results")
+                    else:
+                        no_results = self.formatter.format_no_results(query)
+                        return await self._send_message(chat_id, no_results)
+                except Exception as e:
+                    logger.warning(f"SimpleSearchService failed, falling back to RankingAPI: {e}")
+                    use_simple = False
 
-            # Format results
-            message = self.formatter.format_search_results(response)
+            if not use_simple:
+                # Fallback to RankingAPI
+                search_request = SearchRequest(
+                    query=query,
+                    method='hybrid',
+                    limit=10,
+                    user_id=user_id,
+                    session_id=session_id,
+                    explain=True
+                )
+
+                response = await self.ranking_api.search(search_request)
+
+                if not response.results:
+                    no_results = self.formatter.format_no_results(query)
+                    return await self._send_message(chat_id, no_results)
+
+                # Apply soft relevance filter on results for better ranking
+                try:
+                    filtered = self.command_handler._soft_relevance_filter(query, response.results)
+                    if filtered:
+                        response.results = filtered
+                except Exception as _soft_err:
+                    logger.debug(f"Soft relevance filter skipped: {_soft_err}")
+
+                # Format results
+                message = self.formatter.format_search_results(response)
 
             # Create action buttons
             buttons = [

@@ -117,6 +117,14 @@ def main():
         print("📊 Structured Logging: ✅")
         print()
 
+        # Start health check server in background
+        from health_server import start_health_server
+        health_port = int(os.getenv('PORT', '8080'))
+        health_server = start_health_server(health_port)
+        if health_server:
+            print(f"🏥 Health check server running on port {health_port}")
+        print()
+
         # Import and run bot
         from run_bot import main as run_bot_main
 
