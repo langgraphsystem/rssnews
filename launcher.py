@@ -44,6 +44,8 @@ def build_command() -> str:
     chunk_continuous_batch = os.getenv("CHUNK_CONTINUOUS_BATCH", "100")
 
     mig_interval = os.getenv("MIGRATION_INTERVAL", "60")
+    # OpenAI embedding migration batch size (fallback to service default 100)
+    mig_batch = os.getenv("OPENAI_EMBEDDING_BATCH_SIZE", os.getenv("MIGRATION_BATCH", "100"))
 
     if mode == "poll":
         return f"python main.py poll --workers {poll_workers} --batch-size {poll_batch}"
@@ -65,7 +67,8 @@ def build_command() -> str:
         return f"python services/chunk_continuous_service.py --interval {chunk_continuous_interval} --batch {chunk_continuous_batch}"
 
     if mode == "openai-migration":
-        return f"python services/openai_embedding_migration_service.py --interval {mig_interval}"
+        # Default to continuous mode; the migration service requires a subcommand
+        return f"python services/openai_embedding_migration_service.py continuous --interval {mig_interval} --batch-size {mig_batch}"
 
     if mode == "bot":
         return "python start_telegram_bot.py"
@@ -85,4 +88,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
