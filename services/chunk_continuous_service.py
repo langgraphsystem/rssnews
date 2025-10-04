@@ -36,34 +36,32 @@ class ChunkContinuousService:
         self.chunker = ChunkingService(db_client=self.db)
 
     def get_backlog_stats(self) -> Dict[str, Any]:
-        """Get statistics about articles needing chunking"""
+        """Get statistics about articles needing chunking using articles_index."""
         try:
             with self.db._cursor() as cur:
-                # Total articles in fulltext
-                cur.execute("SELECT COUNT(*) FROM fulltext")
-                total = cur.fetchone()[0]
-
-                # Articles without chunks (not in article_chunks)
-                cur.execute("""
-                    SELECT COUNT(DISTINCT f.article_id)
-                    FROM fulltext f
-                    WHERE NOT EXISTS (
-                        SELECT 1
-                        FROM article_chunks ac
-                        WHERE ac.article_id = f.article_id
-                    )
-                    AND f.clean_text IS NOT NULL
-                    AND LENGTH(f.clean_text) > 50
-                """)
+                # Pending (eligible and not yet chunked)
+                cur.execute(
+                    """
+                    SELECT COUNT(*)
+                    FROM articles_index
+                    WHERE ready_for_chunking = TRUE
+                      AND (chunking_completed IS DISTINCT FROM TRUE)
+                    """
+                )
                 pending = cur.fetchone()[0]
+
+                # Completed (chunking done)
+                cur.execute(
+                    "SELECT COUNT(*) FROM articles_index WHERE chunking_completed IS TRUE"
+                )
+                chunked_articles = cur.fetchone()[0]
 
                 # Total chunks created
                 cur.execute("SELECT COUNT(*) FROM article_chunks")
                 total_chunks = cur.fetchone()[0]
 
-                # Articles with chunks
-                cur.execute("SELECT COUNT(DISTINCT article_id) FROM article_chunks")
-                chunked_articles = cur.fetchone()[0]
+                # Define total as pending + completed (eligible population)
+                total = pending + chunked_articles
 
                 stats = {
                     'total_articles': total,
