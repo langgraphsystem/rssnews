@@ -425,8 +425,8 @@ class MemoryResult(BaseModel):
 class ErrorDetail(BaseModel):
     """Error detail structure"""
     code: Literal["VALIDATION_FAILED", "NO_DATA", "BUDGET_EXCEEDED", "MODEL_UNAVAILABLE", "INTERNAL"]
-    user_message: str = Field(..., max_length=200)
-    tech_message: str = Field(..., max_length=500)
+    user_message: str = Field(..., max_length=500)  # Increased from 200 to 500
+    tech_message: str = Field(..., max_length=1000)  # Increased from 500 to 1000
     retryable: bool
 
 
