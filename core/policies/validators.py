@@ -32,10 +32,10 @@ class PolicyValidator:
     MAX_SNIPPET = 240
     MAX_HEADER = 100
 
-    # Minimum requirements
-    MIN_INSIGHTS = 1
+    # Minimum requirements (0 allows "no data found" scenarios)
+    MIN_INSIGHTS = 0  # Changed from 1 to allow empty results
     MAX_INSIGHTS = 5
-    MIN_EVIDENCE = 1
+    MIN_EVIDENCE = 0  # Changed from 1 to allow empty results
 
     def __init__(self):
         self.schema_validator = SchemaValidator()
