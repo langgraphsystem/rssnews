@@ -520,8 +520,9 @@ class AdvancedRSSBot:
             await self._send_message(chat_id, "🔍 Searching...")
 
             # Try SimpleSearchService first (more reliable), fallback to RankingAPI
-            results = []
             use_simple = os.getenv('USE_SIMPLE_SEARCH', 'true').lower() == 'true'
+            response = None  # Initialize to avoid UnboundLocalError
+            message = None
 
             if use_simple and self.simple_search:
                 try:
@@ -534,6 +535,9 @@ class AdvancedRSSBot:
                             simple_results, query, max_results=5
                         )
                         logger.info(f"SimpleSearchService returned {len(simple_results)} results")
+
+                        # Send result immediately (SimpleSearch doesn't support buttons yet)
+                        return await self._send_long_message(chat_id, message)
                     else:
                         no_results = self.formatter.format_no_results(query)
                         return await self._send_message(chat_id, no_results)
@@ -569,30 +573,30 @@ class AdvancedRSSBot:
                 # Format results
                 message = self.formatter.format_search_results(response)
 
-            # Create action buttons
-            buttons = [
-                [
-                    {"text": "🔍 Refine Search", "callback_data": f"refine:{session_id}"},
-                    {"text": "💡 Explain Rankings", "callback_data": f"explain:{session_id}"}
-                ],
-                [
-                    {"text": "📊 Show Stats", "callback_data": f"stats:{session_id}"},
-                    {"text": "🔄 More Like This", "callback_data": f"similar:{session_id}"}
+                # Create action buttons (only for RankingAPI results)
+                buttons = [
+                    [
+                        {"text": "🔍 Refine Search", "callback_data": f"refine:{session_id}"},
+                        {"text": "💡 Explain Rankings", "callback_data": f"explain:{session_id}"}
+                    ],
+                    [
+                        {"text": "📊 Show Stats", "callback_data": f"stats:{session_id}"},
+                        {"text": "🔄 More Like This", "callback_data": f"similar:{session_id}"}
+                    ]
                 ]
-            ]
 
-            markup = self._create_inline_keyboard(buttons)
+                markup = self._create_inline_keyboard(buttons)
 
-            # Store session data
-            self.user_sessions[session_id] = {
-                'user_id': user_id,
-                'chat_id': chat_id,
-                'query': query,
-                'response': response,
-                'timestamp': datetime.utcnow()
-            }
+                # Store session data
+                self.user_sessions[session_id] = {
+                    'user_id': user_id,
+                    'chat_id': chat_id,
+                    'query': query,
+                    'response': response,
+                    'timestamp': datetime.utcnow()
+                }
 
-            return await self._send_long_message(chat_id, message, markup)
+                return await self._send_long_message(chat_id, message, markup)
 
         except Exception as e:
             logger.error(f"Search command failed: {e}")
