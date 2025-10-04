@@ -250,7 +250,8 @@ def main():
                 print("Using full worker (with chunking/FTS/embeddings)")
 
             try:
-                stats = worker.process_pending_articles()
+                import asyncio
+                stats = asyncio.run(worker.process_pending_articles())
 
                 print(f"✓ Processing complete:")
                 print(f"  Articles processed: {stats['articles_processed']}")

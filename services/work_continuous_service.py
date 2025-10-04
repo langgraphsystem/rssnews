@@ -79,11 +79,11 @@ class WorkContinuousService:
             logger.error(f"Failed to get backlog stats: {e}")
             return {}
 
-    def process_batch(self) -> Dict[str, Any]:
+    async def process_batch(self) -> Dict[str, Any]:
         """Process one batch of pending articles"""
         try:
             logger.info("Processing batch of articles...")
-            result = self.worker.process_pending_articles()
+            result = await self.worker.process_pending_articles()
             return result
 
         except Exception as e:
@@ -120,7 +120,7 @@ class WorkContinuousService:
 
             if pending > 0:
                 # Process batch
-                result = self.process_batch()
+                result = await self.process_batch()
 
                 logger.info(
                     f"Processed {result.get('articles_processed', 0)} articles: "
@@ -176,7 +176,8 @@ def main():
         logger.info(f"Backlog: {stats}")
 
         if stats.get('pending', 0) > 0:
-            result = service.process_batch()
+            # Run a single async batch
+            result = asyncio.run(service.process_batch())
             logger.info(f"Result: {result}")
         else:
             logger.info("No pending articles")

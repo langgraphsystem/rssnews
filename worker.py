@@ -28,7 +28,7 @@ class ArticleWorker:
         self.max_workers = max_workers
         self.http_client = HttpClient()
         
-    def process_pending_articles(self) -> Dict[str, Any]:
+    async def process_pending_articles(self) -> Dict[str, Any]:
         """
         Process pending articles in batches with concurrent processing
         Returns statistics about the processing operation
@@ -53,52 +53,47 @@ class ArticleWorker:
         }
         
         # Process articles concurrently (async)
+        tasks = []
+        for article in articles:
+            task = asyncio.create_task(self._process_single_article(article))
+            tasks.append((task, article))
 
-        async def process_article_batch():
-            tasks = []
-            for article in articles:
-                task = asyncio.create_task(self._process_single_article(article))
-                tasks.append((task, article))
+        for task, article in tasks:
+            stats['articles_processed'] += 1
 
-            for task, article in tasks:
-                stats['articles_processed'] += 1
+            try:
+                result = await task
 
-                try:
-                    result = await task
-                    
-                    if result['status'] == 'stored':
-                        stats['successful'] += 1
-                    elif result['status'] == 'duplicate':
-                        stats['duplicates'] += 1
-                    elif result['status'] == 'partial':
-                        stats['partial'] += 1
-                    else:
-                        stats['errors'] += 1
-                        if result.get('error'):
-                            stats['error_details'].append({
-                                'article_id': article['id'],
-                                'url': article['url'],
-                                'error': result['error']
-                            })
-                        
-                except Exception as e:
+                if result['status'] == 'stored':
+                    stats['successful'] += 1
+                elif result['status'] == 'duplicate':
+                    stats['duplicates'] += 1
+                elif result['status'] == 'partial':
+                    stats['partial'] += 1
+                else:
                     stats['errors'] += 1
-                    error_msg = f"Exception processing article {article['url']}: {e}"
-                    logger.error(error_msg)
-                    stats['error_details'].append({
-                        'article_id': article['id'],
-                        'url': article['url'],
-                        'error': str(e)
-                    })
-                    
-                    # Update article status to error
-                    try:
-                        self.db.update_article_status(article['id'], 'error', str(e))
-                    except Exception as update_e:
-                        logger.error(f"Failed to update error status for article {article['id']}: {update_e}")
+                    if result.get('error'):
+                        stats['error_details'].append({
+                            'article_id': article['id'],
+                            'url': article['url'],
+                            'error': result['error']
+                        })
 
-        # Run async processing
-        asyncio.run(process_article_batch())
+            except Exception as e:
+                stats['errors'] += 1
+                error_msg = f"Exception processing article {article['url']}: {e}"
+                logger.error(error_msg)
+                stats['error_details'].append({
+                    'article_id': article['id'],
+                    'url': article['url'],
+                    'error': str(e)
+                })
+
+                # Update article status to error
+                try:
+                    self.db.update_article_status(article['id'], 'error', str(e))
+                except Exception as update_e:
+                    logger.error(f"Failed to update error status for article {article['id']}: {update_e}")
 
         logger.info(f"Processing complete: {stats['successful']}/{stats['articles_processed']} successful, "
                    f"{stats['duplicates']} duplicates, {stats['errors']} errors")
@@ -270,6 +265,6 @@ def process_pending(db_client, worker_id: str = "worker-1", batch_size: int = 50
     """Legacy function wrapper for the new worker"""
     worker = ArticleWorker(db_client, batch_size=batch_size)
     try:
-        return worker.process_pending_articles()
+        return asyncio.run(worker.process_pending_articles())
     finally:
         worker.close()
