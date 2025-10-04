@@ -214,19 +214,8 @@ class PolicyValidator:
                 "tldr field is required"
             )
 
-        if not response.insights:
-            raise ValidationError(
-                "VALIDATION_FAILED",
-                "Missing insights",
-                "At least 1 insight is required"
-            )
-
-        if not response.evidence:
-            raise ValidationError(
-                "VALIDATION_FAILED",
-                "Missing evidence",
-                "At least 1 evidence item is required"
-            )
+        # Note: insights and evidence can be empty (e.g., no data found scenarios)
+        # Removed strict checks - MIN_INSIGHTS=0 and MIN_EVIDENCE=0 allow this
 
         if not response.result:
             raise ValidationError(
