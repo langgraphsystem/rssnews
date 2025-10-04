@@ -238,23 +238,23 @@ class EmbeddingService:
             logger.error(f"❌ Embedding service test error: {e}")
             return False
 
-    def run_service(self, interval_seconds: int = 45):
-        """Run embedding service in a loop"""
+    async def run_service_async(self, interval_seconds: int = 45):
+        """Run embedding service loop (async)."""
         logger.info(f"Starting embedding service with {interval_seconds}s interval")
+        while True:
+            try:
+                await self.process_pending_embeddings()
+                await asyncio.sleep(interval_seconds)
+            except KeyboardInterrupt:
+                logger.info("Embedding service stopped by user")
+                break
+            except Exception as e:
+                logger.error(f"Error in embedding service: {e}")
+                await asyncio.sleep(interval_seconds)
 
-        async def service_loop():
-            while True:
-                try:
-                    await self.process_pending_embeddings()
-                    await asyncio.sleep(interval_seconds)
-                except KeyboardInterrupt:
-                    logger.info("Embedding service stopped by user")
-                    break
-                except Exception as e:
-                    logger.error(f"Error in embedding service: {e}")
-                    await asyncio.sleep(interval_seconds)
-
-        asyncio.run(service_loop())
+    def run_service(self, interval_seconds: int = 45):
+        """Synchronous wrapper to run the embedding service loop."""
+        asyncio.run(self.run_service_async(interval_seconds))
 
 
 async def main():
@@ -325,8 +325,8 @@ async def main():
         print(f"Embedding service test: {'PASSED' if success else 'FAILED'}")
 
     elif args.command == 'service':
-        # Run continuous service
-        service.run_service(args.interval)
+        # Run continuous service (async)
+        await service.run_service_async(args.interval)
 
 
 if __name__ == "__main__":
