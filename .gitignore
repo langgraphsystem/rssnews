@@ -87,3 +87,4 @@ storage/queue/*.lock
 # Tools directory (contains Portable Git and other tools)
 tools/
 
+.claude/

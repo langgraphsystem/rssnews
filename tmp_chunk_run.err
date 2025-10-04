@@ -1,0 +1,15 @@
+2025-10-04 19:17:12,854 - pg_client_new - INFO - DB pool initialized
+2025-10-04 19:17:12,866 - __main__ - INFO - Starting Chunk Continuous Service (interval: 2s, batch: 3)
+2025-10-04 19:17:12,867 - __main__ - INFO - === Iteration 1 ===
+2025-10-04 19:17:13,027 - __main__ - INFO - Backlog: 352 articles need chunking (98.45% complete, 209,942 total chunks)
+2025-10-04 19:17:13,029 - __main__ - INFO - Processing batch of 3 articles...
+2025-10-04 19:17:13,030 - services.chunking_service - INFO - Starting chunking service
+2025-10-04 19:17:13,392 - services.chunking_service - INFO - Processing 3 articles for chunking
+2025-10-04 19:17:17,872 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2025-10-04 19:17:17,873 - local_llm_chunker - ERROR - Failed to parse LLM chunks response: No valid JSON array or object with 'chunks' found in response; raw={     "text": "Google News is a news aggregator website that provides users with the latest headlines and articles from various sources around the world. It offers personalized recommendations based on user preferences, as well as search functionality to find specific articles.",     "topic": "Intro
+2025-10-04 19:17:17,873 - local_llm_chunker - INFO - Smart chunking completed: 1 chunks, model: qwen2.5-coder:3b
+2025-10-04 19:17:18,000 - services.chunking_service - INFO - Successfully chunked article 31606: 1 chunks
+2025-10-04 19:17:22,131 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2025-10-04 19:17:22,144 - local_llm_chunker - ERROR - Failed to parse LLM chunks response: No valid JSON array or object with 'chunks' found in response; raw={     "text": "Google News is a news aggregator website that provides users with the latest headlines and articles from various sources around the world. It offers personalized recommendations based on user preferences, as well as the ability to filter content by category, language, and date.",     
+2025-10-04 19:17:22,144 - local_llm_chunker - INFO - Smart chunking completed: 1 chunks, model: qwen2.5-coder:3b
+2025-10-04 19:17:22,283 - services.chunking_service - INFO - Successfully chunked article 31872: 1 chunks
