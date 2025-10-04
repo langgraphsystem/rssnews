@@ -396,9 +396,6 @@ class RankingAPI:
                 "3m": 2160, "6m": 4320, "1y": 8760
             }.get(window, 24)
 
-            # Build time filter
-            time_filter = f"NOW() - INTERVAL '{window_hours} hours'"
-
             # Build filters dict
             filters = {}
             if sources:
@@ -419,16 +416,16 @@ class RankingAPI:
                 query_embedding = query_embeddings[0]
 
                 # Search with time filter
-                results = self.db.search_with_time_filter(
+                results = await self.db.search_with_time_filter(
                     query=query_normalized,
                     query_embedding=query_embedding,
-                    time_filter=time_filter,
+                    hours=window_hours,
                     limit=k_final * 2,  # Get more candidates
                     filters=filters
                 )
             else:
                 # No query - get recent articles for trends
-                results = self.db.get_recent_articles(
+                results = await self.db.get_recent_articles(
                     hours=window_hours,
                     limit=k_final * 3,  # Get more for clustering
                     filters=filters

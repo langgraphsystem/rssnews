@@ -623,21 +623,21 @@ class ProductionDBClient(PgClient):
         self,
         query: str,
         query_embedding: List[float],
-        time_filter: str,
+        hours: int = 24,
         limit: int = 20,
         filters: Dict[str, Any] = None
     ) -> List[Dict[str, Any]]:
         """Search articles with time filtering (async version)"""
         return await asyncio.to_thread(
             self._search_with_time_filter_sync,
-            query, query_embedding, time_filter, limit, filters
+            query, query_embedding, hours, limit, filters
         )
 
     def _search_with_time_filter_sync(
         self,
         query: str,
         query_embedding: List[float],
-        time_filter: str,
+        hours: int = 24,
         limit: int = 20,
         filters: Dict[str, Any] = None
     ) -> List[Dict[str, Any]]:
@@ -647,15 +647,19 @@ class ProductionDBClient(PgClient):
                 # Convert embedding to pgvector format
                 vector_str = '[' + ','.join(str(x) for x in query_embedding) + ']'
 
-                # Build WHERE clauses
-                where_clauses = [f"ac.published_at >= {time_filter}"]
-                params = [vector_str, vector_str, limit]
+                # Build WHERE clauses and params list
+                where_clauses = ["ac.embedding_vector IS NOT NULL"]
+                where_clauses.append("ac.published_at >= NOW() - (%s || ' hours')::interval")
+                params = [vector_str, hours]
 
-                if filters:
-                    if filters.get('sources'):
-                        placeholders = ','.join(['%s'] * len(filters['sources']))
-                        where_clauses.append(f"ac.source_domain IN ({placeholders})")
-                        params[2:2] = filters['sources']
+                # Add source filter if provided
+                if filters and filters.get('sources'):
+                    placeholders = ','.join(['%s'] * len(filters['sources']))
+                    where_clauses.append(f"ac.source_domain IN ({placeholders})")
+                    params.extend(filters['sources'])
+
+                # Add vector params for ORDER BY and LIMIT
+                params.extend([vector_str, limit])
 
                 where_sql = " AND ".join(where_clauses)
 
@@ -666,8 +670,7 @@ class ProductionDBClient(PgClient):
                         ac.url, ac.title_norm, ac.source_domain, ac.published_at,
                         1 - (ac.embedding_vector <=> %s::vector) AS similarity
                     FROM article_chunks ac
-                    WHERE ac.embedding_vector IS NOT NULL
-                      AND {where_sql}
+                    WHERE {where_sql}
                     ORDER BY ac.embedding_vector <=> %s::vector
                     LIMIT %s
                 """
