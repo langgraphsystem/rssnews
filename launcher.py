@@ -11,10 +11,14 @@ Supported SERVICE_MODE values:
   - embedding          -> python main.py services run-once --services embedding --embedding-batch {EMBEDDING_BATCH}
   - chunking           -> python main.py services run-once --services chunking --chunking-batch {CHUNKING_BATCH}
   - chunk-continuous   -> python services/chunk_continuous_service.py --interval {CHUNK_CONTINUOUS_INTERVAL} --batch {CHUNK_CONTINUOUS_BATCH}
-  - openai-migration   -> python services/openai_embedding_migration_service.py --interval {MIGRATION_INTERVAL}
+  - fts                -> python services/fts_service.py index --batch-size {FTS_BATCH}
+  - fts-continuous     -> python services/fts_service.py service --interval {FTS_CONTINUOUS_INTERVAL} --batch-size {FTS_BATCH}
+  - openai-migration   -> python services/openai_embedding_migration_service.py continuous --interval {MIGRATION_INTERVAL} --batch-size {MIGRATION_BATCH}
   - bot                -> python start_telegram_bot.py
 
 Default SERVICE_MODE: openai-migration (keeps backward compatibility until services set explicit modes).
+
+NOTE: FTS service runs directly without ServiceManager to avoid OPENAI_API_KEY dependency.
 """
 
 import os
@@ -71,12 +75,12 @@ def build_command() -> str:
         return f"python services/chunk_continuous_service.py --interval {chunk_continuous_interval} --batch {chunk_continuous_batch}"
 
     if mode == "fts":
-        # One-off FTS indexing using the consolidated services entrypoint
-        return f"python main.py services run-once --services fts --fts-batch {fts_batch}"
+        # One-off FTS indexing - run directly without ServiceManager
+        return f"python services/fts_service.py index --batch-size {fts_batch}"
 
     if mode == "fts-continuous":
-        # Continuous FTS indexing loop via main services controller
-        return f"python main.py services start --services fts --fts-interval {fts_continuous_interval}"
+        # Continuous FTS indexing - run directly without ServiceManager to avoid OpenAI dependency
+        return f"python services/fts_service.py service --interval {fts_continuous_interval} --batch-size {fts_batch}"
 
     if mode == "openai-migration":
         # Default to continuous mode; the migration service requires a subcommand

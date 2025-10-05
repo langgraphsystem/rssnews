@@ -108,13 +108,16 @@ railway run python check_dims_simple.py
 SERVICE_MODE=fts-continuous
 FTS_CONTINUOUS_INTERVAL=60
 FTS_BATCH=100000
+# NOTE: Does NOT require OPENAI_API_KEY (runs independently)
 ```
 
-**Command:** `python main.py services start --services fts --fts-interval 60`
+**Command:** `python services/fts_service.py service --interval 60 --batch-size 100000`
 
 **Purpose:** Continuously maintains Full-Text Search (FTS) indexes using PostgreSQL tsvector for hybrid search
 
 **Mode:** Continuous (checks every 60s for articles needing FTS indexing)
+
+**Why Direct Execution:** FTS service runs directly without ServiceManager to avoid unnecessary OpenAI API dependencies
 
 **Monitoring:**
 ```bash
