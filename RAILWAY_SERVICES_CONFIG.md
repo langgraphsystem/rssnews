@@ -100,6 +100,30 @@ railway run python check_dims_simple.py
 
 ---
 
+### 5. FTS Indexing Service (Continuous)
+**Service ID:** `ffe65f79-4dc5-4757-b772-5a99c7ea624f`
+
+**Environment Variables:**
+```bash
+SERVICE_MODE=fts-continuous
+FTS_CONTINUOUS_INTERVAL=60
+FTS_BATCH=100000
+```
+
+**Command:** `python main.py services start --services fts --fts-interval 60`
+
+**Purpose:** Continuously maintains Full-Text Search (FTS) indexes using PostgreSQL tsvector for hybrid search
+
+**Mode:** Continuous (checks every 60s for articles needing FTS indexing)
+
+**Monitoring:**
+```bash
+railway link --service ffe65f79-4dc5-4757-b772-5a99c7ea624f
+railway logs
+```
+
+---
+
 ## Pipeline Architecture
 
 ```
@@ -114,11 +138,13 @@ railway run python check_dims_simple.py
 │  (469223..) │ Monitors: status='pending' in `raw`
 └──────┬──────┘
        │ Extracts fulltext, metadata → stores in `fulltext` table
-       ↓
-┌─────────────┐
-│   CHUNK     │ (Continuous - 30s interval)
-│  (f32c12..) │ Monitors: articles without chunks
-└──────┬──────┘
+       ├──────────────────────┐
+       ↓                      ↓
+┌─────────────┐      ┌─────────────┐
+│   CHUNK     │      │  FTS Index  │ (Continuous - 60s interval)
+│  (f32c12..) │      │  (ffe65f..) │ Monitors: articles without FTS
+└──────┬──────┘      └─────────────┘
+       │                      │ Creates tsvector indexes for fulltext search
        │ Creates semantic chunks → stores in `article_chunks`
        ↓
 ┌─────────────┐
@@ -127,7 +153,7 @@ railway run python check_dims_simple.py
 └─────────────┘
        │ Generates 3072-dim embeddings → updates `article_chunks.embedding`
        ↓
-    Ready for search/ranking!
+    Ready for hybrid search! (Semantic + FTS)
 ```
 
 ## Benefits of Continuous Architecture
@@ -235,13 +261,22 @@ OPENAI_EMBEDDING_MAX_RETRIES=3
 EMBEDDING_TIMEOUT=30
 ```
 
-## Current Status (2025-10-03)
+### FTS Indexing Service
+```bash
+SERVICE_MODE=fts-continuous
+FTS_CONTINUOUS_INTERVAL=60       # Seconds between checks
+FTS_BATCH=100000                 # Articles per batch
+```
+
+## Current Status (2025-10-05)
 
 ✅ All services deployed with continuous architecture
-✅ POLL: Cron-scheduled RSS feed polling
-✅ WORK: Continuous article processing (30s interval)
-✅ CHUNK: Continuous chunking (30s interval)
-✅ OpenAIEmbending: Continuous embedding generation (60s interval)
-✅ OpenAI embedding migration completed: 209,415/209,415 chunks (100%)
+✅ POLL: Cron-scheduled RSS feed polling (d116f94c)
+✅ WORK: Continuous article processing - 30s interval (4692233a)
+✅ CHUNK: Continuous chunking - 30s interval (f32c1205)
+✅ OpenAIEmbending: Continuous embedding generation - 60s interval (c015bdb5)
+✅ FTS Indexing: Continuous FTS indexing - 60s interval (ffe65f79)
+✅ OpenAI embedding migration completed: 217,694/217,694 chunks (100%)
 ✅ All embeddings are 3072-dim (text-embedding-3-large)
+✅ Hybrid search enabled: Semantic (pgvector) + Full-Text Search (tsvector)
 ✅ Fully automated pipeline - no manual intervention required
