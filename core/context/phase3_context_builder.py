@@ -475,31 +475,41 @@ class Phase3ContextBuilder:
             # Clean and validate docs
             cleaned_docs = []
             for doc in docs:
-                # Ensure required fields
-                if not doc.get("title"):
+                # Normalize title
+                title = doc.get('title') or doc.get('title_norm') or doc.get('headline') or doc.get('name')
+                if not title:
                     continue
 
                 # Normalize date
-                date = doc.get("date")
+                date = doc.get('date')
                 if not date or not self._is_valid_date(date):
                     date = datetime.utcnow().strftime("%Y-%m-%d")
 
                 # Normalize lang
-                doc_lang = doc.get("lang", "en")
-                if doc_lang not in ["ru", "en"]:
-                    doc_lang = "en"
+                doc_lang = doc.get('lang') or doc.get('language') or 'en'
+                if doc_lang not in ['ru', 'en']:
+                    doc_lang = 'en'
 
-                # Trim snippet
-                snippet = doc.get("snippet", "")[:240]
+                # Normalize snippet and score
+                raw_snippet = doc.get('snippet') or doc.get('summary') or doc.get('text') or doc.get('clean_text') or ''
+                snippet = raw_snippet[:240]
+
+                score = doc.get('score')
+                if score is None:
+                    score = doc.get('similarity') or doc.get('semantic_score') or 0.0
+                try:
+                    score_value = float(score)
+                except (TypeError, ValueError):
+                    score_value = 0.0
 
                 cleaned_docs.append({
-                    "article_id": doc.get("article_id"),
-                    "title": doc.get("title", ""),
-                    "url": doc.get("url"),
-                    "date": date,
-                    "lang": doc_lang,
-                    "score": doc.get("score", 0.0),
-                    "snippet": snippet
+                    'article_id': doc.get('article_id'),
+                    'title': title,
+                    'url': doc.get('url'),
+                    'date': date,
+                    'lang': doc_lang,
+                    'score': score_value,
+                    'snippet': snippet
                 })
 
             return cleaned_docs[:k_final]

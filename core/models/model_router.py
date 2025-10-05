@@ -37,17 +37,19 @@ class ModelRouter:
 
     # Model name mapping
     MODEL_MAP = {
-        "gpt-5": "gpt-4o",  # Use GPT-4o as current best model
-        "gpt-4o": "gpt-4o",
-        "gpt-4o-mini": "gpt-4o-mini",
+        "gpt-5": os.getenv('OPENAI_GPT5_MODEL', 'gpt-5'),
+        "gpt-5-mini": os.getenv('OPENAI_GPT5_MINI_MODEL', 'gpt-5-mini'),
+        "gpt-5-nano": os.getenv('OPENAI_GPT5_NANO_MODEL', 'gpt-5-nano'),
         "gpt-3.5-turbo": "gpt-3.5-turbo",
-        "claude-4.5": "claude-3-5-sonnet-20241022",
-        "gemini-2.5-pro": "gemini-1.5-pro-latest"
+        "claude-4.5": os.getenv('ANTHROPIC_CLAUDE_MODEL', 'claude-3-5-sonnet-20241022'),
+        "gemini-2.5-pro": os.getenv('GOOGLE_GEMINI_MODEL', 'gemini-1.5-pro-latest')
     }
 
     # Token cost per 1K tokens (cents)
     TOKEN_COSTS = {
-        "gpt-5": {"input": 1.0, "output": 3.0},
+        "gpt-5": {"input": 0.8, "output": 2.4},
+        "gpt-5-mini": {"input": 0.25, "output": 0.75},
+        "gpt-5-nano": {"input": 0.12, "output": 0.36},
         "claude-4.5": {"input": 0.3, "output": 1.5},
         "gemini-2.5-pro": {"input": 0.125, "output": 0.375}
     }

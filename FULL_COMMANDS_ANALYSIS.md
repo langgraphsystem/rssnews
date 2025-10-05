@@ -24,7 +24,7 @@ formatted_date = datetime.fromisoformat(date_value).strftime('%Y-%m-%d')
 ### 2. GPT-5 Timeout (12s)
 **Проблема:** Модель gpt-5 не существует, gpt-4-turbo-preview тормозит
 **Причина:** Placeholder модели + малый timeout 12 секунд
-**Решение:** Переключение на gpt-4o с timeout 30 секунд
+**Решение:** Переключение на gpt-5 с timeout 30 секунд
 
 **Файл:** `infra/config/phase1_config.py`
 ```python
@@ -34,8 +34,8 @@ fallback=["claude-4.5", "gpt-5"],  # gpt-5 не существует
 timeout_seconds=12  # Мало
 
 # После
-primary="gpt-4o",  # Актуальная модель
-fallback=["gpt-4o-mini", "gpt-3.5-turbo"],  # Рабочие модели
+primary="gpt-5",  # Актуальная модель
+fallback=["gpt-5-mini", "gpt-3.5-turbo"],  # Рабочие модели
 timeout_seconds=30  # Достаточно
 ```
 
@@ -95,7 +95,7 @@ SELECT value, value_type FROM system_config WHERE key = %s
     ↓
 11. core/orchestrator/nodes/agents_node.py::agents_node()
     - AI анализ через ModelRouter
-    - Модели: gpt-4o (primary), gpt-4o-mini (fallback)
+    - Модели: gpt-5 (primary), gpt-5-mini (fallback)
     ↓
 12. core/orchestrator/nodes/format_node.py::format_node()
     - Форматирование ответа (TrendsAnalysisResponse)
@@ -134,7 +134,7 @@ SELECT value, value_type FROM system_config WHERE key = %s
 ```
 ✅ Команда работает корректно
 📝 Размер ответа: 789 символов
-🤖 Модель: gpt-4o
+🤖 Модель: gpt-5
 ⏱️  Время: ~15 секунд
 ```
 
@@ -253,7 +253,7 @@ SELECT value, value_type FROM system_config WHERE key = %s
 
 ### Критические (работа блокировалась):
 1. ✅ Evidence date validation
-2. ✅ Model timeout (gpt-5 → gpt-4o)
+2. ✅ Model timeout (gpt-5 → gpt-5)
 3. ✅ Config table schema
 
 ### Улучшения:
@@ -283,7 +283,7 @@ SELECT value, value_type FROM system_config WHERE key = %s
 ✅ База данных PostgreSQL + pgvector
 ✅ Таблица article_chunks (3,772 записей за 24ч, 100% с embeddings)
 ✅ Hybrid search (semantic + FTS)
-✅ Model router с fallback (gpt-4o → gpt-4o-mini → gpt-3.5-turbo)
+✅ Model router с fallback (gpt-5 → gpt-5-mini → gpt-3.5-turbo)
 ✅ Orchestrator pipeline (retrieval → agents → format → validate)
 ✅ Evidence/Insights валидация (Pydantic)
 ✅ Telegram форматирование
@@ -291,7 +291,7 @@ SELECT value, value_type FROM system_config WHERE key = %s
 ### Исправленные проблемы:
 1. ❌→✅ Evidence date field (пустая строка → YYYY-MM-DD формат)
 2. ❌→✅ Model timeout (12s → 30s)
-3. ❌→✅ Несуществующие модели (gpt-5, gemini-2.5-pro → gpt-4o)
+3. ❌→✅ Несуществующие модели (gpt-5, gemini-2.5-pro → gpt-5)
 4. ❌→✅ Config table schema (config_value → value)
 
 ### Рекомендации:

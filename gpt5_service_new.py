@@ -161,7 +161,7 @@ class GPT5Service:
 
         # Map any gpt-5* aliases to a stable known model
         if model_id.lower().startswith("gpt-5"):
-            return os.getenv("OPENAI_FALLBACK_MODEL", "gpt-4o-mini")
+            return os.getenv("OPENAI_FALLBACK_MODEL", "gpt-5-mini")
 
         return model_id
 
@@ -329,7 +329,7 @@ class GPT5Service:
                 # Second attempt via Responses using chat route
                 try:
                     payload2 = dict(payload)
-                    payload2["model"] = self._map_model_id(self.routing.get("chat", "gpt-4o-mini"))
+                    payload2["model"] = self._map_model_id(self.routing.get("chat", "gpt-5-mini"))
                     payload2.pop("reasoning", None)
                     resp2 = self.client.responses.create(**payload2)
                     output_text2 = self._extract_output_text(resp2, logger)
@@ -345,7 +345,7 @@ class GPT5Service:
                 if not output_text:
                     try:
                         msg = payload.get("input", "")
-                        cc_model = os.getenv("OPENAI_FALLBACK_MODEL", "gpt-4o-mini")
+                        cc_model = os.getenv("OPENAI_FALLBACK_MODEL", "gpt-5-mini")
                         cc = self.client.chat.completions.create(
                             model=cc_model,
                             messages=[{"role": "user", "content": msg}],

@@ -174,8 +174,8 @@ class Phase3ContextBuilder:
         # 4. Построение models (маршрутизация к нужным LLM)
         models = self._build_models(command)
         # models = {
-        #     "primary": "gpt-4o",
-        #     "fallback": ["gpt-4o-mini", "gpt-3.5-turbo"]
+        #     "primary": "gpt-5",
+        #     "fallback": ["gpt-5-mini", "gpt-3.5-turbo"]
         # }
 
         # 5. Построение limits (бюджет и таймауты)
@@ -753,7 +753,7 @@ async def execute(self, query, initial_docs, depth, retrieval_fn, budget_manager
         {"iteration": 2, "answer": "...", "docs_used": 5},
         {"iteration": 3, "answer": "...", "docs_used": 5, "self_corrected": False}
     ],
-    "model_used": "gpt-4o",
+    "model_used": "gpt-5",
     "all_docs": [...]
 }
 ```
@@ -896,7 +896,7 @@ async def _send_orchestrator_payload(self, chat_id: str, payload: Dict[str, Any]
 │                                                                  │
 │  Step 1: Validate & parse command                               │
 │  Step 2: Build params (query, window, lang, k_final)            │
-│  Step 3: Build models routing (gpt-4o, fallbacks)               │
+│  Step 3: Build models routing (gpt-5, fallbacks)               │
 │  Step 4: Build limits (tokens, budget, timeout)                 │
 │  Step 5: *** RETRIEVAL WITH AUTO-RECOVERY ***                   │
 │     ├─ Normal retrieval (24h)                                   │
@@ -1004,7 +1004,7 @@ Results: [
 │    • Reasoning chain                                            │
 │    • Confidence score (0.0-1.0)                                 │
 │    • All documents used (5-10 chunks)                           │
-│    • Model used (gpt-4o)                                        │
+│    • Model used (gpt-5)                                        │
 └────────────────────┬───────────────────────────────────────────┘
                      │
                      ↓

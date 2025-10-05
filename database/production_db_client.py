@@ -502,7 +502,11 @@ class ProductionDBClient(PgClient):
 
                 cols = [d[0] for d in cur.description]
                 rows = cur.fetchall()
-                return [dict(zip(cols, row)) for row in rows]
+                records = [dict(zip(cols, row)) for row in rows]
+                for record in records:
+                    if 'title' not in record or not record.get('title'):
+                        record['title'] = record.get('title_norm')
+                return records
 
         except Exception as e:
             logger.error(f"Failed to get canonical articles: {e}")
@@ -613,7 +617,11 @@ class ProductionDBClient(PgClient):
 
                 cols = [d[0] for d in cur.description]
                 rows = cur.fetchall()
-                return [dict(zip(cols, row)) for row in rows]
+                records = [dict(zip(cols, row)) for row in rows]
+                for record in records:
+                    if 'title' not in record or not record.get('title'):
+                        record['title'] = record.get('title_norm')
+                return records
 
         except Exception as e:
             logger.error(f"Failed to get recent articles: {e}")
@@ -686,6 +694,7 @@ class ProductionDBClient(PgClient):
                         'text': row[3],
                         'url': row[4],
                         'title_norm': row[5],
+                        'title': row[5],
                         'source_domain': row[6],
                         'published_at': str(row[7]) if row[7] else None,
                         'similarity': float(row[8]),

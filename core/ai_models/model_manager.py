@@ -54,9 +54,10 @@ class ModelManager:
     # Model cost estimates (cents per 1K tokens)
     # Input / Output
     MODEL_COSTS = {
-        "gpt-5": (0.3, 0.6),  # Placeholder
-        "gpt-4o-mini": (0.015, 0.06),
-        "claude-4.5": (0.3, 1.5),  # Claude Sonnet 4
+        "gpt-5": (0.8, 2.4),
+        "gpt-5-mini": (0.25, 0.75),
+        "gpt-5-nano": (0.12, 0.36),
+        "claude-4.5": (0.3, 1.5),
         "gemini-2.5-pro": (0.125, 0.375),
         "cohere-rerank-v3": (0.002, 0.002),
     }
@@ -296,8 +297,8 @@ class ModelManager:
     def _estimate_cost(self, model: str, prompt_tokens: int, completion_tokens: int) -> float:
         """Estimate cost in cents"""
         if model not in self.MODEL_COSTS:
-            # Default to GPT-4o-mini costs if unknown
-            input_cost, output_cost = self.MODEL_COSTS["gpt-4o-mini"]
+            # Default to GPT-5-mini costs if unknown
+            input_cost, output_cost = self.MODEL_COSTS["gpt-5-mini"]
         else:
             input_cost, output_cost = self.MODEL_COSTS[model]
 

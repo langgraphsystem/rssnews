@@ -88,8 +88,8 @@ fallback=["claude-4.5", "gpt-5"],  # gpt-5 не существует
 timeout_seconds=12  # Слишком мало
 
 # После
-primary="gpt-4o",  # Актуальная модель
-fallback=["gpt-4o-mini", "gpt-3.5-turbo"],
+primary="gpt-5",  # Актуальная модель
+fallback=["gpt-5-mini", "gpt-3.5-turbo"],
 timeout_seconds=30  # Достаточно
 ```
 
@@ -97,9 +97,9 @@ timeout_seconds=30  # Достаточно
 # core/models/model_router.py
 
 MODEL_MAP = {
-    "gpt-5": "gpt-4o",  # Маппинг на реальную модель
-    "gpt-4o": "gpt-4o",
-    "gpt-4o-mini": "gpt-4o-mini",
+    "gpt-5": "gpt-5",  # Маппинг на реальную модель
+    "gpt-5": "gpt-5",
+    "gpt-5-mini": "gpt-5-mini",
     # ...
 }
 ```
@@ -243,7 +243,7 @@ OPENAI_EMBEDDING_BATCH_SIZE=100
 Telegram → advanced_bot.py → orchestrator.py → retrieval_node
 → ranking_api.retrieve_for_analysis() → db.get_recent_articles()
 → article_chunks (published_at >= NOW() - INTERVAL '24h')
-→ scoring → dedup → agents (gpt-4o) → format → validate
+→ scoring → dedup → agents (gpt-5) → format → validate
 → Telegram (Markdown)
 ```
 
@@ -338,7 +338,7 @@ LIMIT %s
 |-----------|--------|-----------|
 | /trends | ✅ Работает | Формат даты исправлен |
 | /analyze | ✅ Работает | Формат даты исправлен |
-| Model router | ✅ Быстро | gpt-4o, 30s timeout |
+| Model router | ✅ Быстро | gpt-5, 30s timeout |
 | Config DB | ✅ OK | Столбцы исправлены |
 | Embeddings | ✅ Точные | tiktoken, 100% точность |
 
