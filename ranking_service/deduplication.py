@@ -169,6 +169,10 @@ class DeduplicationEngine:
                         duplicate_groups[similar_id] = []
                     if article_id not in duplicate_groups[similar_id]:
                         duplicate_groups[similar_id].append(article_id)
+                # Also insert current article into LSH (if not already there)
+                # This allows it to be found by subsequent similar articles
+                if article_id not in processed_hashes:
+                    self.lsh.insert(article_id, minhash)
             else:
                 # New unique article
                 self.lsh.insert(article_id, minhash)
