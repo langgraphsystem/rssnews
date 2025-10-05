@@ -169,16 +169,15 @@ class DeduplicationEngine:
                         duplicate_groups[similar_id] = []
                     if article_id not in duplicate_groups[similar_id]:
                         duplicate_groups[similar_id].append(article_id)
-                # Also insert current article into LSH (if not already there)
-                # This allows it to be found by subsequent similar articles
-                if article_id not in processed_hashes:
-                    self.lsh.insert(article_id, minhash)
             else:
-                # New unique article
-                self.lsh.insert(article_id, minhash)
+                # New unique article - create new group
                 duplicate_groups[article_id] = [article_id]
 
-            processed_hashes[article_id] = minhash
+            # Insert into LSH only if not already inserted
+            # This prevents "The given key already exists" error
+            if article_id not in processed_hashes:
+                self.lsh.insert(article_id, minhash)
+                processed_hashes[article_id] = minhash
 
         return duplicate_groups
 
