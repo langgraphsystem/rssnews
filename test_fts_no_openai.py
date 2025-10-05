@@ -4,6 +4,7 @@ Test that FTS service works without OPENAI_API_KEY
 import os
 import sys
 import subprocess
+import inspect
 
 def test_fts_service_no_openai():
     """Test FTS service without OPENAI_API_KEY"""
@@ -21,6 +22,7 @@ def test_fts_service_no_openai():
     try:
         sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
         from services.fts_service import FTSService
+        assert inspect.iscoroutinefunction(FTSService.run_service), "FTSService.run_service should be async"
         print("   ✅ FTSService imported successfully")
     except ImportError as e:
         print(f"   ❌ Failed to import FTSService: {e}")

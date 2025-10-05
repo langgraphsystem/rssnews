@@ -797,16 +797,37 @@ class PgClient:
             logger.error(f"Failed to get chunks for indexing: {e}")
             return []
 
+    def get_all_chunk_ids(self) -> List[int]:
+        """Get all chunk IDs for rebuild operations."""
+        try:
+            with self._cursor() as cur:
+                cur.execute("SELECT id FROM article_chunks ORDER BY id")
+                return [row[0] for row in cur.fetchall()]
+        except Exception as e:
+            logger.error(f"Failed to get all chunk ids: {e}")
+            return []
+
+
     def update_chunks_fts(self, ids: List[int]) -> int:
-        """Update FTS vectors for given chunk ids using simple config."""
+        """Update FTS vectors for given chunk ids using language-aware config."""
         if not ids:
             return 0
         try:
             with self._cursor() as cur:
                 cur.execute(
-                    f"""
+                    """
                     UPDATE article_chunks
-                    SET fts_vector = to_tsvector('english', coalesce(text, ''))
+                    SET fts_vector = to_tsvector(
+                        (
+                            CASE
+                                WHEN language ILIKE 'ru%%' THEN 'pg_catalog.russian'
+                                WHEN language ILIKE 'en%%' THEN 'pg_catalog.english'
+                                WHEN language ILIKE 'es%%' THEN 'pg_catalog.spanish'
+                                ELSE 'pg_catalog.simple'
+                            END
+                        )::regconfig,
+                        coalesce(text, '')
+                    )
                     WHERE id = ANY(%s)
                     """,
                     (ids,)
@@ -853,24 +874,33 @@ class PgClient:
         """Search chunks using Full-Text Search (FTS) with BM25 ranking."""
         try:
             with self._cursor() as cur:
-                cur.execute(
-                    """
-                    SELECT 
-                        id, article_id, chunk_index, text,
-                        url, title_norm, source_domain,
-                        ts_rank_cd(fts_vector, plainto_tsquery('english', %s)) as score
-                    FROM article_chunks
-                    WHERE fts_vector @@ plainto_tsquery('english', %s)
+                sql = """
+                    SELECT
+                        ac.id, ac.article_id, ac.chunk_index, ac.text,
+                        ac.url, ac.title_norm, ac.source_domain,
+                        ts_rank_cd(ac.fts_vector, lang_query.tsq) AS score
+                    FROM article_chunks ac
+                    CROSS JOIN LATERAL (
+                        SELECT CASE
+                            WHEN ac.language ILIKE 'ru%%' THEN plainto_tsquery('pg_catalog.russian', %s)
+                            WHEN ac.language ILIKE 'en%%' THEN plainto_tsquery('pg_catalog.english', %s)
+                            WHEN ac.language ILIKE 'es%%' THEN plainto_tsquery('pg_catalog.spanish', %s)
+                            ELSE plainto_tsquery('pg_catalog.simple', %s)
+                        END AS tsq
+                    ) AS lang_query
+                    WHERE lang_query.tsq <> ''::tsquery
+                      AND ac.fts_vector @@ lang_query.tsq
                     ORDER BY score DESC
                     LIMIT %s
-                    """,
-                    (query, query, limit)
-                )
+                """
+                cur.execute(sql, (query, query, query, query, limit))
                 cols = [d[0] for d in cur.description]
                 return [dict(zip(cols, r)) for r in cur.fetchall()]
         except Exception as e:
             logger.error(f"FTS search failed for query '{query}': {e}")
             return []
+
+
 
     def search_chunks_fts_ts(self, tsquery: Optional[str], plainto: str,
                               sources: List[str], since_days: Optional[int],
@@ -879,46 +909,48 @@ class PgClient:
         Can filter by source_domain list and published_at > now()-interval 'N days'.
         """
         try:
-            where = ["TRUE"]
-            params: List[Any] = []
-            if tsquery:
-                where.append("fts_vector @@ to_tsquery('english', %s)")
-                params.append(tsquery)
-                rank_expr = "ts_rank_cd(fts_vector, to_tsquery('english', %s))"
-                rank_param_first = True
-            else:
-                where.append("fts_vector @@ plainto_tsquery('english', %s)")
-                params.append(plainto)
-                rank_expr = "ts_rank_cd(fts_vector, plainto_tsquery('english', %s))"
-                rank_param_first = True
-
-            if sources:
-                where.append("source_domain = ANY(%s)")
-                params.append(sources)
-            if since_days:
-                where.append("published_at IS NOT NULL AND published_at > NOW() - (%s || ' days')::interval")
-                params.append(int(since_days))
+            ts_function = 'to_tsquery' if tsquery else 'plainto_tsquery'
+            ts_value = tsquery if tsquery else plainto
 
             sql = f"""
-                SELECT id, article_id, chunk_index, text, url, title_norm, source_domain,
-                       {rank_expr} as score
-                FROM article_chunks
-                WHERE {' AND '.join(where)}
-                ORDER BY score DESC
-                LIMIT %s
+                SELECT
+                    ac.id, ac.article_id, ac.chunk_index, ac.text,
+                    ac.url, ac.title_norm, ac.source_domain,
+                    ts_rank_cd(ac.fts_vector, lang_query.tsq) AS score
+                FROM article_chunks ac
+                CROSS JOIN LATERAL (
+                    SELECT CASE
+                        WHEN ac.language ILIKE 'ru%%' THEN {{ts_function}}('pg_catalog.russian', %s)
+                        WHEN ac.language ILIKE 'en%%' THEN {{ts_function}}('pg_catalog.english', %s)
+                        WHEN ac.language ILIKE 'es%%' THEN {{ts_function}}('pg_catalog.spanish', %s)
+                        ELSE {{ts_function}}('pg_catalog.simple', %s)
+                    END AS tsq
+                ) AS lang_query
+                WHERE lang_query.tsq <> ''::tsquery
+                  AND ac.fts_vector @@ lang_query.tsq
             """
-            if rank_param_first:
-                params_rank = [params[0]]
-            else:
-                params_rank = []
-            qparams = params_rank + params + [limit]
+
+            params: List[Any] = [ts_value, ts_value, ts_value, ts_value]
+
+            if sources:
+                sql += "\n                  AND ac.source_domain = ANY(%s)"
+                params.append(sources)
+            if since_days:
+                sql += "\n                  AND ac.published_at IS NOT NULL AND ac.published_at > NOW() - (%s || ' days')::interval"
+                params.append(int(since_days))
+
+            sql += "\n                ORDER BY score DESC\n                LIMIT %s"
+            params.append(limit)
+
             with self._cursor() as cur:
-                cur.execute(sql, qparams)
+                cur.execute(sql.format(ts_function=ts_function), params)
                 cols = [d[0] for d in cur.description]
                 return [dict(zip(cols, r)) for r in cur.fetchall()]
         except Exception as e:
             logger.error(f"FTS TS search failed: {e}")
             return []
+
+
 
     def search_chunks_embedding(self, query_vector: List[float], limit: int = 10) -> List[Dict[str, Any]]:
         """Search chunks using pgvector cosine similarity or fallback to Python."""

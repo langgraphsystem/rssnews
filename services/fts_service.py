@@ -131,23 +131,25 @@ class FTSService:
             logger.error(f"Error during FTS index rebuild: {e}")
             return {'processed': 0, 'successful': 0, 'errors': 1}
 
-    def run_service(self, interval_seconds: int = 60):
+    async def run_service(self, interval_seconds: int = 60, batch_size: int = 100000):
         """Run FTS service in a loop"""
-        logger.info(f"Starting FTS service with {interval_seconds}s interval")
+        logger.info(
+            f"Starting FTS service with {interval_seconds}s interval and batch size {batch_size}"
+        )
 
-        async def service_loop():
+        try:
             while True:
                 try:
-                    await self.update_fts_index()
-                    await asyncio.sleep(interval_seconds)
-                except KeyboardInterrupt:
-                    logger.info("FTS service stopped by user")
-                    break
+                    await self.update_fts_index(batch_size=batch_size)
                 except Exception as e:
                     logger.error(f"Error in FTS service: {e}")
-                    await asyncio.sleep(interval_seconds)
 
-        asyncio.run(service_loop())
+                await asyncio.sleep(interval_seconds)
+        except asyncio.CancelledError:
+            logger.info("FTS service cancelled")
+            raise
+
+
 
 
 async def main():
@@ -216,7 +218,10 @@ async def main():
 
     elif args.command == 'service':
         # Run continuous service
-        service.run_service(args.interval)
+        try:
+            await service.run_service(args.interval, args.batch_size)
+        except KeyboardInterrupt:
+            logger.info("FTS service stopped by user")
 
 
 if __name__ == "__main__":
