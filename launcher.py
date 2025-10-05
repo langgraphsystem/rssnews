@@ -39,13 +39,13 @@ def build_command() -> str:
 
     emb_batch = os.getenv("EMBEDDING_BATCH", "1000")
 
-  chunk_batch = os.getenv("CHUNKING_BATCH", "100")
-  chunk_continuous_interval = os.getenv("CHUNK_CONTINUOUS_INTERVAL", "30")
-  chunk_continuous_batch = os.getenv("CHUNK_CONTINUOUS_BATCH", "100")
+    chunk_batch = os.getenv("CHUNKING_BATCH", "100")
+    chunk_continuous_interval = os.getenv("CHUNK_CONTINUOUS_INTERVAL", "30")
+    chunk_continuous_batch = os.getenv("CHUNK_CONTINUOUS_BATCH", "100")
 
-  # FTS controls
-  fts_batch = os.getenv("FTS_BATCH", "100000")
-  fts_continuous_interval = os.getenv("FTS_CONTINUOUS_INTERVAL", "60")
+    # FTS controls
+    fts_batch = os.getenv("FTS_BATCH", "100000")
+    fts_continuous_interval = os.getenv("FTS_CONTINUOUS_INTERVAL", "60")
 
     mig_interval = os.getenv("MIGRATION_INTERVAL", "60")
     # OpenAI embedding migration batch size (fallback to service default 100)
@@ -61,22 +61,22 @@ def build_command() -> str:
     if mode == "work-continuous":
         return f"python services/work_continuous_service.py --interval {work_continuous_interval} --batch {work_continuous_batch}"
 
-  if mode == "embedding":
-      return f"python main.py services run-once --services embedding --embedding-batch {emb_batch}"
+    if mode == "embedding":
+        return f"python main.py services run-once --services embedding --embedding-batch {emb_batch}"
 
-  if mode == "chunking":
-      return f"python main.py services run-once --services chunking --chunking-batch {chunk_batch}"
+    if mode == "chunking":
+        return f"python main.py services run-once --services chunking --chunking-batch {chunk_batch}"
 
-  if mode == "chunk-continuous":
-      return f"python services/chunk_continuous_service.py --interval {chunk_continuous_interval} --batch {chunk_continuous_batch}"
+    if mode == "chunk-continuous":
+        return f"python services/chunk_continuous_service.py --interval {chunk_continuous_interval} --batch {chunk_continuous_batch}"
 
-  if mode == "fts":
-      # One-off FTS indexing using the consolidated services entrypoint
-      return f"python main.py services run-once --services fts --fts-batch {fts_batch}"
+    if mode == "fts":
+        # One-off FTS indexing using the consolidated services entrypoint
+        return f"python main.py services run-once --services fts --fts-batch {fts_batch}"
 
-  if mode == "fts-continuous":
-      # Continuous FTS indexing loop via main services controller
-      return f"python main.py services start --services fts --fts-interval {fts_continuous_interval}"
+    if mode == "fts-continuous":
+        # Continuous FTS indexing loop via main services controller
+        return f"python main.py services start --services fts --fts-interval {fts_continuous_interval}"
 
     if mode == "openai-migration":
         # Default to continuous mode; the migration service requires a subcommand
