@@ -37,7 +37,10 @@ class ModelRouter:
 
     # Model name mapping
     MODEL_MAP = {
-        "gpt-5": "gpt-4-turbo-preview",  # Placeholder until GPT-5 is available
+        "gpt-5": "gpt-4o",  # Use GPT-4o as current best model
+        "gpt-4o": "gpt-4o",
+        "gpt-4o-mini": "gpt-4o-mini",
+        "gpt-3.5-turbo": "gpt-3.5-turbo",
         "claude-4.5": "claude-3-5-sonnet-20241022",
         "gemini-2.5-pro": "gemini-1.5-pro-latest"
     }

@@ -24,24 +24,24 @@ class ModelRoute(BaseModel):
 class ModelRoutingConfig(BaseModel):
     """Model routing rules for all agents"""
     keyphrase_mining: ModelRoute = ModelRoute(
-        primary="gemini-2.5-pro",
-        fallback=["claude-4.5", "gpt-5"],
-        timeout_seconds=10
+        primary="gpt-4o",
+        fallback=["gpt-4o-mini", "gpt-3.5-turbo"],
+        timeout_seconds=30
     )
     query_expansion: ModelRoute = ModelRoute(
-        primary="gemini-2.5-pro",
-        fallback=["gpt-5"],
-        timeout_seconds=8
+        primary="gpt-4o-mini",
+        fallback=["gpt-3.5-turbo"],
+        timeout_seconds=20
     )
     sentiment_emotion: ModelRoute = ModelRoute(
-        primary="gpt-5",
-        fallback=["claude-4.5"],
-        timeout_seconds=12
+        primary="gpt-4o",
+        fallback=["gpt-4o-mini"],
+        timeout_seconds=30
     )
     topic_modeler: ModelRoute = ModelRoute(
-        primary="claude-4.5",
-        fallback=["gpt-5", "gemini-2.5-pro"],
-        timeout_seconds=15
+        primary="gpt-4o",
+        fallback=["gpt-4o-mini", "gpt-3.5-turbo"],
+        timeout_seconds=30
     )
 
 

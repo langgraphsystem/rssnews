@@ -382,20 +382,20 @@ class ProductionDBClient(PgClient):
         try:
             with self._cursor() as cur:
                 cur.execute("""
-                    SELECT config_value, config_type
+                    SELECT value, value_type
                     FROM system_config
-                    WHERE config_key = %s
+                    WHERE key = %s
                 """, (key,))
 
                 row = cur.fetchone()
                 if row:
-                    value, config_type = row
+                    value, value_type = row
                     # Convert based on type
-                    if config_type == 'number':
-                        return float(value) if '.' in value else int(value)
-                    elif config_type == 'boolean':
-                        return value.lower() in ('true', '1', 'yes')
-                    elif config_type == 'json':
+                    if value_type == 'number':
+                        return float(value) if '.' in str(value) else int(value)
+                    elif value_type == 'boolean':
+                        return str(value).lower() in ('true', '1', 'yes')
+                    elif value_type == 'json':
                         return json.loads(value)
                     else:
                         return value

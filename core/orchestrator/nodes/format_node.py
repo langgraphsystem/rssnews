@@ -443,14 +443,37 @@ def _build_topic_insights(topics: List[Dict], docs: List[Dict]) -> List[Insight]
 
 def _build_evidence_list(docs: List[Dict]) -> List[Evidence]:
     """Build evidence list from documents"""
+    from datetime import datetime
     evidence_list = []
 
     for doc in docs[:5]:  # Max 5 evidence items
+        # Extract date from published_at or date field
+        date_value = doc.get("date") or doc.get("published_at")
+
+        # Format date to YYYY-MM-DD
+        if isinstance(date_value, str) and date_value:
+            # Parse datetime string
+            try:
+                if 'T' in date_value or ' ' in date_value:
+                    # ISO format or datetime
+                    dt = datetime.fromisoformat(date_value.replace('Z', '+00:00'))
+                    formatted_date = dt.strftime('%Y-%m-%d')
+                else:
+                    # Already in YYYY-MM-DD format
+                    formatted_date = date_value[:10]
+            except:
+                formatted_date = "2025-01-01"  # Fallback
+        elif hasattr(date_value, 'strftime'):
+            # Python datetime object
+            formatted_date = date_value.strftime('%Y-%m-%d')
+        else:
+            formatted_date = "2025-01-01"  # Fallback for missing date
+
         evidence_list.append(Evidence(
             title=doc.get("title", "")[:200],
             article_id=doc.get("article_id"),
             url=doc.get("url"),
-            date=doc.get("date", ""),
+            date=formatted_date,
             snippet=doc.get("snippet", "")[:240]
         ))
 
@@ -459,10 +482,29 @@ def _build_evidence_list(docs: List[Dict]) -> List[Evidence]:
 
 def _doc_to_evidence_ref(doc: Dict) -> EvidenceRef:
     """Convert doc to evidence reference"""
+    from datetime import datetime
+
+    # Extract and format date
+    date_value = doc.get("date") or doc.get("published_at")
+
+    if isinstance(date_value, str) and date_value:
+        try:
+            if 'T' in date_value or ' ' in date_value:
+                dt = datetime.fromisoformat(date_value.replace('Z', '+00:00'))
+                formatted_date = dt.strftime('%Y-%m-%d')
+            else:
+                formatted_date = date_value[:10]
+        except:
+            formatted_date = "2025-01-01"
+    elif hasattr(date_value, 'strftime'):
+        formatted_date = date_value.strftime('%Y-%m-%d')
+    else:
+        formatted_date = "2025-01-01"
+
     return EvidenceRef(
         article_id=doc.get("article_id"),
         url=doc.get("url"),
-        date=doc.get("date", "2025-01-01")
+        date=formatted_date
     )
 
 
