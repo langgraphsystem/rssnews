@@ -53,6 +53,7 @@ structlog==24.2.0
 
 # AI clients
 openai==1.108.2
+tiktoken==0.8.0  # Token counting for OpenAI models
 
 # Production ranking and deduplication (2025 latest)
 datasketch==1.6.5

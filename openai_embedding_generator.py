@@ -7,6 +7,13 @@ import logging
 import asyncio
 from typing import List, Optional
 
+try:
+    import tiktoken
+    HAS_TIKTOKEN = True
+except ImportError:
+    HAS_TIKTOKEN = False
+    logging.warning("tiktoken not installed - using character-based truncation (less accurate)")
+
 logger = logging.getLogger(__name__)
 
 
@@ -21,12 +28,25 @@ class OpenAIEmbeddingGenerator:
         self.model = os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-3-large")
         self.timeout = int(os.getenv("EMBEDDING_TIMEOUT", "30"))
         self.dimensions = 3072
+        self.max_tokens = 8191  # OpenAI API limit
 
         # Initialize OpenAI client
         from openai import OpenAI
         self.client = OpenAI(api_key=self.api_key, timeout=self.timeout)
 
-        logger.info(f"OpenAI embedding generator initialized: model={self.model}, dimensions={self.dimensions}")
+        # Initialize tiktoken encoder if available
+        if HAS_TIKTOKEN:
+            try:
+                self.encoding = tiktoken.encoding_for_model(self.model)
+                logger.info(f"✅ tiktoken encoder initialized for {self.model}")
+            except:
+                # Fallback to cl100k_base encoding (used by most modern models)
+                self.encoding = tiktoken.get_encoding("cl100k_base")
+                logger.warning(f"Using fallback encoding cl100k_base")
+        else:
+            self.encoding = None
+
+        logger.info(f"OpenAI embedding generator initialized: model={self.model}, dimensions={self.dimensions}, max_tokens={self.max_tokens}")
 
     async def generate_embeddings(self, texts: List[str]) -> List[Optional[List[float]]]:
         """Generate embeddings for list of texts
@@ -40,14 +60,26 @@ class OpenAIEmbeddingGenerator:
         if not texts:
             return []
 
-        # Truncate very long texts (OpenAI limit is ~8191 tokens)
+        # Truncate texts that exceed token limit
         truncated_texts = []
-        for text in texts:
-            if len(text) > 8000:  # Conservative character limit
-                truncated_texts.append(text[:8000])
-                logger.warning(f"Truncated text from {len(text)} to 8000 characters")
-            else:
-                truncated_texts.append(text)
+        for i, text in enumerate(texts):
+            truncated = self._truncate_text(text)
+            truncated_texts.append(truncated)
+
+            # Log if truncation occurred
+            if len(truncated) < len(text):
+                if self.encoding:
+                    orig_tokens = len(self.encoding.encode(text))
+                    trunc_tokens = len(self.encoding.encode(truncated))
+                    logger.warning(
+                        f"Truncated text #{i+1}: {orig_tokens} → {trunc_tokens} tokens "
+                        f"({len(text)} → {len(truncated)} chars)"
+                    )
+                else:
+                    logger.warning(
+                        f"Truncated text #{i+1}: {len(text)} → {len(truncated)} characters "
+                        f"(character-based, may be inaccurate)"
+                    )
 
         try:
             # OpenAI supports batch processing (up to 2048 texts)
@@ -70,6 +102,39 @@ class OpenAIEmbeddingGenerator:
             logger.error(f"Failed to generate embeddings: {e}")
             # Return None for all texts if batch fails
             return [None] * len(texts)
+
+    def _truncate_text(self, text: str) -> str:
+        """Truncate text to fit within token limit
+
+        Args:
+            text: Input text
+
+        Returns:
+            Truncated text that fits within max_tokens limit
+        """
+        if not text:
+            return text
+
+        # Use tiktoken if available for accurate token counting
+        if self.encoding:
+            tokens = self.encoding.encode(text)
+
+            if len(tokens) <= self.max_tokens:
+                return text
+
+            # Truncate to max_tokens
+            truncated_tokens = tokens[:self.max_tokens]
+            return self.encoding.decode(truncated_tokens)
+
+        else:
+            # Fallback: use character-based truncation
+            # Rough estimate: 1 token ≈ 4 characters for English
+            max_chars = self.max_tokens * 4
+
+            if len(text) <= max_chars:
+                return text
+
+            return text[:max_chars]
 
     async def _generate_batch(self, texts: List[str]) -> List[Optional[List[float]]]:
         """Generate embeddings for a batch of texts using OpenAI API
