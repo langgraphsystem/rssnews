@@ -223,6 +223,22 @@ Maximum {self.max_chunks} chunks. Focus on quality over quantity."""
                     except json.JSONDecodeError:
                         pass
 
+            # If array format failed, try single chunk object: {"text": "...", "topic": "...", "type": "..."}
+            if chunks_data is None:
+                json_start = response.find('{')
+                json_end = response.rfind('}') + 1
+
+                if json_start != -1 and json_end > json_start:
+                    try:
+                        json_str = response[json_start:json_end]
+                        data = json.loads(json_str)
+                        # Check if this looks like a single chunk (has 'text' field)
+                        if isinstance(data, dict) and 'text' in data:
+                            chunks_data = [data]  # Wrap in array
+                            logger.debug("Parsed single chunk object format")
+                    except json.JSONDecodeError:
+                        pass
+
             if chunks_data is None:
                 raise ValueError("No valid JSON array or object with 'chunks' found in response")
             if not isinstance(chunks_data, list):
