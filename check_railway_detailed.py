@@ -1,11 +1,23 @@
 #!/usr/bin/env python3
-"""Get detailed Railway service information including logs"""
+"""Get detailed Railway service information including logs.
+
+Reads credentials from environment variables to avoid hardcoding secrets.
+
+Required env vars:
+- RAILWAY_TOKEN
+- RAILWAY_SERVICE_ID (defaults to provided ID if missing)
+"""
+import os
 import requests
 import json
 from datetime import datetime
 
-RAILWAY_TOKEN = "562cdf71-e227-42de-b275-66208aac85c9"
-SERVICE_ID = "eac4079c-506c-4eab-a6d2-49bd860379de"
+RAILWAY_TOKEN = os.getenv("RAILWAY_TOKEN")
+SERVICE_ID = os.getenv("RAILWAY_SERVICE_ID", "ffe65f79-4dc5-4757-b772-5a99c7ea624f")
+
+if not RAILWAY_TOKEN:
+    print("Error: RAILWAY_TOKEN is not set in environment.")
+    raise SystemExit(1)
 
 headers = {
     "Authorization": f"Bearer {RAILWAY_TOKEN}",

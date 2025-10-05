@@ -1132,51 +1132,76 @@ class PgClient:
 
     def search_chunks_by_similarity(self, query_embedding: List[float],
                                    limit: int = 10, similarity_threshold: float = 0.7) -> List[Dict[str, Any]]:
-        """Search chunks by embedding similarity using pgvector native operator.
+        """Search chunks by embedding similarity with resilient fallbacks.
 
-        Performance notes:
-        - Uses pgvector <=> operator for cosine distance (fast with HNSW index)
-        - Fallback to Python implementation if pgvector not available
+        Order of attempts:
+        1) pgvector search on `embedding_vector` (if column has any non-NULL values)
+        2) pgvector search on `embedding` (if it's a vector-typed column)
+        3) Python fallback over TEXT/json `embedding` values
         """
         try:
             with self._cursor() as cur:
-                # Try pgvector-native search first (fast, indexed)
+                # Convert list to pgvector format: '[1,2,3,...]'
+                vector_str = '[' + ','.join(str(x) for x in query_embedding) + ']'
+
+                # Helper to run a pgvector query against a given column name
+                def _pgvector_query(col: str) -> List[Dict[str, Any]]:
+                    cur.execute(
+                        f"""
+                            SELECT
+                                id, article_id, chunk_index, text,
+                                url, title_norm, source_domain,
+                                1 - ({col} <=> %s::vector) AS similarity
+                            FROM article_chunks
+                            WHERE {col} IS NOT NULL
+                            ORDER BY {col} <=> %s::vector
+                            LIMIT %s
+                        """,
+                        (vector_str, vector_str, limit)
+                    )
+                    rows = cur.fetchall()
+                    return [
+                        {
+                            'id': r[0],
+                            'article_id': r[1],
+                            'chunk_index': r[2],
+                            'text': r[3],
+                            'url': r[4],
+                            'title_norm': r[5],
+                            'source_domain': r[6],
+                            'similarity': float(r[7]),
+                        }
+                        for r in rows
+                    ]
+
+                # 1) Try embedding_vector if it actually contains data
                 try:
-                    # Convert list to pgvector format: '[1,2,3,...]'
-                    vector_str = '[' + ','.join(str(x) for x in query_embedding) + ']'
+                    cur.execute("SELECT 1 FROM article_chunks WHERE embedding_vector IS NOT NULL LIMIT 1")
+                    has_vec = cur.fetchone() is not None
+                except Exception:
+                    has_vec = False
 
-                    cur.execute("""
-                        SELECT
-                            id, article_id, chunk_index, text,
-                            url, title_norm, source_domain,
-                            1 - (embedding_vector <=> %s::vector) AS similarity
-                        FROM article_chunks
-                        WHERE embedding_vector IS NOT NULL
-                          AND (1 - (embedding_vector <=> %s::vector)) >= %s
-                        ORDER BY embedding_vector <=> %s::vector
-                        LIMIT %s
-                    """, (vector_str, vector_str, similarity_threshold, vector_str, limit))
+                if has_vec:
+                    try:
+                        results = _pgvector_query("embedding_vector")
+                        logger.debug(f"pgvector search on embedding_vector returned {len(results)} results")
+                        if results:
+                            return results
+                    except Exception as e:
+                        logger.debug(f"embedding_vector search failed, will try 'embedding' column: {e}")
 
-                    results = []
-                    for row in cur.fetchall():
-                        results.append({
-                            'id': row[0],
-                            'article_id': row[1],
-                            'chunk_index': row[2],
-                            'text': row[3],
-                            'url': row[4],
-                            'title_norm': row[5],
-                            'source_domain': row[6],
-                            'similarity': float(row[7])
-                        })
-
-                    logger.debug(f"pgvector search returned {len(results)} results")
-                    return results
-
+                # 2) Try pgvector on 'embedding' column (if it is vector-typed in this DB)
+                # This may raise if 'embedding' is TEXT; we catch and fall back.
+                try:
+                    results = _pgvector_query("embedding")
+                    logger.debug(f"pgvector search on embedding returned {len(results)} results")
+                    if results:
+                        return results
                 except Exception as e:
-                    # Fallback to Python implementation if pgvector not available
-                    logger.warning(f"pgvector search failed, falling back to Python: {e}")
-                    return self._search_chunks_python_fallback(query_embedding, limit, similarity_threshold)
+                    logger.debug(f"embedding(pgvector) search failed, using Python fallback: {e}")
+
+                # 3) Final fallback: Python similarity over TEXT/JSON embeddings
+                return self._search_chunks_python_fallback(query_embedding, limit, similarity_threshold)
 
         except Exception as e:
             logger.error(f"Similarity search failed: {e}")

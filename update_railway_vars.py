@@ -8,7 +8,8 @@ load_dotenv()
 
 # Get from environment or set manually
 RAILWAY_TOKEN = os.getenv("RAILWAY_TOKEN", "<your-railway-token>")
-SERVICE_ID = os.getenv("RAILWAY_SERVICE_ID", "eac4079c-506c-4eab-a6d2-49bd860379de")
+# Prefer env var; default to the provided service ID if not set
+SERVICE_ID = os.getenv("RAILWAY_SERVICE_ID", "ffe65f79-4dc5-4757-b772-5a99c7ea624f")
 
 headers = {
     "Authorization": f"Bearer {RAILWAY_TOKEN}",
