@@ -1,6 +1,45 @@
 # /ask Command Enhancement Changelog
 **Implementation Date:** 2025-10-06
-**Status:** 🚧 In Progress (Sprint 1-3 Complete)
+**Status:** 🚧 In Progress (Sprint 1-4 Complete)
+
+---
+
+## Sprint 4 Complete ✅ — Metrics & Configuration
+
+### Summary
+Created centralized metrics module for tracking /ask performance and quality, implemented environment-based configuration system, and integrated metrics into intent router and query parser.
+
+### Files Created (3 new files)
+
+#### 14. `core/metrics/ask_metrics.py` (465 lines) ✅
+**Purpose:** Centralized metrics collection
+
+**Metrics Categories:**
+- Intent routing: general_qa_total, news_total, confidence
+- Retrieval: bypassed, executed, empty, window_expansion
+- Filtering: offtopic, category_penalty, date_penalty, domain_diversity
+- Deduplication: duplicates_found, canonical_selected
+- Query parsing: site/after/before operators
+- Performance: response_time (p50/p95/p99), llm_calls
+- Quality: top10_unique_domains, dated_percentage
+
+#### 15. `core/config/ask_config.py` (320 lines) ✅
+**Purpose:** Environment-based configuration
+
+**40+ Environment Variables:**
+`ASK_DEFAULT_TIME_WINDOW`, `ASK_K_FINAL`, `ASK_MIN_COSINE_THRESHOLD`, `ASK_MAX_PER_DOMAIN`, scoring weights, etc.
+
+#### 16. `.env.ask.example` (80 lines) ✅
+**Purpose:** Configuration examples and documentation
+
+### Files Modified (2 files)
+
+#### 17. `core/routing/intent_router.py` ✅
+- Added `_record_metrics()` helper
+- Integrated metrics in all classification paths
+
+#### 18. `core/rag/query_parser.py` ✅
+- Added metrics for site:/after:/before: operators
 
 ---
 

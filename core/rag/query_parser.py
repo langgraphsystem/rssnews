@@ -143,6 +143,15 @@ class QueryParser:
                 else:
                     logger.warning(f"Domain not in allow-list: {domain}")
 
+        # Record metrics
+        if valid_domains:
+            try:
+                from core.metrics import get_metrics_collector
+                metrics = get_metrics_collector()
+                metrics.record_search_operator("site")
+            except Exception as e:
+                logger.debug(f"Failed to record site operator metrics: {e}")
+
         return list(set(valid_domains))  # Deduplicate
 
     def _extract_after_date(self, query: str) -> Optional[datetime]:
@@ -152,7 +161,17 @@ class QueryParser:
             return None
 
         date_str = match.group(1)
-        return self._parse_date(date_str, "after")
+        result = self._parse_date(date_str, "after")
+
+        if result:
+            try:
+                from core.metrics import get_metrics_collector
+                metrics = get_metrics_collector()
+                metrics.record_search_operator("after")
+            except Exception as e:
+                logger.debug(f"Failed to record after operator metrics: {e}")
+
+        return result
 
     def _extract_before_date(self, query: str) -> Optional[datetime]:
         """Extract date from before: operator"""
@@ -161,7 +180,17 @@ class QueryParser:
             return None
 
         date_str = match.group(1)
-        return self._parse_date(date_str, "before")
+        result = self._parse_date(date_str, "before")
+
+        if result:
+            try:
+                from core.metrics import get_metrics_collector
+                metrics = get_metrics_collector()
+                metrics.record_search_operator("before")
+            except Exception as e:
+                logger.debug(f"Failed to record before operator metrics: {e}")
+
+        return result
 
     def _parse_date(self, date_str: str, operator: str) -> Optional[datetime]:
         """

@@ -77,11 +77,13 @@ class IntentRouter:
         # RULE 1: Search operators force news mode
         if re.search(self.search_operator_pattern, query, re.IGNORECASE):
             logger.info(f"Intent: news_current_events (search operators detected)")
-            return IntentClassification(
+            result = IntentClassification(
                 intent="news_current_events",
                 confidence=1.0,
                 reason="search_operators (site:/after:/before:)"
             )
+            self._record_metrics(result)
+            return result
 
         # RULE 2: Check for general-QA patterns (high priority)
         general_qa_matches = sum(
@@ -109,28 +111,34 @@ class IntentRouter:
             if len(query.split()) <= 4 and any(c.isupper() for c in query):
                 # Short query with capitals → likely named entity → news
                 logger.info(f"Intent: news_current_events (short query with capitals, default)")
-                return IntentClassification(
+                result = IntentClassification(
                     intent="news_current_events",
                     confidence=0.6,
                     reason="default_heuristic (short_with_capitals)"
                 )
+                self._record_metrics(result)
+                return result
             else:
                 # Longer query without clear signals → general-QA
                 logger.info(f"Intent: general_qa (no clear signals, default)")
-                return IntentClassification(
+                result = IntentClassification(
                     intent="general_qa",
                     confidence=0.5,
                     reason="default_heuristic (no_clear_signals)"
                 )
+                self._record_metrics(result)
+                return result
 
         # If general-QA patterns dominate and no strong news signals
         if general_qa_matches > 0 and news_matches == 0 and entity_matches == 0:
             logger.info(f"Intent: general_qa (qa_patterns={general_qa_matches})")
-            return IntentClassification(
+            result = IntentClassification(
                 intent="general_qa",
                 confidence=0.9,
                 reason=f"qa_patterns_dominant (matches={general_qa_matches})"
             )
+            self._record_metrics(result)
+            return result
 
         # If news patterns or entities present
         if news_matches > 0 or entity_matches > 0:
@@ -139,28 +147,43 @@ class IntentRouter:
                 f"Intent: news_current_events (news_matches={news_matches}, "
                 f"entity_matches={entity_matches})"
             )
-            return IntentClassification(
+            result = IntentClassification(
                 intent="news_current_events",
                 confidence=confidence,
                 reason=f"news_signals (news={news_matches}, entities={entity_matches})"
             )
+            self._record_metrics(result)
+            return result
 
         # Mixed signals — prefer news if entities present
         if entity_matches > 0:
             logger.info(f"Intent: news_current_events (mixed signals, entities present)")
-            return IntentClassification(
+            result = IntentClassification(
                 intent="news_current_events",
                 confidence=0.7,
                 reason="mixed_signals_with_entities"
             )
+            self._record_metrics(result)
+            return result
 
         # Default to general-QA if truly ambiguous
         logger.info(f"Intent: general_qa (ambiguous, default)")
-        return IntentClassification(
+        result = IntentClassification(
             intent="general_qa",
             confidence=0.5,
             reason="ambiguous_default"
         )
+        self._record_metrics(result)
+        return result
+
+    def _record_metrics(self, result: IntentClassification):
+        """Record intent classification metrics"""
+        try:
+            from core.metrics import get_metrics_collector
+            metrics = get_metrics_collector()
+            metrics.record_intent_classification(result.intent, result.confidence)
+        except Exception as e:
+            logger.debug(f"Failed to record intent metrics: {e}")
 
 
 # Singleton instance
