@@ -1270,15 +1270,21 @@ class AdvancedRSSBot:
         try:
             if not args:
                 help_text = "🧠 **Phase 3 Agentic RAG Help**\n\n"
-                help_text += "**Usage:** `/ask <query> [--depth=1|2|3] [window]`\n\n"
+                help_text += "**Usage:** `/ask <query> [--depth=1|2|3]`\n\n"
                 help_text += "**Examples:**\n"
-                help_text += "• `/ask AI governance --depth=3` - Deep analysis\n"
-                help_text += "• `/ask crypto trends 1w` - Weekly trends\n\n"
+                help_text += "• `/ask AI governance --depth=3` - Deep analysis (7d default)\n"
+                help_text += "• `/ask how does an LLM work` - General knowledge\n"
+                help_text += "• `/ask AI regulation site:europa.eu` - Domain-specific news\n"
+                help_text += "• `/ask ceasefire talks today` - Latest news (24h)\n\n"
                 help_text += "**Depth:**\n"
                 help_text += "• 1 = Quick answer (1 iteration)\n"
                 help_text += "• 2 = Standard (2 iterations)\n"
                 help_text += "• 3 = Deep (3 iterations with self-check)\n\n"
-                help_text += "**Windows:** 12h, 24h, 3d, 1w"
+                help_text += "**Search Operators:**\n"
+                help_text += "• site:domain.com - Limit to specific domain\n"
+                help_text += "• after:YYYY-MM-DD - Articles after date\n"
+                help_text += "• before:YYYY-MM-DD - Articles before date\n\n"
+                help_text += "**Default:** 7-day window for news, instant for knowledge questions"
                 return await self._send_message(chat_id, help_text)
 
             # Parse depth parameter
@@ -1298,18 +1304,51 @@ class AdvancedRSSBot:
             if not query:
                 return await self._send_message(chat_id, "❌ Please provide a query")
 
-            await self._send_message(chat_id, f"🧠 Agentic RAG (depth={depth}): {query[:80]}...")
+            # Parse query for operators and time window
+            from core.rag.query_parser import get_query_parser
+            from core.routing.intent_router import get_intent_router
+
+            query_parser = get_query_parser()
+            intent_router = get_intent_router()
+
+            # Classify intent
+            intent_result = intent_router.classify(query)
+            intent = intent_result.intent
+
+            # Parse query
+            parsed = query_parser.parse(query)
+
+            # Determine time window
+            if parsed.time_window:
+                window = parsed.time_window
+            elif intent == "news_current_events":
+                window = "7d"  # Default for news queries
+            else:
+                window = None  # No window for general-QA
+
+            # Show status message
+            if intent == "general_qa":
+                await self._send_message(chat_id, f"💡 Knowledge Question: {parsed.clean_query[:60]}...")
+            else:
+                await self._send_message(
+                    chat_id,
+                    f"🧠 News Analysis (depth={depth}, window={window}): {parsed.clean_query[:50]}..."
+                )
 
             # Use Phase3Handlers
             from services.phase3_handlers import execute_ask_command
 
             payload = await execute_ask_command(
-                query=query,
+                query=parsed.clean_query,  # Use cleaned query
                 depth=depth,
-                window="24h",
+                window=window or "7d",  # Fallback to 7d
                 lang="auto",
-                k_final=5,
-                correlation_id=f"ask-{user_id}"
+                k_final=10,  # Increased for better diversity
+                correlation_id=f"ask-{user_id}",
+                intent=intent,  # Pass intent
+                domains=parsed.domains,  # Pass site: domains
+                after_date=parsed.after_date,  # Pass after: date
+                before_date=parsed.before_date  # Pass before: date
             )
 
             return await self._send_orchestrator_payload(chat_id, payload)

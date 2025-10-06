@@ -53,14 +53,17 @@ class Phase3HandlerService:
         *,
         query: str,
         depth: int = 3,
-        window: str = "24h",
+        window: str = "7d",  # Changed default from 24h to 7d
         lang: str = "auto",
         sources: Optional[List[str]] = None,
-        k_final: int = 5,
+        k_final: int = 10,  # Increased from 5 to 10
         max_tokens: int = 8000,
         budget_cents: int = 50,
         timeout_s: int = 30,
         correlation_id: Optional[str] = None,
+        intent: str = "news_current_events",  # NEW: intent classification
+        after_date: Optional[Any] = None,  # NEW: after: date filter
+        before_date: Optional[Any] = None,  # NEW: before: date filter
     ) -> Dict[str, Any]:
         """Execute /ask --depth=deep command"""
 
@@ -68,7 +71,8 @@ class Phase3HandlerService:
 
         try:
             logger.info(
-                f"[Phase3] /ask | query='{query[:50]}...' depth={depth} window={window} k={k_final}"
+                f"[Phase3] /ask | intent={intent} query='{query[:50]}...' "
+                f"depth={depth} window={window} k={k_final}"
             )
 
             args_tokens: List[str] = []
@@ -84,6 +88,8 @@ class Phase3HandlerService:
                 args_tokens.append(f"k={k_final}")
             if depth != 3:
                 args_tokens.append(f"depth={depth}")
+            if intent:
+                args_tokens.append(f"intent={intent}")
 
             context, error_payload = await self._build_context(
                 raw_command="/ask",
@@ -101,6 +107,9 @@ class Phase3HandlerService:
 
             params = context.setdefault("params", {})
             params["depth"] = depth
+            params["intent"] = intent  # Add intent to context
+            params["after_date"] = after_date
+            params["before_date"] = before_date
 
             raw_response = await self.orchestrator.execute(context)
             response = self._normalize_response(raw_response)
@@ -118,6 +127,7 @@ class Phase3HandlerService:
                 "k_final": params.get("k_final", k_final),
                 "sources": sources or [],
                 "correlation_id": response_correlation,
+                "intent": intent,  # Add intent to meta
             }
 
             return self._augment_payload(payload, context=context_meta)
@@ -519,14 +529,18 @@ async def execute_ask_command(
     *,
     query: str,
     depth: int = 3,
-    window: str = "24h",
+    window: str = "7d",  # Changed default from 24h to 7d
     lang: str = "auto",
     sources: Optional[List[str]] = None,
-    k_final: int = 5,
+    k_final: int = 10,  # Increased from 5 to 10 for better diversity
     max_tokens: int = 8000,
     budget_cents: int = 50,
     timeout_s: int = 30,
     correlation_id: Optional[str] = None,
+    intent: str = "news_current_events",  # NEW: intent classification
+    domains: Optional[List[str]] = None,  # NEW: site: domains
+    after_date: Optional[Any] = None,  # NEW: after: date filter
+    before_date: Optional[Any] = None,  # NEW: before: date filter
 ) -> Dict[str, Any]:
     """Public helper for /ask command"""
     service = get_phase3_handler_service()
@@ -535,12 +549,15 @@ async def execute_ask_command(
         depth=depth,
         window=window,
         lang=lang,
-        sources=sources,
+        sources=sources or domains,  # Use domains from site: if provided
         k_final=k_final,
         max_tokens=max_tokens,
         budget_cents=budget_cents,
         timeout_s=timeout_s,
-        correlation_id=correlation_id
+        correlation_id=correlation_id,
+        intent=intent,
+        after_date=after_date,
+        before_date=before_date
     )
 
 

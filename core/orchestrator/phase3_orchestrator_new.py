@@ -67,6 +67,15 @@ class Phase3Orchestrator:
         self.embeddings_service = create_embeddings_service()
         self.memory_store = create_memory_store(self.embeddings_service)
 
+        # Initialize GPT5Service for general-QA bypass
+        try:
+            from gpt5_service_new import GPT5Service
+            self.gpt5_service = GPT5Service()
+            logger.info("GPT5Service initialized for general-QA mode")
+        except Exception as e:
+            logger.warning(f"Failed to initialize GPT5Service: {e}")
+            self.gpt5_service = None
+
     async def execute(self, context: Dict[str, Any]) -> Dict[str, Any]:
         """
         Execute Phase 3 command
@@ -118,12 +127,116 @@ class Phase3Orchestrator:
     # ------------------------------------------------------------------
 
     async def _handle_agentic(self, context: Dict[str, Any]) -> Any:
-        """Handle /ask --depth=deep with real Agentic RAG"""
+        """Handle /ask with intent routing: general_qa vs news_current_events"""
+        params = context.get("params", {})
+        intent = params.get("intent", "news_current_events")
+        lang = params.get("lang", "en")
+        query = params.get("query") or params.get("topic") or "primary question"
+
+        # Route based on intent
+        if intent == "general_qa":
+            logger.info(f"Routing to general-QA bypass for query: '{query[:50]}...'")
+            return await self._handle_general_qa(context)
+        else:
+            logger.info(f"Routing to news-mode retrieval for query: '{query[:50]}...'")
+            return await self._handle_news_mode(context)
+
+    async def _handle_general_qa(self, context: Dict[str, Any]) -> Any:
+        """Handle general knowledge questions (bypass retrieval, direct LLM)"""
+        params = context.get("params", {})
+        lang = params.get("lang", "en")
+        query = params.get("query") or "question"
+
+        # Create budget manager
+        limits = context.get("limits", {})
+        budget = create_budget_manager(
+            max_tokens=limits.get("max_tokens", 2000),  # Lower for general-QA
+            budget_cents=limits.get("budget_cents", 10),  # Lower budget
+            timeout_s=limits.get("timeout_s", 15)  # Shorter timeout
+        )
+
+        try:
+            # Direct LLM call via GPT5Service (NO retrieval)
+            if self.gpt5_service:
+                # Use GPT-5 for knowledge questions
+                prompt = query
+                if lang == "ru":
+                    prompt = f"Ответь кратко и точно на вопрос: {query}"
+                else:
+                    prompt = f"Provide a concise, accurate answer to: {query}"
+
+                # Synchronous call (GPT5Service doesn't have async yet)
+                import asyncio
+                answer = await asyncio.to_thread(
+                    self.gpt5_service.generate_text_sync,
+                    prompt,
+                    model_id="gpt-5-mini",  # Use mini for general-QA
+                    max_output_tokens=500,
+                    reasoning_effort="minimal"
+                )
+
+                # Record usage
+                budget.record_usage(
+                    tokens=len(prompt.split()) + len(answer.split()),  # Rough estimate
+                    cost_cents=0.5,  # Rough estimate
+                    latency_s=1.0
+                )
+            else:
+                # Fallback to ModelRouter
+                response_data, metadata = await self.model_router.call_with_fallback(
+                    prompt=query,
+                    docs=[],
+                    primary="gpt-5-mini",
+                    fallback=["claude-4.5"],
+                    timeout_s=15,
+                    max_tokens=500,
+                    temperature=0.3
+                )
+                answer = response_data.get("content", "Unable to generate response")
+                budget.record_usage(
+                    tokens=metadata["tokens_used"],
+                    cost_cents=metadata["cost_cents"],
+                    latency_s=metadata["latency_ms"] / 1000
+                )
+
+        except Exception as e:
+            logger.error(f"General-QA LLM call failed: {e}", exc_info=True)
+            answer = "I apologize, but I'm unable to answer that question right now."
+
+        # Build minimal response (NO evidence, single insight with answer)
+        header = "Ответ" if lang == "ru" else "Answer"
+        tldr = self._trim(answer, 200)
+
+        # Single insight with the answer
+        insight = Insight(
+            type="fact",
+            text=self._trim(answer, 300),
+            evidence_refs=[]  # No evidence for general-QA
+        )
+
+        # Meta with intent marker
+        meta = self._build_meta(context, iterations=1, confidence=0.80)
+        meta.model = "gpt-5-mini (direct)"
+
+        response = build_base_response(
+            header=header,
+            tldr=tldr,
+            insights=[insight],
+            evidence=[],  # NO evidence for general-QA
+            result={"answer": answer, "source": "LLM/KB"},
+            meta=meta,
+            warnings=budget.get_warnings()
+        )
+
+        return response
+
+    async def _handle_news_mode(self, context: Dict[str, Any]) -> Any:
+        """Handle news-mode queries with full retrieval pipeline"""
         docs = context.get("retrieval", {}).get("docs", [])
         params = context.get("params", {})
         lang = params.get("lang", "en")
         query = params.get("query") or params.get("topic") or "primary question"
-        window = context.get("retrieval", {}).get("window", "24h")
+        window = context.get("retrieval", {}).get("window", "7d")  # Default changed to 7d
 
         # Create budget manager
         limits = context.get("limits", {})
@@ -144,7 +257,7 @@ class Phase3Orchestrator:
             query=query,
             initial_docs=docs,
             depth=depth,
-            retrieval_fn=self._create_retrieval_fn(window, lang),
+            retrieval_fn=self._create_retrieval_fn(window, lang, use_cache=False),  # Disable cache
             budget_manager=budget,
             lang=lang,
             window=window
@@ -156,10 +269,10 @@ class Phase3Orchestrator:
         meta = self._build_meta(context, iterations=len(agentic_result.steps), confidence=0.78)
         meta.model = budget.get_summary()["spent"].get("model", meta.model)
 
-        header = "Глубокий разбор" if lang == "ru" else "Deep Dive"
+        header = "Новостной анализ" if lang == "ru" else "News Analysis"
         tldr = self._trim(
-            ("Многоходовой анализ с проверкой и уточнением запроса." if lang == "ru"
-             else "Iterative analysis with query refinement and self-check."),
+            ("Многоходовой анализ новостей с проверкой и уточнением." if lang == "ru"
+             else "Iterative news analysis with verification and refinement."),
             220
         )
 
@@ -605,7 +718,7 @@ class Phase3Orchestrator:
             )
         return links
 
-    def _create_retrieval_fn(self, window: str, lang: str):
+    def _create_retrieval_fn(self, window: str, lang: str, use_cache: bool = True):
         """Create retrieval function for Agentic RAG"""
         async def retrieval_fn(query: str, window: str = window, k_final: int = 5):
             return await self.retrieval_client.retrieve(
@@ -613,7 +726,8 @@ class Phase3Orchestrator:
                 window=window,
                 lang=lang,
                 k_final=k_final,
-                use_rerank=True
+                use_rerank=True,
+                use_cache=use_cache  # Pass cache parameter
             )
         return retrieval_fn
 
