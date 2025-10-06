@@ -134,7 +134,17 @@ class ArticleWorker:
                 result['error'] = f"Failed to fetch {article_url}"
                 self.db.update_article_status(article_id, 'error', result['error'])
                 return result
-            
+
+            # Skip Google News aggregator entries
+            final_domain = extract_domain(final_url or article_url) or ''
+            if 'news.google' in final_domain:
+                skip_msg = 'Skipped Google News aggregator entry'
+                self.db.update_article_status(article_id, 'partial', skip_msg)
+                result['status'] = 'partial'
+                result['error'] = skip_msg
+                logger.info(f"Skipping Google News aggregator article: {article_url}")
+                return result
+
             # Parse and extract content
             rss_data = {
                 'title': article.get('title'),

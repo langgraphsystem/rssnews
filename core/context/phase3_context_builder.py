@@ -475,6 +475,11 @@ class Phase3ContextBuilder:
             # Clean and validate docs
             cleaned_docs = []
             for doc in docs:
+                url_value = doc.get('url') or ''
+                source_domain = doc.get('source_domain') or doc.get('source') or ''
+                if 'news.google' in url_value or 'news.google' in source_domain:
+                    continue
+
                 # Normalize title
                 title = doc.get('title') or doc.get('title_norm') or doc.get('headline') or doc.get('name')
                 if not title:
