@@ -13,6 +13,8 @@ from core.ux.formatter import format_for_telegram
 from core.context.phase3_context_builder import get_phase3_context_builder
 from core.rag.retrieval_client import get_retrieval_client
 from schemas.analysis_schemas import BaseAnalysisResponse
+from schemas.analysis_schemas import ErrorResponse
+from pydantic import ValidationError
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +26,27 @@ class Phase3HandlerService:
         self.orchestrator = Phase3Orchestrator()
         self.context_builder = get_phase3_context_builder()
         self.retrieval_client = get_retrieval_client()
+
+    def _normalize_response(self, raw_response: Any) -> BaseAnalysisResponse | ErrorResponse:
+        """Ensure orchestrator output is a schema instance for downstream formatting."""
+        if isinstance(raw_response, (BaseAnalysisResponse, ErrorResponse)):
+            return raw_response
+
+        if isinstance(raw_response, dict):
+            try:
+                if 'error' in raw_response:
+                    if hasattr(ErrorResponse, 'model_validate'):
+                        return ErrorResponse.model_validate(raw_response)
+                    return ErrorResponse.parse_obj(raw_response)
+
+                if hasattr(BaseAnalysisResponse, 'model_validate'):
+                    return BaseAnalysisResponse.model_validate(raw_response)
+                return BaseAnalysisResponse.parse_obj(raw_response)
+            except ValidationError as exc:
+                logger.error(f"Phase3 response validation failed: {exc}", exc_info=True)
+                raise
+
+        raise TypeError(f"Unsupported Phase3 response type: {type(raw_response)!r}")
 
     async def handle_ask_command(
         self,
@@ -79,9 +102,12 @@ class Phase3HandlerService:
             params = context.setdefault("params", {})
             params["depth"] = depth
 
-            response_dict = await self.orchestrator.execute(context)
+            raw_response = await self.orchestrator.execute(context)
+            response = self._normalize_response(raw_response)
 
-            payload = format_for_telegram(response_dict)
+            payload = format_for_telegram(response)
+
+            response_correlation = getattr(getattr(response, 'meta', None), 'correlation_id', correlation_id)
 
             context_meta = {
                 "command": "ask",
@@ -91,7 +117,7 @@ class Phase3HandlerService:
                 "lang": lang,
                 "k_final": params.get("k_final", k_final),
                 "sources": sources or [],
-                "correlation_id": correlation_id,
+                "correlation_id": response_correlation,
             }
 
             return self._augment_payload(payload, context=context_meta)
@@ -151,9 +177,12 @@ class Phase3HandlerService:
             if error_payload:
                 return error_payload
 
-            response_dict = await self.orchestrator.execute(context)
+            raw_response = await self.orchestrator.execute(context)
+            response = self._normalize_response(raw_response)
 
-            payload = format_for_telegram(response_dict)
+            payload = format_for_telegram(response)
+
+            response_correlation = getattr(getattr(response, 'meta', None), 'correlation_id', correlation_id)
 
             context_meta = {
                 "command": "events",
@@ -163,7 +192,7 @@ class Phase3HandlerService:
                 "lang": lang,
                 "k_final": context.get("params", {}).get("k_final", k_final),
                 "sources": sources or [],
-                "correlation_id": correlation_id,
+                "correlation_id": response_correlation,
             }
 
             return self._augment_payload(payload, context=context_meta)
@@ -226,9 +255,12 @@ class Phase3HandlerService:
             graph_ctx = context.setdefault("graph", {})
             graph_ctx["hop_limit"] = max(1, min(4, hops))
             
-            response_dict = await self.orchestrator.execute(context)
+            raw_response = await self.orchestrator.execute(context)
+            response = self._normalize_response(raw_response)
 
-            payload = format_for_telegram(response_dict)
+            payload = format_for_telegram(response)
+
+            response_correlation = getattr(getattr(response, 'meta', None), 'correlation_id', correlation_id)
 
             context_meta = {
                 "command": "graph",
@@ -238,7 +270,7 @@ class Phase3HandlerService:
                 "lang": lang,
                 "k_final": context.get("params", {}).get("k_final", k_final),
                 "sources": sources or [],
-                "correlation_id": correlation_id,
+                "correlation_id": response_correlation,
             }
 
             return self._augment_payload(payload, context=context_meta)
@@ -298,9 +330,12 @@ class Phase3HandlerService:
             params = context.setdefault("params", {})
             params["user_id"] = user_id
 
-            response_dict = await self.orchestrator.execute(context)
+            raw_response = await self.orchestrator.execute(context)
+            response = self._normalize_response(raw_response)
 
-            payload = format_for_telegram(response_dict)
+            payload = format_for_telegram(response)
+
+            response_correlation = getattr(getattr(response, 'meta', None), 'correlation_id', correlation_id)
 
             context_meta = {
                 "command": "memory",
@@ -308,7 +343,7 @@ class Phase3HandlerService:
                 "query": query or "",
                 "window": window,
                 "lang": lang,
-                "correlation_id": correlation_id,
+                "correlation_id": response_correlation,
             }
 
             return self._augment_payload(payload, context=context_meta)
