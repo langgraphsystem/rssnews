@@ -622,9 +622,10 @@ class Phase3ContextBuilder:
         if context["params"]["k_final"] != len(context["retrieval"]["docs"]):
             return "k_final mismatch with docs length"
 
-        # Check k_final range
-        if not (5 <= context["params"]["k_final"] <= 10):
-            return f"k_final out of range: {context['params']['k_final']}"
+        # Check k_final range (allow smaller counts when retrieval returns fewer docs)
+        k_final_value = context["params"]["k_final"]
+        if not (1 <= k_final_value <= 10):
+            return f"k_final out of range: {k_final_value}"
 
         # Check docs format
         for i, doc in enumerate(context["retrieval"]["docs"]):
