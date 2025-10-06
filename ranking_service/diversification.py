@@ -189,9 +189,42 @@ class MMRDiversifier:
         logger.info(f"MMR diversification: {len(results)} -> {len(selected)} results")
         return selected
 
+    def extract_etld_plus_one(self, url: str) -> str:
+        """
+        Extract eTLD+1 (base domain) - consistent with deduplication.py
+        Examples: news.bbc.com → bbc.com, www.nytimes.com → nytimes.com
+        """
+        if not url:
+            return ""
+
+        domain = url
+        if '://' in url:
+            domain = url.split('://')[1].split('/')[0]
+
+        domain = domain.split(':')[0]  # Remove port
+
+        if domain.startswith('www.'):
+            domain = domain[4:]
+
+        # Handle multi-part TLDs
+        multi_part_tlds = ['co.uk', 'com.au', 'com.br', 'co.jp', 'co.kr',
+                          'co.nz', 'co.za', 'com.cn', 'com.mx', 'com.ar']
+
+        parts = domain.split('.')
+
+        if len(parts) >= 3:
+            potential_tld = '.'.join(parts[-2:])
+            if potential_tld in multi_part_tlds:
+                return '.'.join(parts[-3:])
+
+        return '.'.join(parts[-2:]) if len(parts) >= 2 else domain
+
     def ensure_domain_diversity(self, results: List[Dict[str, Any]],
-                               max_per_domain: int = 3) -> List[Dict[str, Any]]:
-        """Ensure no domain dominates the results"""
+                               max_per_domain: int = 2) -> List[Dict[str, Any]]:
+        """Ensure no domain dominates the results (Sprint 3: max_per_domain lowered to 2)
+
+        Uses eTLD+1 for domain grouping (news.bbc.com and www.bbc.com count as same domain)
+        """
         if not results:
             return results
 
@@ -199,17 +232,29 @@ class MMRDiversifier:
         diverse_results = []
 
         for result in results:
-            domain = result.get('source_domain', result.get('domain', result.get('source', 'unknown')))
-            current_count = domain_counts.get(domain, 0)
+            # Get domain from multiple possible fields
+            domain = result.get('source_domain', result.get('domain', result.get('source', '')))
+            if not domain:
+                url = result.get('url', result.get('link', ''))
+                domain = url
+
+            # Extract eTLD+1 for consistent grouping
+            etld_domain = self.extract_etld_plus_one(domain) if domain else 'unknown'
+
+            current_count = domain_counts.get(etld_domain, 0)
 
             if current_count < max_per_domain:
                 diverse_results.append(result)
-                domain_counts[domain] = current_count + 1
+                domain_counts[etld_domain] = current_count + 1
+                # Store normalized domain for debugging
+                result['_etld_domain'] = etld_domain
             else:
                 # Mark as filtered for domain diversity
                 result['filtered_reason'] = 'domain_diversity'
+                logger.debug(f"Filtered {etld_domain} (count={current_count}): {result.get('title', '')[:50]}")
 
-        logger.info(f"Domain diversity filter: {len(results)} -> {len(diverse_results)} results")
+        logger.info(f"Domain diversity filter: {len(results)} -> {len(diverse_results)} results "
+                   f"(max_per_domain={max_per_domain}, unique_domains={len(domain_counts)})")
         return diverse_results
 
     def ensure_temporal_diversity(self, results: List[Dict[str, Any]],

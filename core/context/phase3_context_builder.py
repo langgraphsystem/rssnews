@@ -13,21 +13,25 @@ from core.rag.retrieval_client import get_retrieval_client
 
 logger = logging.getLogger(__name__)
 
-# Valid window values
-VALID_WINDOWS = ["6h", "12h", "24h", "1d", "3d", "1w", "2w", "1m", "3m", "6m", "1y"]
+# Valid window values (Sprint 3: added 7d, 14d, 30d for better granularity)
+VALID_WINDOWS = ["6h", "12h", "24h", "1d", "3d", "7d", "1w", "14d", "2w", "30d", "1m", "3m", "6m", "1y"]
 
-# Window expansion sequence for auto-recovery
+# Window expansion sequence for auto-recovery (Sprint 3: 7d → 14d → 30d)
 WINDOW_EXPANSION = {
     "6h": "12h",
     "12h": "24h",
     "24h": "3d",
-    "3d": "1w",
-    "1w": "2w",
-    "2w": "1m",
-    "1m": "3m",
+    "1d": "3d",
+    "3d": "7d",
+    "7d": "14d",     # NEW: 7d (default) → 14d
+    "1w": "14d",     # 1w = 7d, also expands to 14d
+    "14d": "30d",    # NEW: 14d → 30d
+    "2w": "30d",     # 2w = 14d, also expands to 30d
+    "30d": "3m",     # NEW: 30d → 3m
+    "1m": "3m",      # 1m = 30d, also expands to 3m
     "3m": "6m",
     "6m": "1y",
-    "1y": "1y"  # Cannot expand further
+    "1y": "1y"       # Cannot expand further
 }
 
 

@@ -86,6 +86,117 @@ class DeduplicationEngine:
 
         return text.strip()
 
+    def extract_etld_plus_one(self, url: str) -> str:
+        """
+        Extract eTLD+1 (effective top-level domain + 1 label)
+
+        Examples:
+        - news.bbc.com → bbc.com
+        - www.nytimes.com → nytimes.com
+        - edition.cnn.com → cnn.com
+        - example.co.uk → example.co.uk
+
+        Args:
+            url: Full URL or domain
+
+        Returns:
+            eTLD+1 domain string
+        """
+        if not url:
+            return ""
+
+        # Extract domain from URL
+        domain = url
+        if '://' in url:
+            domain = url.split('://')[1].split('/')[0]
+
+        # Remove port if present
+        domain = domain.split(':')[0]
+
+        # Remove www prefix
+        if domain.startswith('www.'):
+            domain = domain[4:]
+
+        # Handle multi-part TLDs (co.uk, com.au, etc.)
+        multi_part_tlds = [
+            'co.uk', 'com.au', 'com.br', 'co.jp', 'co.kr',
+            'co.nz', 'co.za', 'com.cn', 'com.mx', 'com.ar'
+        ]
+
+        parts = domain.split('.')
+
+        # Check for multi-part TLD
+        if len(parts) >= 3:
+            potential_tld = '.'.join(parts[-2:])
+            if potential_tld in multi_part_tlds:
+                # Return domain.tld.tld (e.g., example.co.uk)
+                return '.'.join(parts[-3:]) if len(parts) >= 3 else domain
+
+        # Standard TLD: return domain.tld
+        if len(parts) >= 2:
+            return '.'.join(parts[-2:])
+
+        return domain
+
+    def normalize_url_path(self, url: str) -> str:
+        """
+        Normalize URL path by removing tracking parameters
+
+        Removes: utm_*, fbclid, gclid, ref, source, campaign, etc.
+
+        Args:
+            url: Full URL
+
+        Returns:
+            Normalized path (without domain, without tracking params)
+        """
+        if not url:
+            return ""
+
+        # Extract path and query
+        if '://' in url:
+            parts = url.split('://', 1)[1].split('/', 1)
+            path_and_query = parts[1] if len(parts) > 1 else ""
+        else:
+            path_and_query = url
+
+        # Split path and query
+        if '?' in path_and_query:
+            path, query = path_and_query.split('?', 1)
+        else:
+            path = path_and_query
+            query = ""
+
+        # Normalize path
+        path = path.lower().strip('/')
+
+        # Remove trailing .html, .htm, etc.
+        path = re.sub(r'\.(html?|php|aspx?)$', '', path)
+
+        # Filter query parameters (remove tracking params)
+        if query:
+            tracking_params = {
+                'utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term',
+                'fbclid', 'gclid', 'msclkid',
+                'ref', 'source', 'campaign', 'medium',
+                '_ga', '_gac', '_gl'
+            }
+
+            # Parse query params
+            param_pairs = query.split('&')
+            clean_params = []
+            for pair in param_pairs:
+                if '=' in pair:
+                    key = pair.split('=')[0].lower()
+                    if key not in tracking_params:
+                        clean_params.append(pair)
+
+            # Reconstruct
+            if clean_params:
+                path = f"{path}?{'&'.join(sorted(clean_params))}"
+
+        return path
+
     def create_content_hash(self, article: Dict[str, Any]) -> str:
         """Create stable content hash for article"""
         # Combine title and content for hashing
@@ -135,12 +246,15 @@ class DeduplicationEngine:
         return intersection / union if union > 0 else 0.0
 
     def find_duplicates(self, articles: List[Dict[str, Any]]) -> Dict[str, List[str]]:
-        """Find duplicate articles using MinHash LSH"""
+        """Find duplicate articles using eTLD+1 + URL path + title + MinHash LSH"""
         # Reset LSH for each deduplication session to avoid key collision errors
         self.lsh = MinHashLSH(threshold=self.config.lsh_threshold,
                              num_perm=self.config.num_perm)
         duplicate_groups = {}
         processed_hashes = {}
+
+        # First pass: Group by (eTLD+1, normalized_path, title_norm) for exact URL duplicates
+        url_groups = {}  # dedup_key -> [article_ids]
 
         for article in articles:
             article_id = article.get('article_id', article.get('id'))
@@ -151,38 +265,75 @@ class DeduplicationEngine:
             content_hash = self.create_content_hash(article)
             article['content_hash'] = content_hash
 
-            # Create MinHash for similarity
-            content = article.get('clean_text', article.get('text', ''))
-            if not content:
-                continue
+            # Extract deduplication key components
+            url = article.get('url', article.get('link', ''))
+            title_norm = article.get('title_norm', article.get('title', ''))
 
-            clean_content = self.clean_text_for_hashing(content)
-            minhash = self.create_minhash(clean_content)
+            etld_plus_one = self.extract_etld_plus_one(url)
+            normalized_path = self.normalize_url_path(url)
 
-            # Check for similar articles using LSH
-            similar_articles = self.lsh.query(minhash)
+            # Create deduplication key: (etld+1, normalized_path, title_norm)
+            dedup_key = (etld_plus_one, normalized_path, self.clean_text_for_hashing(title_norm)[:100])
 
-            if similar_articles:
-                # Found similar articles
-                for similar_id in similar_articles:
-                    if similar_id not in duplicate_groups:
-                        duplicate_groups[similar_id] = []
-                    if article_id not in duplicate_groups[similar_id]:
-                        duplicate_groups[similar_id].append(article_id)
+            if dedup_key not in url_groups:
+                url_groups[dedup_key] = []
+            url_groups[dedup_key].append(article_id)
+
+        # Second pass: Use MinHash LSH for content similarity within unique URLs
+        for dedup_key, article_ids in url_groups.items():
+            if len(article_ids) == 1:
+                # Single article for this URL+title combination
+                article_id = article_ids[0]
+                article = next((a for a in articles if a.get('article_id', a.get('id')) == article_id), None)
+
+                if article:
+                    # Create MinHash for similarity
+                    content = article.get('clean_text', article.get('text', ''))
+                    if content:
+                        clean_content = self.clean_text_for_hashing(content)
+                        minhash = self.create_minhash(clean_content)
+
+                        # Check for similar articles using LSH
+                        similar_articles = self.lsh.query(minhash)
+
+                        if similar_articles:
+                            # Found similar articles
+                            for similar_id in similar_articles:
+                                if similar_id not in duplicate_groups:
+                                    duplicate_groups[similar_id] = []
+                                if article_id not in duplicate_groups[similar_id]:
+                                    duplicate_groups[similar_id].append(article_id)
+                        else:
+                            # New unique article - create new group
+                            duplicate_groups[article_id] = [article_id]
+
+                        # Insert into LSH only if not already inserted
+                        if article_id not in processed_hashes:
+                            self.lsh.insert(article_id, minhash)
+                            processed_hashes[article_id] = minhash
             else:
-                # New unique article - create new group
-                duplicate_groups[article_id] = [article_id]
+                # Multiple articles with same URL+title - group them together
+                # Choose representative for LSH insertion
+                representative_id = article_ids[0]
+                duplicate_groups[representative_id] = article_ids
 
-            # Insert into LSH only if not already inserted
-            # This prevents "The given key already exists" error
-            if article_id not in processed_hashes:
-                self.lsh.insert(article_id, minhash)
-                processed_hashes[article_id] = minhash
+                # Insert representative into LSH
+                article = next((a for a in articles if a.get('article_id', a.get('id')) == representative_id), None)
+                if article and representative_id not in processed_hashes:
+                    content = article.get('clean_text', article.get('text', ''))
+                    if content:
+                        clean_content = self.clean_text_for_hashing(content)
+                        minhash = self.create_minhash(clean_content)
+                        self.lsh.insert(representative_id, minhash)
+                        processed_hashes[representative_id] = minhash
 
         return duplicate_groups
 
     def choose_canonical_article(self, article_group: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Choose canonical article from duplicate group"""
+        """Choose canonical article from duplicate group
+
+        Prefers articles WITH dates and higher source scores (Sprint 3 enhancement)
+        """
         if len(article_group) == 1:
             return article_group[0]
 
@@ -190,13 +341,14 @@ class DeduplicationEngine:
         def canonicalization_score(article):
             score = 0
 
-            # Domain priority
-            domain = article.get('source_domain', article.get('domain', article.get('source', '')))
-            score += self.domain_priority.get(domain.lower(), 0)
-
-            # Earlier publication gets bonus
+            # CRITICAL: Strongly prefer articles WITH publication dates
             published_at = article.get('published_at')
-            if published_at:
+            has_date = bool(published_at) and published_at not in ['None', '', 'null', None]
+
+            if has_date:
+                # Large bonus for having a date (20 points)
+                score += 20
+
                 try:
                     if isinstance(published_at, str):
                         pub_date = datetime.fromisoformat(published_at.replace('Z', '+00:00'))
@@ -213,6 +365,24 @@ class DeduplicationEngine:
                         score += min(5, hours_old / 24)  # More points for older articles
                 except:
                     pass
+            else:
+                # Large penalty for missing date (-10 points)
+                score -= 10
+
+            # Domain priority (up to 10 points for top sources)
+            domain = article.get('source_domain', article.get('domain', article.get('source', '')))
+            etld_domain = self.extract_etld_plus_one(domain) if domain else ''
+
+            # Check both full domain and eTLD+1
+            domain_score = self.domain_priority.get(domain.lower(), 0)
+            if domain_score == 0 and etld_domain:
+                domain_score = self.domain_priority.get(etld_domain.lower(), 0)
+
+            score += domain_score
+
+            # Source score from ranking (if available)
+            source_score = article.get('scores', {}).get('source', 0)
+            score += source_score * 10  # Scale up source score
 
             # Content length bonus (longer is often more comprehensive)
             content_length = len(article.get('clean_text', article.get('text', '')))
@@ -231,7 +401,12 @@ class DeduplicationEngine:
 
         canonical = scored_articles[0][1]
 
-        logger.debug(f"Chose canonical from {len(article_group)} duplicates: {canonical.get('title_norm', '')[:50]}")
+        has_date = bool(canonical.get('published_at'))
+        logger.debug(
+            f"Chose canonical from {len(article_group)} duplicates: "
+            f"{canonical.get('title_norm', '')[:50]} "
+            f"(has_date={has_date}, domain={canonical.get('source_domain', 'unknown')})"
+        )
         return canonical
 
     def canonicalize_articles(self, articles: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
