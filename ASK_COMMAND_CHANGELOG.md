@@ -1,6 +1,70 @@
 # /ask Command Enhancement Changelog
 **Implementation Date:** 2025-10-06
-**Status:** 🚧 In Progress (Sprint 1-4 Complete)
+**Status:** ✅ Complete (All 5 Sprints Finished)
+
+---
+
+## Sprint 5 Complete ✅ — Testing & Documentation
+
+### Summary
+Created comprehensive test suites (acceptance + integration), user guide, and deployment documentation.
+
+### Files Created (4 new files)
+
+#### 19. `tests/test_ask_acceptance.py` (430 lines) ✅
+**Purpose:** Acceptance tests for 8 key scenarios
+
+**Test Scenarios:**
+- S1: Intent routing (general-QA vs news)
+- S2: Query parsing (site:/after:/before:)
+- S3: Time window defaults (7d for news)
+- S4: Filtering quality (off-topic, penalties)
+- S5: Auto-recovery (window expansion)
+- S6: Metrics collection
+- S7: Configuration validation
+- S8: End-to-end integration
+
+**Test Coverage:**
+- 30+ test cases
+- Performance benchmarks
+- Error handling validation
+
+#### 20. `tests/test_ask_integration.py` (280 lines) ✅
+**Purpose:** Integration tests for component interaction
+
+**Test Categories:**
+- Router + metrics integration
+- Parser + metrics integration
+- Router + parser pipeline
+- Config integration
+- Singleton patterns
+- Error handling
+
+#### 21. `docs/ASK_COMMAND_GUIDE.md` (520 lines) ✅
+**Purpose:** Comprehensive user guide
+
+**Sections:**
+- Quick start examples
+- Intent routing explanation
+- Search operators (site:, after:, before:)
+- Time windows and auto-recovery
+- Configuration tuning profiles
+- Metrics viewing
+- Troubleshooting
+- Best practices
+
+#### 22. `docs/ASK_DEPLOYMENT_GUIDE.md` (480 lines) ✅
+**Purpose:** Production deployment guide
+
+**Sections:**
+- Pre-deployment checklist
+- Environment setup
+- Testing procedures
+- Gradual rollout (10% → 50% → 100%)
+- Monitoring dashboards
+- Alert rules
+- Rollback procedures
+- Post-deployment optimization
 
 ---
 
