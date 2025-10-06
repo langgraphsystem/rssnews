@@ -1135,6 +1135,16 @@ class PgClient:
             logger.error(f"Failed to get chunks needing FTS update: {e}")
             return []
 
+    def count_chunks_missing_fts(self) -> int:
+        """Return total number of chunks that still need FTS indexing."""
+        try:
+            with self._cursor() as cur:
+                cur.execute("SELECT COUNT(*) FROM article_chunks WHERE fts_vector IS NULL")
+                return cur.fetchone()[0] or 0
+        except Exception as e:
+            logger.error(f"Failed to count chunks missing FTS: {e}")
+            return 0
+
     def get_chunks_needing_embeddings(self, limit: int = 50) -> List[Dict[str, Any]]:
         """Get chunks that need embeddings."""
         try:

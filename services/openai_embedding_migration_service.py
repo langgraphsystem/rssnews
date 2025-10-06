@@ -75,16 +75,24 @@ class OpenAIEmbeddingMigrationService:
             logger.info("OpenAI embedding migration service is disabled")
             return {'processed': 0, 'successful': 0, 'errors': 0}
 
-        logger.info("Starting embedding backlog migration")
+        fetch_limit = limit or 999999
+
+        if limit is None:
+            logger.info("Starting embedding backlog migration (limit=all)")
+        else:
+            logger.info(f"Starting embedding backlog migration (limit={limit})")
 
         # Get chunks that need embeddings
-        chunks = self._get_chunks_needing_embeddings(limit or 999999)
+        chunks = self._get_chunks_needing_embeddings(fetch_limit)
+        chunk_count = len(chunks)
 
-        if not chunks:
-            logger.info("No chunks need embeddings")
+        if chunk_count == 0:
+            suffix = f" (limit {limit})" if limit is not None else ""
+            logger.info(f"No chunks need embeddings in current snapshot{suffix}")
             return {'processed': 0, 'successful': 0, 'errors': 0}
 
-        logger.info(f"Migrating embeddings for {len(chunks)} chunks")
+        limit_suffix = f" (limit {limit})" if limit is not None else ""
+        logger.info(f"Preparing embeddings for {chunk_count} chunks{limit_suffix}")
 
         stats = {
             'processed': 0,
@@ -123,9 +131,20 @@ class OpenAIEmbeddingMigrationService:
                 backlog = stats_before.get('without_embeddings', 0)
 
                 if backlog > 0:
-                    logger.info(f"Found {backlog} chunks without embeddings, processing...")
+                    logger.info(
+                        f"Backlog snapshot: {backlog} chunks without embeddings (processing up to {self.batch_size})"
+                    )
                     result = await self.migrate_backlog(limit=self.batch_size)
-                    logger.info(f"Processed {result['successful']} chunks")
+                    processed = result.get('processed', 0)
+                    successful = result.get('successful', 0)
+                    errors = result.get('errors', 0)
+
+                    if processed == 0:
+                        logger.info("Backlog already handled by another worker, nothing to process this cycle")
+                    else:
+                        logger.info(
+                            f"Processed {processed} chunks ({successful} successful, {errors} errors)"
+                        )
                 else:
                     logger.info("No backlog, waiting...")
 

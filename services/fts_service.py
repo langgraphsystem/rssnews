@@ -28,17 +28,27 @@ class FTSService:
         """Update FTS vectors for chunks that need indexing"""
         logger.info("Starting FTS indexing service")
 
-        # Get chunks that need FTS indexing (those without fts_vector)
-        chunk_ids = self.db.get_chunks_needing_fts_update(batch_size)
+        backlog_total = self.db.count_chunks_missing_fts()
+        logger.info(
+            f"FTS backlog snapshot: {backlog_total} chunks need indexing (processing up to {batch_size})"
+        )
 
-        if not chunk_ids:
-            logger.info("No chunks need FTS indexing")
+        if backlog_total == 0:
+            logger.info("FTS backlog empty, nothing to index")
             return {'processed': 0, 'successful': 0, 'errors': 0}
 
-        logger.info(f"Updating FTS index for {len(chunk_ids)} chunks")
+        # Get chunks that need FTS indexing (those without fts_vector)
+        chunk_ids = self.db.get_chunks_needing_fts_update(batch_size)
+        chunk_count = len(chunk_ids)
+
+        if chunk_count == 0:
+            logger.info("FTS backlog already handled by another worker, nothing to index this pass")
+            return {'processed': 0, 'successful': 0, 'errors': 0}
+
+        logger.info(f"Preparing FTS vectors for {chunk_count} chunks")
 
         stats = {
-            'processed': len(chunk_ids),
+            'processed': chunk_count,
             'successful': 0,
             'errors': 0,
             'error_details': []
@@ -49,14 +59,16 @@ class FTSService:
             updated_count = self.db.update_chunks_fts(chunk_ids)
             stats['successful'] = updated_count
 
-            if updated_count != len(chunk_ids):
-                stats['errors'] = len(chunk_ids) - updated_count
-                logger.warning(f"Expected to update {len(chunk_ids)} chunks, but updated {updated_count}")
+            if updated_count != chunk_count:
+                stats['errors'] = chunk_count - updated_count
+                logger.warning(f"Expected to update {chunk_count} chunks, but updated {updated_count}")
 
-            logger.info(f"FTS indexing complete: {updated_count} chunks indexed")
+            logger.info(
+                f"FTS indexing complete: processed {chunk_count}, successful {stats['successful']}, errors {stats['errors']}"
+            )
 
         except Exception as e:
-            stats['errors'] = len(chunk_ids)
+            stats['errors'] = chunk_count
             error_msg = f"Error updating FTS index: {e}"
             logger.error(error_msg)
             stats['error_details'].append(error_msg)
