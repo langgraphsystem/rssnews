@@ -371,7 +371,11 @@ class RankingAPI:
         lang: str = "auto",
         sources: Optional[List[str]] = None,
         k_final: int = 5,
-        use_rerank: bool = False
+        use_rerank: bool = False,
+        intent: str = "news_current_events",  # NEW Sprint 2
+        filter_offtopic: bool = True,  # NEW Sprint 2
+        apply_category_penalties: bool = True,  # NEW Sprint 2
+        apply_date_penalties: bool = True  # NEW Sprint 2
     ) -> List[Dict[str, Any]]:
         """
         Retrieve documents for analysis (trends/analyze commands)
@@ -383,6 +387,10 @@ class RankingAPI:
             sources: Optional list of source domains to filter
             k_final: Number of documents to return
             use_rerank: Whether to use reranking (not implemented yet)
+            intent: Query intent (general_qa or news_current_events) [Sprint 2]
+            filter_offtopic: Apply off-topic guard (cosine < 0.28) [Sprint 2]
+            apply_category_penalties: Apply category penalties [Sprint 2]
+            apply_date_penalties: Apply date penalties [Sprint 2]
 
         Returns:
             List of document dictionaries with metadata
@@ -431,9 +439,17 @@ class RankingAPI:
                     filters=filters
                 )
 
-            # Apply scoring
+            # Apply scoring (NEW Sprint 2: pass intent and filter flags)
             if results:
-                scored_results = self.scorer.score_and_rank(results, query or "")
+                scored_results = self.scorer.score_and_rank(
+                    results,
+                    query or "",
+                    apply_caps=True,
+                    intent=intent,
+                    filter_offtopic=filter_offtopic,
+                    apply_category_penalties=apply_category_penalties,
+                    apply_date_penalties=apply_date_penalties
+                )
 
                 # Apply deduplication
                 if len(scored_results) > 1:

@@ -252,12 +252,13 @@ class Phase3Orchestrator:
             degraded = budget.get_degraded_params("/ask", {"depth": depth})
             depth = degraded.get("depth", 1)
 
-        # Execute Agentic RAG
+        # Execute Agentic RAG (NEW Sprint 2: pass intent to retrieval function)
+        intent = params.get("intent", "news_current_events")
         agentic_result, all_docs = await self.agentic_rag_agent.execute(
             query=query,
             initial_docs=docs,
             depth=depth,
-            retrieval_fn=self._create_retrieval_fn(window, lang, use_cache=False),  # Disable cache
+            retrieval_fn=self._create_retrieval_fn(window, lang, use_cache=False, intent=intent),
             budget_manager=budget,
             lang=lang,
             window=window
@@ -718,7 +719,7 @@ class Phase3Orchestrator:
             )
         return links
 
-    def _create_retrieval_fn(self, window: str, lang: str, use_cache: bool = True):
+    def _create_retrieval_fn(self, window: str, lang: str, use_cache: bool = True, intent: str = "news_current_events"):
         """Create retrieval function for Agentic RAG"""
         async def retrieval_fn(query: str, window: str = window, k_final: int = 5):
             return await self.retrieval_client.retrieve(
@@ -727,7 +728,11 @@ class Phase3Orchestrator:
                 lang=lang,
                 k_final=k_final,
                 use_rerank=True,
-                use_cache=use_cache  # Pass cache parameter
+                use_cache=use_cache,  # Pass cache parameter
+                intent=intent,  # NEW Sprint 2: pass intent for filtering
+                filter_offtopic=True,  # NEW Sprint 2: enable off-topic guard
+                apply_category_penalties=True,  # NEW Sprint 2: enable category penalties
+                apply_date_penalties=True  # NEW Sprint 2: enable date penalties
             )
         return retrieval_fn
 

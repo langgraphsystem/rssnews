@@ -81,7 +81,11 @@ class RetrievalClient:
         sources: Optional[List[str]] = None,
         k_final: int = 5,
         use_rerank: bool = False,
-        use_cache: bool = True
+        use_cache: bool = True,
+        intent: str = "news_current_events",  # NEW Sprint 2
+        filter_offtopic: bool = True,  # NEW Sprint 2
+        apply_category_penalties: bool = True,  # NEW Sprint 2
+        apply_date_penalties: bool = True  # NEW Sprint 2
     ) -> List[Dict[str, Any]]:
         """
         Unified retrieval interface
@@ -94,6 +98,10 @@ class RetrievalClient:
             k_final: Number of documents to return
             use_rerank: Whether to use reranking
             use_cache: Whether to use cache
+            intent: Query intent (general_qa or news_current_events) [Sprint 2]
+            filter_offtopic: Apply off-topic guard [Sprint 2]
+            apply_category_penalties: Apply category penalties [Sprint 2]
+            apply_date_penalties: Apply date penalties [Sprint 2]
 
         Returns:
             List of documents with metadata
@@ -111,14 +119,18 @@ class RetrievalClient:
             # Get ranking API
             api = self._get_ranking_api()
 
-            # Call retrieve_for_analysis
+            # Call retrieve_for_analysis (NEW Sprint 2: pass filtering flags)
             results = await api.retrieve_for_analysis(
                 query=query,
                 window=window,
                 lang=lang,
                 sources=sources,
                 k_final=k_final,
-                use_rerank=use_rerank
+                use_rerank=use_rerank,
+                intent=intent,
+                filter_offtopic=filter_offtopic,
+                apply_category_penalties=apply_category_penalties,
+                apply_date_penalties=apply_date_penalties
             )
 
             # Cache results
@@ -127,7 +139,7 @@ class RetrievalClient:
 
             logger.info(
                 f"Retrieved {len(results)} docs: "
-                f"query={query or 'none'}, window={window}, k_final={k_final}"
+                f"query={query or 'none'}, window={window}, k_final={k_final}, intent={intent}"
             )
 
             return results

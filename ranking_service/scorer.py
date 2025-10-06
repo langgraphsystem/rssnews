@@ -16,10 +16,11 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ScoringWeights:
     """Production scoring weights configuration"""
-    semantic: float = 0.58
-    fts: float = 0.32
-    freshness: float = 0.06
-    source: float = 0.04
+    # NEW weights for /ask news mode (Sprint 2)
+    semantic: float = 0.45  # Reduced from 0.58
+    fts: float = 0.30       # Reduced from 0.32
+    freshness: float = 0.20 # Increased from 0.06 (prioritize fresh news)
+    source: float = 0.05    # Increased from 0.04
 
     # Time decay parameters
     tau_hours: int = 72  # General news decay: 72 hours
@@ -28,6 +29,11 @@ class ScoringWeights:
     # Domain caps
     max_per_domain: int = 3
     max_per_article: int = 2
+
+    # NEW: Off-topic and category filtering (Sprint 2)
+    min_cosine_threshold: float = 0.28  # Drop if similarity < 0.28
+    require_dates_in_top_n: bool = True  # Require published_at for top results
+    date_penalty_factor: float = 0.3  # Multiply score by 0.3 if no date
 
 
 @dataclass
@@ -289,25 +295,234 @@ class ProductionScorer:
 
         return penalized_results
 
-    def score_and_rank(self, results: List[Dict[str, Any]],
-                      query: str, apply_caps: bool = True) -> List[Dict[str, Any]]:
-        """Complete scoring pipeline with caps and penalties"""
+    def filter_offtopic(self, results: List[Dict[str, Any]],
+                       query: str,
+                       threshold: Optional[float] = None) -> Tuple[List[Dict[str, Any]], int]:
+        """
+        Filter off-topic articles using cosine similarity threshold
+
+        Args:
+            results: List of search results with semantic scores
+            query: Original query string
+            threshold: Minimum cosine similarity (default from weights)
+
+        Returns:
+            Tuple of (filtered_results, dropped_count)
+        """
+        if not results:
+            return results, 0
+
+        min_threshold = threshold or self.weights.min_cosine_threshold
+        filtered_results = []
+        dropped_count = 0
+
+        for result in results:
+            # Check semantic similarity (cosine from pgvector)
+            similarity = result.get('similarity', result.get('semantic_score', 1.0))
+
+            if similarity < min_threshold:
+                # Mark as off-topic and drop
+                result.get('postflags', {})['offtopic_dropped'] = True
+                result.get('postflags', {})['drop_reason'] = f'similarity={similarity:.3f} < {min_threshold}'
+                dropped_count += 1
+                logger.debug(
+                    f"Dropped off-topic: '{result.get('title', 'N/A')[:50]}...' "
+                    f"(similarity={similarity:.3f})"
+                )
+            else:
+                filtered_results.append(result)
+
+        if dropped_count > 0:
+            logger.info(f"Off-topic guard: dropped {dropped_count}/{len(results)} articles")
+
+        return filtered_results, dropped_count
+
+    def apply_category_penalties(self, results: List[Dict[str, Any]],
+                                 intent: str = "news_current_events") -> List[Dict[str, Any]]:
+        """
+        Apply category-based penalties for irrelevant content types
+
+        Categories penalized for news queries:
+        - Sports: -50% (unless query explicitly about sports)
+        - Entertainment/Celebrity: -40%
+        - Crime/Local incidents: -30%
+        - Weather: -20%
+
+        Args:
+            results: List of search results
+            intent: Query intent (general_qa or news_current_events)
+
+        Returns:
+            Results with category penalties applied
+        """
+        if not results or intent != "news_current_events":
+            return results
+
+        # Category keywords and penalty factors
+        category_penalties = {
+            'sports': {
+                'keywords': ['game', 'match', 'score', 'playoff', 'championship', 'league',
+                           'football', 'basketball', 'baseball', 'soccer', 'tennis',
+                           'nfl', 'nba', 'mlb', 'uefa', 'fifa'],
+                'penalty': 0.5,  # -50%
+            },
+            'entertainment': {
+                'keywords': ['celebrity', 'movie', 'film', 'actor', 'actress', 'hollywood',
+                           'oscars', 'grammy', 'emmy', 'music video', 'album', 'concert'],
+                'penalty': 0.6,  # -40%
+            },
+            'crime': {
+                'keywords': ['arrest', 'charged', 'suspect', 'robbery', 'theft', 'murder',
+                           'shooting', 'stabbing', 'assault', 'police arrest'],
+                'penalty': 0.7,  # -30%
+            },
+            'weather': {
+                'keywords': ['forecast', 'temperature', 'rain', 'snow', 'storm warning',
+                           'weather alert', 'high of', 'low of'],
+                'penalty': 0.8,  # -20%
+            },
+        }
+
+        penalized_results = []
+        penalties_applied = 0
+
+        for result in results:
+            title = result.get('title', '').lower()
+            snippet = result.get('snippet', result.get('text', ''))[:200].lower()
+            combined_text = f"{title} {snippet}"
+
+            # Check each category
+            applied_penalty = None
+            for category, config in category_penalties.items():
+                # Count keyword matches
+                matches = sum(1 for keyword in config['keywords'] if keyword in combined_text)
+
+                # Apply penalty if 2+ keywords match
+                if matches >= 2:
+                    penalty_factor = config['penalty']
+                    original_score = result.get('scores', {}).get('final', 0.5)
+                    result['scores']['final'] = original_score * penalty_factor
+
+                    # Add flag
+                    flags = result.get('postflags', {})
+                    flags[f'{category}_penalty'] = True
+                    flags['category_penalty_factor'] = penalty_factor
+                    result['postflags'] = flags
+
+                    applied_penalty = category
+                    penalties_applied += 1
+                    logger.debug(
+                        f"Category penalty ({category}): '{title[:50]}...' "
+                        f"(factor={penalty_factor}, matches={matches})"
+                    )
+                    break  # Only apply one category penalty
+
+            penalized_results.append(result)
+
+        if penalties_applied > 0:
+            logger.info(f"Category penalties: applied to {penalties_applied}/{len(results)} articles")
+
+        return penalized_results
+
+    def apply_date_penalties(self, results: List[Dict[str, Any]],
+                            require_dates: bool = None) -> List[Dict[str, Any]]:
+        """
+        Apply penalties for missing publication dates
+
+        Args:
+            results: List of search results
+            require_dates: Whether to require dates (default from weights)
+
+        Returns:
+            Results with date penalties applied
+        """
         if not results:
             return results
 
-        # Step 1: Calculate base scores
+        require = require_dates if require_dates is not None else self.weights.require_dates_in_top_n
+        penalty_factor = self.weights.date_penalty_factor
+
+        penalized_results = []
+        no_date_count = 0
+
+        for result in results:
+            published_at = result.get('published_at')
+
+            # Check if date is missing or invalid
+            has_date = bool(published_at)
+            if isinstance(published_at, str):
+                if published_at in ['None', '', 'null']:
+                    has_date = False
+
+            if not has_date and require:
+                # Apply strong penalty
+                original_score = result.get('scores', {}).get('final', 0.5)
+                result['scores']['final'] = original_score * penalty_factor
+
+                # Add flag
+                flags = result.get('postflags', {})
+                flags['no_date_penalty'] = True
+                flags['date_penalty_factor'] = penalty_factor
+                result['postflags'] = flags
+
+                no_date_count += 1
+                logger.debug(
+                    f"Date penalty: '{result.get('title', 'N/A')[:50]}...' "
+                    f"(factor={penalty_factor})"
+                )
+
+            penalized_results.append(result)
+
+        if no_date_count > 0:
+            logger.info(f"Date penalties: applied to {no_date_count}/{len(results)} articles without dates")
+
+        return penalized_results
+
+    def score_and_rank(self, results: List[Dict[str, Any]],
+                      query: str,
+                      apply_caps: bool = True,
+                      intent: str = "news_current_events",
+                      filter_offtopic: bool = True,
+                      apply_category_penalties: bool = True,
+                      apply_date_penalties: bool = True) -> List[Dict[str, Any]]:
+        """
+        Complete scoring pipeline with filtering and penalties
+
+        NEW Sprint 2 features:
+        - Off-topic filtering (cosine < 0.28)
+        - Category penalties (sports/entertainment/crime)
+        - Date penalties (missing published_at)
+        """
+        if not results:
+            return results
+
+        # Step 1: Filter off-topic articles
+        if filter_offtopic:
+            results, dropped = self.filter_offtopic(results, query)
+            if dropped > 0:
+                logger.info(f"Off-topic filter: {dropped} articles dropped")
+
+        # Step 2: Calculate base scores
         scored_results = self.score_results(results, query)
 
-        # Step 2: Apply penalties
+        # Step 3: Apply category penalties (NEW Sprint 2)
+        if apply_category_penalties:
+            scored_results = self.apply_category_penalties(scored_results, intent)
+
+        # Step 4: Apply date penalties (NEW Sprint 2)
+        if apply_date_penalties:
+            scored_results = self.apply_date_penalties(scored_results)
+
+        # Step 5: Apply duplicate penalties
         penalized_results = self.calculate_penalties(scored_results)
 
-        # Step 3: Apply domain caps
+        # Step 6: Apply domain caps
         if apply_caps:
             final_results = self.apply_domain_caps(penalized_results)
         else:
             final_results = penalized_results
 
-        # Step 4: Final sort by adjusted scores
+        # Step 7: Final sort by adjusted scores
         final_results.sort(key=lambda x: x['scores']['final'], reverse=True)
 
         logger.info(f"Scoring complete: {len(results)} -> {len(final_results)} final results")
