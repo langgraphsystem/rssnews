@@ -1,0 +1,350 @@
+openapi: 3.1.0
+info:
+  title: Search API for GPT Actions
+  description: |
+    Search API endpoint for SearchAgent to retrieve news articles.
+
+    **Base URL:** https://YOUR_HOSTNAME.trycloudflare.com (replace with your Cloudflare Tunnel hostname)
+
+    **Authentication:** Optional Cloudflare Access Service Token (see headers)
+  version: 1.0.0
+  contact:
+    name: RSS News API
+
+servers:
+  - url: https://YOUR_HOSTNAME.trycloudflare.com
+    description: Production (Cloudflare Tunnel)
+
+security:
+  - CloudflareServiceToken: []
+  - {}  # Allow unauthenticated for testing
+
+paths:
+  /retrieve:
+    post:
+      operationId: retrieve
+      summary: Retrieve news articles
+      description: |
+        Search for news articles based on query and filters.
+
+        **Auto-retry logic:**
+        - If no results found, increase hours: 24 → 48 → 72
+        - If still empty, relax filters or rephrase query
+
+        **Pagination:**
+        - Use next_cursor from response for pagination
+        - Pass same query with cursor to get more results
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RetrieveRequest'
+            examples:
+              basic_search:
+                summary: Basic search
+                value:
+                  query: "AI regulation"
+                  hours: 24
+                  k: 10
+                  filters: {}
+                  cursor: null
+                  correlation_id: "search-123"
+
+              filtered_search:
+                summary: Filtered search with sources
+                value:
+                  query: "climate change"
+                  hours: 48
+                  k: 15
+                  filters:
+                    sources: ["reuters.com", "bbc.com"]
+                    lang: "en"
+                  cursor: null
+                  correlation_id: "search-456"
+
+              pagination:
+                summary: Pagination with cursor
+                value:
+                  query: "AI regulation"
+                  hours: 24
+                  k: 10
+                  filters: {}
+                  cursor: "b2Zmc2V0OjEw"
+                  correlation_id: "search-789"
+
+      responses:
+        '200':
+          description: Successful retrieval
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RetrieveResponse'
+              examples:
+                success:
+                  summary: Successful response with results
+                  value:
+                    items:
+                      - id: "art123"
+                        title: "EU proposes new AI regulation framework"
+                        url: "https://europa.eu/news/ai-regulation"
+                        snippet: "The European Union today proposed comprehensive regulations for artificial intelligence..."
+                        ts: "2025-10-06T14:30:00Z"
+                        source: "europa.eu"
+                        score: 0.92
+                      - id: "art456"
+                        title: "AI safety guidelines updated"
+                        url: "https://reuters.com/tech/ai-safety"
+                        snippet: "New safety guidelines for AI development were announced..."
+                        ts: "2025-10-05T10:15:00Z"
+                        source: "reuters.com"
+                        score: 0.87
+                    next_cursor: "b2Zmc2V0OjEw"
+                    coverage: 1.0
+                    freshness_stats:
+                      median_sec: 86400
+
+        '404':
+          description: No results found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                no_results:
+                  summary: No results found
+                  value:
+                    code: "NO_RESULTS"
+                    message: "No articles found for 'obscure topic' in last 24h"
+
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                rate_limit:
+                  summary: Rate limit
+                  value:
+                    code: "RATE_LIMIT"
+                    message: "Too many requests. Please wait 60 seconds."
+
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalid_filter:
+                  summary: Invalid filter
+                  value:
+                    code: "INVALID_FILTER"
+                    message: "Invalid source filter: unknown-domain.com"
+
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                server_error:
+                  summary: Internal error
+                  value:
+                    code: "SERVER_ERROR"
+                    message: "Database connection failed"
+
+components:
+  securitySchemes:
+    CloudflareServiceToken:
+      type: apiKey
+      in: header
+      name: CF-Access-Client-Id
+      description: |
+        Cloudflare Access Service Token (Client ID)
+
+        Pair with CF-Access-Client-Secret header.
+
+        **Setup:**
+        1. Go to Cloudflare Zero Trust → Access → Service Auth
+        2. Create Service Token
+        3. Copy Client ID and Secret
+        4. Add both headers to requests
+      x-additional-header:
+        name: CF-Access-Client-Secret
+        description: Cloudflare Access Service Token (Client Secret)
+
+  schemas:
+    RetrieveRequest:
+      type: object
+      required:
+        - query
+        - correlation_id
+      properties:
+        query:
+          type: string
+          description: Search query string
+          example: "AI regulation"
+          minLength: 1
+          maxLength: 500
+
+        hours:
+          type: integer
+          description: Time window in hours (1-8760)
+          default: 24
+          minimum: 1
+          maximum: 8760
+          example: 24
+
+        k:
+          type: integer
+          description: Number of results to return
+          default: 10
+          minimum: 1
+          maximum: 100
+          example: 10
+
+        filters:
+          type: object
+          description: Additional filters
+          default: {}
+          properties:
+            sources:
+              type: array
+              items:
+                type: string
+              description: Filter by source domains
+              example: ["reuters.com", "bbc.com"]
+
+            lang:
+              type: string
+              description: Language filter (en, ru, auto)
+              default: "auto"
+              enum: ["en", "ru", "auto"]
+              example: "en"
+
+        cursor:
+          type: string
+          nullable: true
+          description: Pagination cursor (from previous response)
+          example: "b2Zmc2V0OjEw"
+
+        correlation_id:
+          type: string
+          description: Correlation ID for request tracking
+          example: "search-abc123"
+          minLength: 1
+          maxLength: 100
+
+    RetrieveResponse:
+      type: object
+      required:
+        - items
+        - coverage
+        - freshness_stats
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SearchItem'
+          description: Search results
+
+        next_cursor:
+          type: string
+          nullable: true
+          description: Cursor for next page (null if no more results)
+          example: "b2Zmc2V0OjEw"
+
+        coverage:
+          type: number
+          format: float
+          description: Search coverage ratio (0.0-1.0)
+          minimum: 0.0
+          maximum: 1.0
+          example: 0.85
+
+        freshness_stats:
+          type: object
+          description: Freshness statistics
+          required:
+            - median_sec
+          properties:
+            median_sec:
+              type: integer
+              description: Median article age in seconds
+              example: 86400
+
+    SearchItem:
+      type: object
+      required:
+        - id
+        - title
+        - url
+        - snippet
+        - ts
+        - source
+        - score
+      properties:
+        id:
+          type: string
+          description: Article ID
+          example: "art123"
+
+        title:
+          type: string
+          description: Article title
+          example: "EU proposes new AI regulation"
+
+        url:
+          type: string
+          format: uri
+          description: Article URL
+          example: "https://europa.eu/news/ai-regulation"
+
+        snippet:
+          type: string
+          description: Article snippet (first 300 chars)
+          example: "The European Union today proposed comprehensive regulations..."
+
+        ts:
+          type: string
+          format: date-time
+          description: Publication timestamp (ISO 8601)
+          example: "2025-10-06T14:30:00Z"
+
+        source:
+          type: string
+          description: Source domain
+          example: "europa.eu"
+
+        score:
+          type: number
+          format: float
+          description: Relevance score (0.0-1.0)
+          minimum: 0.0
+          maximum: 1.0
+          example: 0.92
+
+    ErrorResponse:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          description: Error code
+          enum:
+            - NO_RESULTS
+            - RATE_LIMIT
+            - INVALID_FILTER
+            - SERVER_ERROR
+          example: "NO_RESULTS"
+
+        message:
+          type: string
+          description: Human-readable error message
+          example: "No articles found for query in specified time window"
