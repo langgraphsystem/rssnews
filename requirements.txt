@@ -23,6 +23,10 @@ langdetect==1.0.9
 pydantic==2.11.9
 pydantic-settings==2.6.1
 
+# Web API framework (for /search API)
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+
 # Configuration management
 PyYAML==6.0.1
 watchdog==3.0.0

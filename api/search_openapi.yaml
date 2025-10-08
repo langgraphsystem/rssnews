@@ -4,16 +4,18 @@ info:
   description: |
     Search API endpoint for SearchAgent to retrieve news articles.
 
-    **Base URL:** https://YOUR_HOSTNAME.trycloudflare.com (replace with your Cloudflare Tunnel hostname)
+    **Base URL:** https://search-api-production-XXXX.up.railway.app (replace with your Railway service URL)
 
-    **Authentication:** Optional Cloudflare Access Service Token (see headers)
+    **Authentication:** Optional (can be configured with Railway environment variables)
   version: 1.0.0
   contact:
     name: RSS News API
 
 servers:
-  - url: https://YOUR_HOSTNAME.trycloudflare.com
-    description: Production (Cloudflare Tunnel)
+  - url: https://search-api-production-XXXX.up.railway.app
+    description: Production (Railway)
+  - url: http://localhost:8001
+    description: Local development
 
 security:
   - CloudflareServiceToken: []

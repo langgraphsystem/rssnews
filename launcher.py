@@ -15,6 +15,7 @@ Supported SERVICE_MODE values:
   - fts-continuous     -> python services/fts_service.py service --interval {FTS_CONTINUOUS_INTERVAL} --batch-size {FTS_BATCH}
   - openai-migration   -> python services/openai_embedding_migration_service.py continuous --interval {MIGRATION_INTERVAL} --batch-size {MIGRATION_BATCH}
   - bot                -> python start_telegram_bot.py
+  - search-api         -> uvicorn api.search_api:app --host 0.0.0.0 --port {PORT}
 
 Default SERVICE_MODE: openai-migration (keeps backward compatibility until services set explicit modes).
 
@@ -89,8 +90,13 @@ def build_command() -> str:
     if mode == "bot":
         return "python start_telegram_bot.py"
 
+    if mode == "search-api":
+        # Search API for GPT Actions - runs with uvicorn
+        port = os.getenv("PORT", "8001")
+        return f"uvicorn api.search_api:app --host 0.0.0.0 --port {port}"
+
     # Fallback: print help and exit non-zero
-    print(f"Unsupported SERVICE_MODE='{mode}'. Supported: poll|work|work-continuous|embedding|chunking|chunk-continuous|openai-migration|bot", file=sys.stderr)
+    print(f"Unsupported SERVICE_MODE='{mode}'. Supported: poll|work|work-continuous|embedding|chunking|chunk-continuous|openai-migration|bot|search-api", file=sys.stderr)
     sys.exit(2)
 
 
