@@ -184,7 +184,6 @@ components:
       type: object
       required:
         - query
-        - correlation_id
       properties:
         query:
           type: string
@@ -195,7 +194,7 @@ components:
 
         hours:
           type: integer
-          description: Time window in hours (1-8760)
+          description: Time window in hours (24, 48, or 72)
           default: 24
           minimum: 1
           maximum: 8760
@@ -236,7 +235,8 @@ components:
 
         correlation_id:
           type: string
-          description: Correlation ID for request tracking
+          nullable: true
+          description: Correlation ID for request tracking (optional)
           example: "search-abc123"
           minLength: 1
           maxLength: 100
@@ -245,8 +245,10 @@ components:
       type: object
       required:
         - items
+        - total_available
         - coverage
         - freshness_stats
+        - diagnostics
       properties:
         items:
           type: array
@@ -258,7 +260,12 @@ components:
           type: string
           nullable: true
           description: Cursor for next page (null if no more results)
-          example: "b2Zmc2V0OjEw"
+          example: "eyJvZmZzZXQiOiAxMH0="
+
+        total_available:
+          type: integer
+          description: Total results available in this time window
+          example: 15
 
         coverage:
           type: number
@@ -266,69 +273,111 @@ components:
           description: Search coverage ratio (0.0-1.0)
           minimum: 0.0
           maximum: 1.0
-          example: 0.85
+          example: 1.0
 
         freshness_stats:
           type: object
           description: Freshness statistics
           required:
-            - median_sec
+            - median_age_seconds
+            - window_hours
           properties:
-            median_sec:
-              type: integer
+            median_age_seconds:
+              type: number
+              format: float
               description: Median article age in seconds
-              example: 86400
+              example: 37262.01
+
+            window_hours:
+              type: integer
+              description: Time window used for search
+              example: 24
+
+        diagnostics:
+          type: object
+          description: Diagnostic information
+          required:
+            - total_results
+            - offset
+            - returned
+            - has_more
+            - window
+          properties:
+            total_results:
+              type: integer
+              description: Total results found
+              example: 15
+
+            offset:
+              type: integer
+              description: Offset used for pagination
+              example: 0
+
+            returned:
+              type: integer
+              description: Number of items returned in this response
+              example: 10
+
+            has_more:
+              type: boolean
+              description: Whether more results are available
+              example: true
+
+            window:
+              type: string
+              description: Time window used (24h, 48h, 72h)
+              example: "24h"
+
+            correlation_id:
+              type: string
+              nullable: true
+              description: Correlation ID from request
+              example: "search-abc123"
 
     SearchItem:
       type: object
       required:
-        - id
         - title
         - url
-        - snippet
-        - ts
-        - source
-        - score
+        - source_domain
+        - published_at
       properties:
-        id:
-          type: string
-          description: Article ID
-          example: "art123"
-
         title:
           type: string
           description: Article title
-          example: "EU proposes new AI regulation"
+          example: "Almost a fifth of young UK adults use AI to design holiday"
 
         url:
           type: string
           format: uri
           description: Article URL
-          example: "https://europa.eu/news/ai-regulation"
+          example: "https://www.theguardian.com/travel/2025/oct/07/uk-adults-ai-design-holiday"
 
-        snippet:
+        source_domain:
           type: string
-          description: Article snippet (first 300 chars)
-          example: "The European Union today proposed comprehensive regulations..."
+          description: Source domain
+          example: "theguardian.com"
 
-        ts:
+        published_at:
           type: string
           format: date-time
           description: Publication timestamp (ISO 8601)
-          example: "2025-10-06T14:30:00Z"
+          example: "2025-10-07T12:38:18+00:00"
 
-        source:
+        snippet:
           type: string
-          description: Source domain
-          example: "europa.eu"
+          nullable: true
+          description: Article snippet (first 300 chars, may be null)
+          example: "The European Union today proposed comprehensive regulations..."
 
-        score:
+        relevance_score:
           type: number
           format: float
-          description: Relevance score (0.0-1.0)
+          nullable: true
+          description: Relevance score (0.0-1.0, may be null)
           minimum: 0.0
           maximum: 1.0
-          example: 0.92
+          example: 0.8161
 
     ErrorResponse:
       type: object
