@@ -5,6 +5,7 @@ Direct semantic search using PgClient and OpenAI embeddings
 """
 
 import logging
+import os
 from typing import List, Dict, Any
 from dataclasses import dataclass
 
@@ -59,11 +60,17 @@ class SimpleSearchService:
             logger.info(f"✅ Generated {len(query_embedding)}-dim embedding")
 
             # Search using pgvector
-            logger.info(f"Searching with similarity threshold=0.0, limit={limit}")
+            # Configurable minimum similarity threshold to avoid very weak matches
+            try:
+                min_sim = float(os.getenv('SIMPLE_SEARCH_MIN_SIM', '0.2'))
+            except Exception:
+                min_sim = 0.2
+
+            logger.info(f"Searching with similarity threshold={min_sim}, limit={limit}")
             results = self.db.search_chunks_by_similarity(
                 query_embedding=query_embedding,
                 limit=limit,
-                similarity_threshold=0.0  # Get all results sorted by similarity
+                similarity_threshold=min_sim
             )
 
             logger.info(f"Found {len(results)} results")
@@ -104,24 +111,45 @@ class SimpleSearchService:
             Formatted markdown string
         """
         if not results:
-            return f"🔍 No results found for: *{query}*"
+            return f"🔍 No results found for: *{self._escape_md(query)}*"
+        # Deduplicate by article_id to increase diversity
+        unique: List[SimpleSearchResult] = []
+        seen_ids = set()
+        for r in results:
+            aid = getattr(r, 'article_id', None)
+            if aid is None or aid not in seen_ids:
+                unique.append(r)
+                if aid is not None:
+                    seen_ids.add(aid)
 
-        message = f"🔍 *Search Results for:* {query}\n"
-        message += f"📊 Found {len(results)} relevant articles\n\n"
-
-        for i, result in enumerate(results[:max_results], 1):
+        message = f"🔍 *Search Results for:* {self._escape_md(query)}\n"
+        message += f"📊 Found {len(unique)} relevant articles\n\n"
+        for i, result in enumerate(unique[:max_results], 1):
             similarity_percent = int(result.similarity * 100)
 
-            message += f"*{i}. {result.title}*\n"
-            message += f"📰 Source: {result.source}\n"
-            message += f"🔗 {result.url}\n"
+            title = self._escape_md(result.title)
+            source = self._escape_md(result.source)
+            url = result.url or ""
+            message += f"*{i}. {title}*\n"
+            message += f"📰 Source: {source}\n"
+            message += f"🔗 {url}\n"
             message += f"📈 Relevance: {similarity_percent}%\n"
             message += f"📅 {result.published_at[:10]}\n"
 
             # Add snippet
-            snippet = result.text[:200]
+            snippet = self._escape_md(result.text[:200])
             if len(result.text) > 200:
                 snippet += "..."
             message += f"_{snippet}_\n\n"
 
         return message
+
+    # --- helpers ---
+    @staticmethod
+    def _escape_md(text: str) -> str:
+        if not text:
+            return ""
+        # Telegram MarkdownV2 escaping
+        for ch in ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']:
+            text = text.replace(ch, f"\\{ch}")
+        return text

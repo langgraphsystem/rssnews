@@ -28,7 +28,6 @@ from enum import Enum
 
 # Import existing services
 from ranking_api import RankingAPI, SearchRequest
-from pg_client_new import PgClientNew
 
 # Logging setup
 logging.basicConfig(
@@ -45,7 +44,7 @@ app = FastAPI(
 )
 
 # Global instances
-pg_client: Optional[PgClientNew] = None
+pg_client = None  # Kept for backward-compatible health reporting
 ranking_api: Optional[RankingAPI] = None
 
 
@@ -112,16 +111,8 @@ async def startup_event():
     logger.info("🚀 Starting Search API...")
 
     try:
-        # Initialize PostgreSQL client
-        pg_dsn = os.getenv("PG_DSN")
-        if not pg_dsn:
-            raise ValueError("PG_DSN environment variable not set")
-
-        pg_client = PgClientNew(pg_dsn)
-        logger.info("✅ PostgreSQL client initialized")
-
-        # Initialize RankingAPI
-        ranking_api = RankingAPI(pg_client=pg_client)
+        # Initialize RankingAPI (manages its own DB client internally)
+        ranking_api = RankingAPI()
         logger.info("✅ RankingAPI initialized")
 
         logger.info("🎉 Search API ready")
@@ -320,12 +311,19 @@ async def retrieve(request: RetrieveRequest):
         k_total = request.k + offset
 
         try:
-            results = await ranking_api.retrieve_for_analysis(
+            # Map filters to RankingAPI params
+            filt = request.filters or {}
+            sources = filt.get("sources") if isinstance(filt, dict) else None
+            lang = filt.get("lang") if isinstance(filt, dict) else None
+
+            res = await ranking_api.retrieve_for_analysis(
                 query=request.query,
                 window=window,
                 k_final=k_total,
                 intent="news_current_events",
-                filters=request.filters
+                sources=sources,
+                lang=lang or "auto",
+                correlation_id=request.correlation_id,
             )
         except Exception as e:
             logger.error(f"RankingAPI retrieve_for_analysis failed: {e}")
@@ -334,24 +332,31 @@ async def retrieve(request: RetrieveRequest):
                 detail={"error_code": ErrorCode.DATABASE_ERROR, "message": str(e)}
             )
 
-        # Slice results for pagination
-        paginated_results = results[offset:offset + request.k] if results else []
+        # Extract docs from response and slice for pagination
+        all_docs = []
+        if isinstance(res, dict):
+            all_docs = res.get("docs", []) or []
+        elif isinstance(res, list):
+            # Backward compatibility if underlying API returns list
+            all_docs = res
+
+        paginated_results = all_docs[offset:offset + request.k] if all_docs else []
 
         # Format items
         items = [_format_article_item(article) for article in paginated_results]
 
         # Calculate next cursor
         next_cursor = None
-        if len(results) > offset + request.k:
+        if len(all_docs) > offset + request.k:
             # More results available
             next_cursor = _encode_cursor(offset + request.k)
 
         # Calculate metrics
-        total_available = len(results)
-        coverage = min(1.0, len(results) / request.k) if request.k > 0 else 0.0
+        total_available = len(all_docs)
+        coverage = min(1.0, len(paginated_results) / request.k) if request.k > 0 else 0.0
 
         freshness_stats = {
-            "median_age_seconds": _calculate_freshness_median(results),
+            "median_age_seconds": _calculate_freshness_median(all_docs),
             "window_hours": request.hours
         }
 

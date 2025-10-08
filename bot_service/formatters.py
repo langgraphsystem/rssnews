@@ -247,10 +247,10 @@ Query: `{self._escape_markdown(query)}`
                 snippet = self._truncate_text(text, self.max_snippet_length)
                 lines.append(f"💬 {self._escape_markdown(snippet)}")
 
-            # URL
+            # URL (use plain URL to avoid Markdown parsing issues)
             url = result.get('url', '')
             if url:
-                lines.append(f"🔗 [Read Full Article]({url})")
+                lines.append(f"🔗 {url}")
 
             lines.append("")
 

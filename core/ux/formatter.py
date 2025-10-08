@@ -1,55 +1,181 @@
-"""
+﻿"""
 UX Formatter — Telegram-friendly formatting for Phase 1 responses
 Converts BaseAnalysisResponse to readable Telegram messages with buttons
 """
 
 import logging
-from typing import Dict, Any, List
-from schemas.analysis_schemas import BaseAnalysisResponse, ErrorResponse
+from datetime import datetime, timezone
+from typing import Dict, Any, List, Optional
+from urllib.parse import urlparse
+from zoneinfo import ZoneInfo
+
+from schemas.analysis_schemas import BaseAnalysisResponse, ErrorResponse, Evidence, EvidenceRef, Insight
 
 logger = logging.getLogger(__name__)
 
+CENTRAL_TZ = ZoneInfo("America/Chicago")
+
 
 def format_for_telegram(response: BaseAnalysisResponse | ErrorResponse) -> Dict[str, Any]:
-    """
-    Format response for Telegram
-
-    Args:
-        response: BaseAnalysisResponse or ErrorResponse
-
-    Returns:
-        Dict with 'text' and optional 'buttons'
-    """
+    """Format response for Telegram"""
     if isinstance(response, ErrorResponse):
         return _format_error_response(response)
-    else:
-        return _format_success_response(response)
+    return _format_success_response(response)
 
 
 def _format_success_response(response: BaseAnalysisResponse) -> Dict[str, Any]:
-    """Format successful analysis response"""
+    """Select formatting strategy based on response type"""
+    if _is_general_qa_response(response):
+        return _format_general_qa_response(response)
 
+    if _is_news_response(response):
+        return _format_news_response(response)
+
+    # Fallback to legacy formatting for other commands (/events, /graph, etc.)
+    return _format_legacy_success_response(response)
+
+
+def _is_general_qa_response(response: BaseAnalysisResponse) -> bool:
+    result = getattr(response, "result", {})
+    if isinstance(result, dict):
+        source = result.get("source", "")
+        if source:
+            return source.upper() == "LLM/KB"
+    header = (response.header or "").lower()
+    return "answer" in header and not response.evidence
+
+
+def _is_news_response(response: BaseAnalysisResponse) -> bool:
+    header = (response.header or "").lower()
+    return "news analysis" in header or "новостной анализ" in header
+
+
+def _format_general_qa_response(response: BaseAnalysisResponse) -> Dict[str, Any]:
+    """Format general knowledge answers (LLM/KB)"""
+    result = getattr(response, "result", {}) if isinstance(getattr(response, "result", {}), dict) else {}
+    answer = result.get("answer") or response.tldr or ""
+    source = result.get("source", "LLM/KB")
+
+    lines = [
+        "🤖 **Knowledge Answer**",
+        _escape_markdown(answer.strip()),
+        "",
+        f"Source: {_escape_markdown(source)}",
+    ]
+
+    return {
+        "text": "\n".join(lines).strip(),
+        "buttons": None,
+        "parse_mode": "Markdown",
+    }
+
+
+def _format_news_response(response: BaseAnalysisResponse) -> Dict[str, Any]:
+    """Format news-mode responses with summary bullets and structured sources"""
+    evidence_index = _build_evidence_index(response.evidence)
+
+    summary_entries = _build_summary_entries(response.insights, evidence_index)
+    if len(summary_entries) < 3:
+        summary_entries = _augment_summary_from_evidence(summary_entries, response.evidence)
+
+    source_entries = _build_source_entries(response.evidence)
+
+    lines: List[str] = []
+    lines.append("🧾 **Short Summary**")
+    for entry in summary_entries[:5]:
+        lines.append(f"• {entry}")
+
+    if not summary_entries:
+        lines.append("• No summary available")
+
+    lines.append("")
+    lines.append("📰 **Sources (top 5)**")
+    if source_entries:
+        lines.extend(source_entries[:10])
+    else:
+        lines.append("• No sources available")
+
+    return {
+        "text": "\n".join(lines).strip(),
+        "buttons": None,  # Buttons injected later by Phase3 handlers
+        "parse_mode": "Markdown",
+    }
+
+
+def _build_summary_entries(insights: List[Insight], evidence_index: Dict[str, Evidence]) -> List[str]:
+    entries: List[str] = []
+    for insight in insights[:5]:
+        summary_text = insight.text.strip()
+        date_text = None
+        for ref in insight.evidence_refs or []:
+            date_text = _format_iso_date(ref.date) or _format_iso_date(_lookup_evidence_date(ref, evidence_index))
+            if date_text:
+                break
+        if not date_text and insight.evidence_refs:
+            ref = insight.evidence_refs[0]
+            evidence_obj = _lookup_evidence(ref, evidence_index)
+            if evidence_obj:
+                date_text = _format_iso_date(evidence_obj.date)
+        summary = _escape_markdown(summary_text)
+        if date_text:
+            entries.append(f"{date_text} – {summary}")
+        else:
+            entries.append(summary)
+    return entries
+
+
+def _augment_summary_from_evidence(existing: List[str], evidence: List[Evidence]) -> List[str]:
+    augmented = list(existing)
+    for ev in evidence:
+        if len(augmented) >= 5:
+            break
+        title = ev.title or "Untitled"
+        date_text = _format_iso_date(ev.date)
+        summary = _escape_markdown(title)
+        if date_text:
+            augmented.append(f"{date_text} – {summary}")
+        else:
+            augmented.append(summary)
+    return augmented
+
+
+def _build_source_entries(evidence: List[Evidence]) -> List[str]:
+    entries: List[str] = []
+    for ev in evidence[:5]:
+        title = _escape_markdown(ev.title or "Untitled")
+        url = ev.url or ""
+        date_text = _format_iso_date(ev.date) or "Date unknown"
+        domain = _escape_markdown(_extract_domain(url)) if url else "Unknown domain"
+        snippet = _escape_markdown(_truncate(ev.snippet or ev.text or "", 160))
+
+        if url:
+            entries.append(f"- [{title}]({url}) · {date_text} · {domain}")
+        else:
+            entries.append(f"- {title} · {date_text} · {domain}")
+        if snippet:
+            entries.append(f"  {snippet}")
+    return entries
+
+
+def _format_legacy_success_response(response: BaseAnalysisResponse) -> Dict[str, Any]:
+    """Original formatting used for non-ask commands"""
     lines = []
 
-    # Header with emoji
     header = response.header
     emoji = _get_emoji_for_command(header)
     lines.append(f"{emoji} **{header}**\n")
 
-    # TL;DR
     lines.append(f"📊 **Краткий обзор:**")
     lines.append(f"{response.tldr}\n")
 
-    # Insights (with emojis based on type)
     if response.insights:
         lines.append(f"💡 **Ключевые выводы:**")
         for i, insight in enumerate(response.insights[:5], 1):
-            emoji = _get_insight_emoji(insight.type)
+            emoji_insight = _get_insight_emoji(insight.type)
             text = insight.text
-            lines.append(f"{emoji} {text}")
+            lines.append(f"{emoji_insight} {text}")
         lines.append("")
 
-    # Evidence block (compact)
     if response.evidence:
         lines.append(f"📰 **Источники ({len(response.evidence)}):**")
         for i, ev in enumerate(response.evidence[:5], 1):
@@ -58,7 +184,6 @@ def _format_success_response(response: BaseAnalysisResponse) -> Dict[str, Any]:
             url = ev.url or ""
 
             if url:
-                # Telegram link format
                 lines.append(f"{i}. [{title}]({url})")
                 lines.append(f"   📅 {date}")
             else:
@@ -66,19 +191,14 @@ def _format_success_response(response: BaseAnalysisResponse) -> Dict[str, Any]:
                 lines.append(f"   📅 {date}")
         lines.append("")
 
-    # Meta info (compact)
     confidence_emoji = _get_confidence_emoji(response.meta.confidence)
     confidence_pct = int(response.meta.confidence * 100)
     lines.append(f"{confidence_emoji} Уверенность: {confidence_pct}% | Model: {response.meta.model}")
 
-    # Warnings (if any)
     if response.warnings:
         lines.append(f"\n⚠️ Предупреждения: {', '.join(response.warnings[:2])}")
 
-    # Build message
     text = "\n".join(lines)
-
-    # Build buttons (optional)
     buttons = _build_buttons(response)
 
     return {
@@ -90,7 +210,6 @@ def _format_success_response(response: BaseAnalysisResponse) -> Dict[str, Any]:
 
 def _format_error_response(error_response: ErrorResponse) -> Dict[str, Any]:
     """Format error response"""
-
     error = error_response.error
 
     lines = []
@@ -100,7 +219,6 @@ def _format_error_response(error_response: ErrorResponse) -> Dict[str, Any]:
     if error.retryable:
         lines.append(f"\n💡 Попробуйте повторить запрос через некоторое время.")
 
-    # Tech details (for debugging)
     if error.tech_message and error.tech_message != error.user_message:
         lines.append(f"\n🔧 Детали: `{error.tech_message[:100]}`")
 
@@ -113,186 +231,148 @@ def _format_error_response(error_response: ErrorResponse) -> Dict[str, Any]:
     }
 
 
-def _get_emoji_for_command(header: str) -> str:
-    """Get emoji based on command/header"""
-    header_lower = header.lower()
+def _build_evidence_index(evidence: List[Evidence]) -> Dict[str, Evidence]:
+    index: Dict[str, Evidence] = {}
+    for ev in evidence:
+        key = None
+        if ev.article_id:
+            key = str(ev.article_id)
+        elif ev.url:
+            key = ev.url
+        if key:
+            index[key] = ev
+    return index
 
+
+def _lookup_evidence(ref: EvidenceRef, evidence_index: Dict[str, Evidence]) -> Optional[Evidence]:
+    if not ref:
+        return None
+    if ref.article_id and str(ref.article_id) in evidence_index:
+        return evidence_index[str(ref.article_id)]
+    if ref.url and ref.url in evidence_index:
+        return evidence_index[ref.url]
+    return None
+
+
+def _lookup_evidence_date(ref: EvidenceRef, evidence_index: Dict[str, Evidence]) -> Optional[str]:
+    evidence = _lookup_evidence(ref, evidence_index)
+    return evidence.date if evidence else None
+
+
+def _format_iso_date(value: Optional[str]) -> Optional[str]:
+    if not value:
+        return None
+
+    if isinstance(value, datetime):
+        dt = value
+    else:
+        text = str(value).strip()
+        if not text:
+            return None
+        try:
+            dt = datetime.fromisoformat(text.replace('Z', '+00:00'))
+        except ValueError:
+            for fmt in ("%Y-%m-%d", "%Y/%m/%d"):
+                try:
+                    dt = datetime.strptime(text, fmt)
+                    dt = dt.replace(tzinfo=timezone.utc)
+                    break
+                except ValueError:
+                    dt = None
+            if dt is None:
+                return None
+
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+
+    try:
+        central = dt.astimezone(CENTRAL_TZ)
+    except Exception as exc:  # pragma: no cover - fallback for unexpected tz errors
+        logger.debug(f"Failed to convert date '{value}' to America/Chicago: {exc}")
+        central = dt
+
+    return central.isoformat(timespec='seconds')
+
+
+def _extract_domain(url: str) -> str:
+    if not url:
+        return ""
+    try:
+        parsed = urlparse(url)
+        domain = parsed.netloc or parsed.path
+        return domain.lstrip('www.')
+    except Exception:
+        return url
+
+
+def _truncate(text: str, limit: int) -> str:
+    if len(text) <= limit:
+        return text
+    return text[: limit - 1].rstrip() + "…"
+
+
+def _escape_markdown(text: str) -> str:
+    if not text:
+        return ""
+    replacements = {
+        '\\': '\\\\',
+        '`': '\\`',
+        '*': '\\*',
+        '_': '\\_',
+        '[': '\\[',
+        ']': '\\]',
+        '(': '\\(',
+        ')': '\\)',
+    }
+    result = text
+    for target, replacement in replacements.items():
+        result = result.replace(target, replacement)
+    return result
+
+
+def _get_emoji_for_command(header: str) -> str:
+    header_lower = (header or "").lower()
     if "trend" in header_lower:
         return "📈"
-    elif "keyphrase" in header_lower or "keyword" in header_lower:
+    if "keyphrase" in header_lower or "keyword" in header_lower:
         return "🔑"
-    elif "sentiment" in header_lower:
+    if "sentiment" in header_lower:
         return "😊"
-    elif "topic" in header_lower:
+    if "topic" in header_lower:
         return "📚"
-    else:
-        return "📊"
+    return "📊"
 
 
 def _get_insight_emoji(insight_type: str) -> str:
-    """Get emoji for insight type"""
     emoji_map = {
         "fact": "✅",
         "hypothesis": "🤔",
         "recommendation": "💡",
-        "conflict": "⚠️"
+        "conflict": "⚠️",
     }
     return emoji_map.get(insight_type, "•")
 
 
 def _get_confidence_emoji(confidence: float) -> str:
-    """Get emoji for confidence level"""
     if confidence >= 0.8:
         return "🟢"
-    elif confidence >= 0.6:
+    if confidence >= 0.6:
         return "🟡"
-    else:
-        return "🟠"
+    return "🟠"
 
 
 def _build_buttons(response: BaseAnalysisResponse) -> List[List[Dict[str, str]]]:
-    """Build inline buttons for response"""
-
     buttons = []
-
-    # Row 1: Explain / More Evidence
     row1 = [
         {"text": "📖 Объяснить", "callback_data": f"explain_{response.meta.correlation_id}"},
-        {"text": "📰 Все источники", "callback_data": f"sources_{response.meta.correlation_id}"}
+        {"text": "📰 Все источники", "callback_data": f"sources_{response.meta.correlation_id}"},
     ]
     buttons.append(row1)
 
-    # Row 2: Related / Follow (optional)
     row2 = [
         {"text": "🔗 Похожие", "callback_data": f"related_{response.meta.correlation_id}"},
-        {"text": "🔔 Следить", "callback_data": f"follow_{response.meta.correlation_id}"}
+        {"text": "🔔 Следить", "callback_data": f"follow_{response.meta.correlation_id}"},
     ]
     buttons.append(row2)
 
     return buttons
-
-
-def format_result_details(response: BaseAnalysisResponse, detail_type: str = "default") -> str:
-    """
-    Format additional result details (for detailed views)
-
-    Args:
-        response: BaseAnalysisResponse
-        detail_type: Type of details to show ("keywords", "sentiment", "topics", etc.)
-
-    Returns:
-        Formatted text
-    """
-    result = response.result
-
-    if detail_type == "keywords" or "keyphrases" in result:
-        return _format_keyphrases_detail(result)
-
-    elif detail_type == "sentiment" or "overall" in result:
-        return _format_sentiment_detail(result)
-
-    elif detail_type == "topics" or "topics" in result:
-        return _format_topics_detail(result)
-
-    else:
-        return "Детали недоступны"
-
-
-def _format_keyphrases_detail(result: Dict[str, Any]) -> str:
-    """Format keyphrases in detail"""
-    lines = []
-    lines.append("🔑 **Ключевые фразы:**\n")
-
-    keyphrases = result.get("keyphrases", [])
-    for i, kp in enumerate(keyphrases[:15], 1):
-        phrase = kp.get("phrase", "")
-        score = kp.get("score", 0.0)
-        lang = kp.get("lang", "")
-
-        # Build bar
-        bar = "█" * int(score * 10)
-        lines.append(f"{i}. **{phrase}** `{bar}` {score:.2f} ({lang})")
-
-    return "\n".join(lines)
-
-
-def _format_sentiment_detail(result: Dict[str, Any]) -> str:
-    """Format sentiment in detail"""
-    lines = []
-    lines.append("😊 **Анализ настроений:**\n")
-
-    # Overall
-    overall = result.get("overall", 0.0)
-    sentiment_label = "позитивное" if overall > 0.3 else "негативное" if overall < -0.3 else "нейтральное"
-    lines.append(f"Общий тон: **{sentiment_label}** ({overall:+.2f})\n")
-
-    # Emotions
-    emotions = result.get("emotions", {})
-    if emotions:
-        lines.append("**Эмоции:**")
-        for emotion, score in sorted(emotions.items(), key=lambda x: x[1], reverse=True):
-            if score > 0.1:
-                bar = "█" * int(score * 10)
-                emoji = _get_emotion_emoji(emotion)
-                lines.append(f"{emoji} {emotion.capitalize()}: `{bar}` {score:.2f}")
-        lines.append("")
-
-    # Aspects
-    aspects = result.get("aspects", [])
-    if aspects:
-        lines.append("**Аспекты:**")
-        for aspect in aspects[:5]:
-            name = aspect.get("name", "")
-            score = aspect.get("score", 0.0)
-            lines.append(f"• {name}: {score:+.2f}")
-
-    return "\n".join(lines)
-
-
-def _format_topics_detail(result: Dict[str, Any]) -> str:
-    """Format topics in detail"""
-    lines = []
-    lines.append("📚 **Выявленные темы:**\n")
-
-    topics = result.get("topics", [])
-    for i, topic in enumerate(topics[:8], 1):
-        label = topic.get("label", "")
-        size = topic.get("size", 0)
-        trend = topic.get("trend", "stable")
-        terms = topic.get("terms", [])
-
-        # Trend emoji
-        trend_emoji = {"rising": "📈", "falling": "📉", "stable": "➡️"}.get(trend, "➡️")
-
-        lines.append(f"**{i}. {label}** {trend_emoji}")
-        lines.append(f"   📊 {size} статей | Ключевые термины: {', '.join(terms[:5])}")
-        lines.append("")
-
-    # Emerging topics
-    emerging = result.get("emerging", [])
-    if emerging:
-        lines.append("🌟 **Развивающиеся темы:**")
-        for em in emerging[:3]:
-            lines.append(f"• {em}")
-        lines.append("")
-
-    # Gaps
-    gaps = result.get("gaps", [])
-    if gaps:
-        lines.append("🔍 **Недостаточно освещённые темы:**")
-        for gap in gaps[:2]:
-            lines.append(f"• {gap}")
-
-    return "\n".join(lines)
-
-
-def _get_emotion_emoji(emotion: str) -> str:
-    """Get emoji for emotion"""
-    emoji_map = {
-        "joy": "😊",
-        "fear": "😨",
-        "anger": "😠",
-        "sadness": "😢",
-        "surprise": "😲"
-    }
-    return emoji_map.get(emotion.lower(), "😐")

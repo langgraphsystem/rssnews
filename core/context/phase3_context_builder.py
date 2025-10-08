@@ -13,25 +13,21 @@ from core.rag.retrieval_client import get_retrieval_client
 
 logger = logging.getLogger(__name__)
 
-# Valid window values (Sprint 3: added 7d, 14d, 30d for better granularity)
-VALID_WINDOWS = ["6h", "12h", "24h", "1d", "3d", "7d", "1w", "14d", "2w", "30d", "1m", "3m", "6m", "1y"]
+# Valid window values
+VALID_WINDOWS = ["6h", "12h", "24h", "1d", "3d", "1w", "2w", "1m", "3m", "6m", "1y"]
 
-# Window expansion sequence for auto-recovery (Sprint 3: 7d → 14d → 30d)
+# Window expansion sequence for auto-recovery
 WINDOW_EXPANSION = {
     "6h": "12h",
     "12h": "24h",
     "24h": "3d",
-    "1d": "3d",
-    "3d": "7d",
-    "7d": "14d",     # NEW: 7d (default) → 14d
-    "1w": "14d",     # 1w = 7d, also expands to 14d
-    "14d": "30d",    # NEW: 14d → 30d
-    "2w": "30d",     # 2w = 14d, also expands to 30d
-    "30d": "3m",     # NEW: 30d → 3m
-    "1m": "3m",      # 1m = 30d, also expands to 3m
+    "3d": "1w",
+    "1w": "2w",
+    "2w": "1m",
+    "1m": "3m",
     "3m": "6m",
     "6m": "1y",
-    "1y": "1y"       # Cannot expand further
+    "1y": "1y"  # Cannot expand further
 }
 
 
@@ -231,9 +227,23 @@ class Phase3ContextBuilder:
             parsed["entity"] = entity_match.group(1)
 
         # Extract query (quoted string or remaining text)
-        query_match = re.search(r'query[=:]?"([^"]+)"', args, re.IGNORECASE)
+        query_match = re.search(r'query[=:]?"([^"]+?)"', args, re.IGNORECASE)
         if query_match:
             parsed["query"] = query_match.group(1).strip()
+        elif command == "/ask --depth=deep":
+            # For /ask, treat rest of args as query if not explicitly marked
+            # Clean up other parsed values from the query string
+            raw_query = args
+            for key in ["window", "lang", "sources", "topic", "entity"]:
+                if key in parsed:
+                    # This is a bit simplistic, might need regex replacement for robustness
+                    raw_query = raw_query.replace(parsed[key], "")
+            
+            # Also remove keyword args
+            raw_query = re.sub(r'\b(lang|sources?|window|topic|entity)[=:]?[\w\.,\-]+\b', '', raw_query, flags=re.IGNORECASE)
+            
+            parsed["query"] = raw_query.strip()
+
         elif command == "/graph query":
             # For /graph query, treat entire args as query if not explicitly marked
             parsed["query"] = args.strip()
@@ -479,46 +489,31 @@ class Phase3ContextBuilder:
             # Clean and validate docs
             cleaned_docs = []
             for doc in docs:
-                url_value = doc.get('url') or ''
-                source_domain = doc.get('source_domain') or doc.get('source') or ''
-                if 'news.google' in url_value or 'news.google' in source_domain:
-                    continue
-
-                # Normalize title
-                title = doc.get('title') or doc.get('title_norm') or doc.get('headline') or doc.get('name')
-                if not title:
+                # Ensure required fields
+                if not doc.get("title"):
                     continue
 
                 # Normalize date
-                date = doc.get('date')
+                date = doc.get("date")
                 if not date or not self._is_valid_date(date):
                     date = datetime.utcnow().strftime("%Y-%m-%d")
 
                 # Normalize lang
-                doc_lang = doc.get('lang') or doc.get('language') or 'en'
-                if doc_lang not in ['ru', 'en']:
-                    doc_lang = 'en'
+                doc_lang = doc.get("lang", "en")
+                if doc_lang not in ["ru", "en"]:
+                    doc_lang = "en"
 
-                # Normalize snippet and score
-                raw_snippet = doc.get('snippet') or doc.get('summary') or doc.get('text') or doc.get('clean_text') or ''
-                snippet = raw_snippet[:240]
-
-                score = doc.get('score')
-                if score is None:
-                    score = doc.get('similarity') or doc.get('semantic_score') or 0.0
-                try:
-                    score_value = float(score)
-                except (TypeError, ValueError):
-                    score_value = 0.0
+                # Trim snippet
+                snippet = doc.get("snippet", "")[:240]
 
                 cleaned_docs.append({
-                    'article_id': doc.get('article_id'),
-                    'title': title,
-                    'url': doc.get('url'),
-                    'date': date,
-                    'lang': doc_lang,
-                    'score': score_value,
-                    'snippet': snippet
+                    "article_id": doc.get("article_id"),
+                    "title": doc.get("title", ""),
+                    "url": doc.get("url"),
+                    "date": date,
+                    "lang": doc_lang,
+                    "score": doc.get("score", 0.0),
+                    "snippet": snippet
                 })
 
             return cleaned_docs[:k_final]
@@ -631,10 +626,9 @@ class Phase3ContextBuilder:
         if context["params"]["k_final"] != len(context["retrieval"]["docs"]):
             return "k_final mismatch with docs length"
 
-        # Check k_final range (allow smaller counts when retrieval returns fewer docs)
-        k_final_value = context["params"]["k_final"]
-        if not (1 <= k_final_value <= 10):
-            return f"k_final out of range: {k_final_value}"
+        # Check k_final range
+        if not (5 <= context["params"]["k_final"] <= 10):
+            return f"k_final out of range: {context['params']['k_final']}"
 
         # Check docs format
         for i, doc in enumerate(context["retrieval"]["docs"]):

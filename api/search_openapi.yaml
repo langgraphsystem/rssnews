@@ -88,24 +88,22 @@ paths:
                   summary: Successful response with results
                   value:
                     items:
-                      - id: "art123"
-                        title: "EU proposes new AI regulation framework"
+                      - title: "EU proposes new AI regulation framework"
                         url: "https://europa.eu/news/ai-regulation"
                         snippet: "The European Union today proposed comprehensive regulations for artificial intelligence..."
-                        ts: "2025-10-06T14:30:00Z"
-                        source: "europa.eu"
-                        score: 0.92
-                      - id: "art456"
-                        title: "AI safety guidelines updated"
+                        published_at: "2025-10-06T14:30:00Z"
+                        source_domain: "europa.eu"
+                        relevance_score: 0.92
+                      - title: "AI safety guidelines updated"
                         url: "https://reuters.com/tech/ai-safety"
                         snippet: "New safety guidelines for AI development were announced..."
-                        ts: "2025-10-05T10:15:00Z"
-                        source: "reuters.com"
-                        score: 0.87
+                        published_at: "2025-10-05T10:15:00Z"
+                        source_domain: "reuters.com"
+                        relevance_score: 0.87
                     next_cursor: "b2Zmc2V0OjEw"
                     coverage: 1.0
                     freshness_stats:
-                      median_sec: 86400
+                      median_age_seconds: 86400
 
         '404':
           description: No results found
@@ -391,8 +389,9 @@ components:
           enum:
             - NO_RESULTS
             - RATE_LIMIT
-            - INVALID_FILTER
-            - SERVER_ERROR
+            - INVALID_PARAMS
+            - DATABASE_ERROR
+            - INTERNAL_ERROR
           example: "NO_RESULTS"
 
         message:

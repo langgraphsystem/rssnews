@@ -41,6 +41,23 @@ from services.simple_search_service import SimpleSearchService
 
 logger = logging.getLogger(__name__)
 
+OFFICIAL_SOURCES = [
+    "europa.eu",
+    "ec.europa.eu",
+    "whitehouse.gov",
+    "state.gov",
+    "defense.gov",
+    "justice.gov",
+    "gov.uk",
+    "un.org",
+    "who.int",
+    "imf.org",
+    "worldbank.org",
+    "nato.int"
+]
+
+
+
 
 # Structured analysis prompt builder for GPT-5
 def build_analysis_prompt(query: str, articles: List[Dict[str, Any]], length: str = "detailed",
@@ -463,12 +480,17 @@ class AdvancedRSSBot:
             return await self._send_message(chat_id, "❌ Пустой ответ от оркестратора.")
 
         context = payload.get("context") or {}
-        if context.get("command") == "analyze":
-            query_key = context.get("query_key")
-            if query_key:
-                self._orchestrator_queries[query_key] = context
-                # Keep cache bounded
-                if len(self._orchestrator_queries) > 100:
+        command = context.get("command")
+
+        if command in {"analyze", "ask"}:
+            key = None
+            if command == "analyze":
+                key = context.get("query_key")
+            else:
+                key = context.get("callback_key") or context.get("correlation_id")
+            if key:
+                self._orchestrator_queries[key] = context
+                if len(self._orchestrator_queries) > 200:
                     first_key = next(iter(self._orchestrator_queries))
                     self._orchestrator_queries.pop(first_key, None)
 
@@ -777,6 +799,66 @@ class AdvancedRSSBot:
                 return await self.quality_ux.handle_refine_request(
                     chat_id, user_id, data, message_id
                 )
+
+            elif action == "ask":
+                parts_action = (data or "").split(":")
+                sub_action = parts_action[0] if parts_action else "refresh"
+                key = parts_action[1] if len(parts_action) > 1 else None
+                extra = parts_action[2:] if len(parts_action) > 2 else []
+
+                if not key:
+                    return await self._send_message(chat_id, "❌ Session expired, please run /ask again.")
+
+                context = self._orchestrator_queries.get(key)
+                if not context:
+                    return await self._send_message(chat_id, "❌ Session expired, please run /ask again.")
+
+                query = context.get("query")
+                if not query:
+                    return await self._send_message(chat_id, "❌ Cannot re-run this query.")
+
+                depth = int(context.get("depth", 3))
+                window = context.get("window", "7d") or "7d"
+                lang = context.get("lang", "auto")
+                intent = context.get("intent", "news_current_events")
+                k_final = int(context.get("k_final", 10))
+                sources = list(context.get("sources") or [])
+                after_date = context.get("after_date")
+                before_date = context.get("before_date")
+
+                if sub_action == "more":
+                    k_final = min(k_final + 5, 20)
+                elif sub_action == "window" and extra:
+                    window = extra[0]
+                elif sub_action == "official":
+                    sources = OFFICIAL_SOURCES
+
+                def _parse_iso(value):
+                    if not value:
+                        return None
+                    if isinstance(value, datetime):
+                        return value
+                    try:
+                        return datetime.fromisoformat(str(value))
+                    except Exception:
+                        return value
+
+                from services.phase3_handlers import execute_ask_command
+
+                payload = await execute_ask_command(
+                    query=query,
+                    depth=depth,
+                    window=window,
+                    lang=lang,
+                    k_final=k_final,
+                    correlation_id=f"{context.get('correlation_id', 'ask')}-cb",
+                    intent=intent,
+                    domains=sources,
+                    after_date=_parse_iso(after_date),
+                    before_date=_parse_iso(before_date)
+                )
+
+                return await self._send_orchestrator_payload(chat_id, payload)
 
             elif action.startswith("settings"):
                 return await self._handle_settings_callback(

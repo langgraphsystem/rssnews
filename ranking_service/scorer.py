@@ -49,32 +49,50 @@ class EverGreenWeights:
 class ProductionScorer:
     """Production-ready scoring engine with explainability"""
 
-    def __init__(self, weights: Optional[ScoringWeights] = None):
+    def __init__(self, weights: Optional[ScoringWeights] = None, config: Optional[Any] = None):
         self.weights = weights or ScoringWeights()
+        self.config = config
         self.evergreen_weights = EverGreenWeights()
         self.evergreen_triggers = {
             'how', 'analysis', 'explainer', 'guide', 'tutorial',
             'what is', 'why', 'understanding', 'explained'
         }
 
-        # Load from environment if available
+        # Load configuration overrides
         self._load_from_env()
+        if self.config is not None:
+            self._apply_config(self.config)
 
     def _load_from_env(self):
-        """Load scoring weights from environment variables"""
+        """Load scoring weights from environment variables."""
         try:
-            if os.getenv('SCORING_SEMANTIC_WEIGHT'):
-                self.weights.semantic = float(os.getenv('SCORING_SEMANTIC_WEIGHT'))
-            if os.getenv('SCORING_FTS_WEIGHT'):
-                self.weights.fts = float(os.getenv('SCORING_FTS_WEIGHT'))
-            if os.getenv('SCORING_FRESHNESS_WEIGHT'):
-                self.weights.freshness = float(os.getenv('SCORING_FRESHNESS_WEIGHT'))
-            if os.getenv('SCORING_SOURCE_WEIGHT'):
-                self.weights.source = float(os.getenv('SCORING_SOURCE_WEIGHT'))
-            if os.getenv('SCORING_TAU_HOURS'):
-                self.weights.tau_hours = int(os.getenv('SCORING_TAU_HOURS'))
-        except (ValueError, TypeError) as e:
-            logger.warning(f"Error loading scoring weights from env: {e}")
+            if os.getenv('W_SEMANTIC'):
+                self.weights.semantic = float(os.getenv('W_SEMANTIC'))
+            if os.getenv('W_FTS'):
+                self.weights.fts = float(os.getenv('W_FTS'))
+            if os.getenv('W_FRESH'):
+                self.weights.freshness = float(os.getenv('W_FRESH'))
+            if os.getenv('W_SOURCE'):
+                self.weights.source = float(os.getenv('W_SOURCE'))
+            if os.getenv('ASK_MIN_COSINE'):
+                self.weights.min_cosine_threshold = float(os.getenv('ASK_MIN_COSINE'))
+            if os.getenv('ASK_MAX_PER_DOMAIN'):
+                self.weights.max_per_domain = int(os.getenv('ASK_MAX_PER_DOMAIN'))
+        except (ValueError, TypeError) as exc:
+            logger.warning(f"Error loading scoring weights from env: {exc}")
+    def _apply_config(self, config: Any) -> None:
+        """Apply AskCommandConfig-derived weights and thresholds."""
+        try:
+            self.weights.semantic = getattr(config, 'semantic_weight', self.weights.semantic)
+            self.weights.fts = getattr(config, 'fts_weight', self.weights.fts)
+            self.weights.freshness = getattr(config, 'freshness_weight', self.weights.freshness)
+            self.weights.source = getattr(config, 'source_weight', self.weights.source)
+            self.weights.min_cosine_threshold = getattr(config, 'min_cosine_threshold', self.weights.min_cosine_threshold)
+            self.weights.require_dates_in_top_n = getattr(config, 'date_penalties_enabled', self.weights.require_dates_in_top_n)
+            self.weights.date_penalty_factor = getattr(config, 'date_penalty_factor', self.weights.date_penalty_factor)
+            self.weights.max_per_domain = getattr(config, 'max_per_domain', self.weights.max_per_domain)
+        except AttributeError as exc:
+            logger.debug("Config missing expected fields: %s", exc)
 
     def is_evergreen_query(self, query: str) -> bool:
         """Detect if query is evergreen content focused"""
@@ -337,49 +355,43 @@ class ProductionScorer:
 
         return filtered_results, dropped_count
 
-    def apply_category_penalties(self, results: List[Dict[str, Any]],
-                                 intent: str = "news_current_events") -> List[Dict[str, Any]]:
+    def apply_category_penalties(
+        self,
+        results: List[Dict[str, Any]],
+        intent: str = "news_current_events",
+        query: str = "",
+    ) -> Tuple[List[Dict[str, Any]], int]:
         """
-        Apply category-based penalties for irrelevant content types
+        Apply category-based penalties for irrelevant content types.
 
-        Categories penalized for news queries:
-        - Sports: -50% (unless query explicitly about sports)
-        - Entertainment/Celebrity: -40%
-        - Crime/Local incidents: -30%
-        - Weather: -20%
-
-        Args:
-            results: List of search results
-            intent: Query intent (general_qa or news_current_events)
-
-        Returns:
-            Results with category penalties applied
+        Returns a tuple of (results, penalties_applied).
         """
         if not results or intent != "news_current_events":
-            return results
+            return results, 0
 
-        # Category keywords and penalty factors
+        query_lower = (query or "").lower()
+
         category_penalties = {
             'sports': {
                 'keywords': ['game', 'match', 'score', 'playoff', 'championship', 'league',
-                           'football', 'basketball', 'baseball', 'soccer', 'tennis',
-                           'nfl', 'nba', 'mlb', 'uefa', 'fifa'],
-                'penalty': 0.5,  # -50%
+                             'football', 'basketball', 'baseball', 'soccer', 'tennis',
+                             'nfl', 'nba', 'mlb', 'uefa', 'fifa'],
+                'penalty': 0.5,
             },
             'entertainment': {
                 'keywords': ['celebrity', 'movie', 'film', 'actor', 'actress', 'hollywood',
-                           'oscars', 'grammy', 'emmy', 'music video', 'album', 'concert'],
-                'penalty': 0.6,  # -40%
+                             'oscars', 'grammy', 'emmy', 'music video', 'album', 'concert'],
+                'penalty': 0.6,
             },
             'crime': {
                 'keywords': ['arrest', 'charged', 'suspect', 'robbery', 'theft', 'murder',
-                           'shooting', 'stabbing', 'assault', 'police arrest'],
-                'penalty': 0.7,  # -30%
+                             'shooting', 'stabbing', 'assault', 'police arrest'],
+                'penalty': 0.7,
             },
             'weather': {
                 'keywords': ['forecast', 'temperature', 'rain', 'snow', 'storm warning',
-                           'weather alert', 'high of', 'low of'],
-                'penalty': 0.8,  # -20%
+                             'weather alert', 'high of', 'low of'],
+                'penalty': 0.8,
             },
         }
 
@@ -387,57 +399,52 @@ class ProductionScorer:
         penalties_applied = 0
 
         for result in results:
-            title = result.get('title', '').lower()
-            snippet = result.get('snippet', result.get('text', ''))[:200].lower()
+            title = (result.get('title', '') or '').lower()
+            snippet = (result.get('snippet', result.get('text', '')) or '')[:200].lower()
             combined_text = f"{title} {snippet}"
 
-            # Check each category
-            applied_penalty = None
+            applied_penalty = False
             for category, config in category_penalties.items():
-                # Count keyword matches
-                matches = sum(1 for keyword in config['keywords'] if keyword in combined_text)
+                if any(keyword in query_lower for keyword in config['keywords']):
+                    continue  # User explicitly asked for this category
 
-                # Apply penalty if 2+ keywords match
+                matches = sum(1 for keyword in config['keywords'] if keyword in combined_text)
                 if matches >= 2:
                     penalty_factor = config['penalty']
                     original_score = result.get('scores', {}).get('final', 0.5)
                     result['scores']['final'] = original_score * penalty_factor
 
-                    # Add flag
                     flags = result.get('postflags', {})
                     flags[f'{category}_penalty'] = True
                     flags['category_penalty_factor'] = penalty_factor
                     result['postflags'] = flags
 
-                    applied_penalty = category
                     penalties_applied += 1
+                    applied_penalty = True
                     logger.debug(
-                        f"Category penalty ({category}): '{title[:50]}...' "
-                        f"(factor={penalty_factor}, matches={matches})"
+                        "Category penalty (%s): '%s' (factor=%s, matches=%s)",
+                        category,
+                        title[:50],
+                        penalty_factor,
+                        matches,
                     )
-                    break  # Only apply one category penalty
+                    break
 
             penalized_results.append(result)
 
         if penalties_applied > 0:
-            logger.info(f"Category penalties: applied to {penalties_applied}/{len(results)} articles")
+            logger.info("Category penalties: applied to %s/%s articles", penalties_applied, len(results))
 
-        return penalized_results
-
-    def apply_date_penalties(self, results: List[Dict[str, Any]],
-                            require_dates: bool = None) -> List[Dict[str, Any]]:
+        return penalized_results, penalties_applied
+    def apply_date_penalties(self, results: List[Dict[str, Any]], require_dates: bool = None) -> Tuple[List[Dict[str, Any]], int]:
         """
-        Apply penalties for missing publication dates
-
-        Args:
-            results: List of search results
-            require_dates: Whether to require dates (default from weights)
+        Apply penalties for missing publication dates.
 
         Returns:
-            Results with date penalties applied
+            Tuple of (results, penalties_applied)
         """
         if not results:
-            return results
+            return results, 0
 
         require = require_dates if require_dates is not None else self.weights.require_dates_in_top_n
         penalty_factor = self.weights.date_penalty_factor
@@ -447,19 +454,12 @@ class ProductionScorer:
 
         for result in results:
             published_at = result.get('published_at')
-
-            # Check if date is missing or invalid
-            has_date = bool(published_at)
-            if isinstance(published_at, str):
-                if published_at in ['None', '', 'null']:
-                    has_date = False
+            has_date = bool(published_at) and published_at not in ['None', '', 'null', None]
 
             if not has_date and require:
-                # Apply strong penalty
                 original_score = result.get('scores', {}).get('final', 0.5)
                 result['scores']['final'] = original_score * penalty_factor
 
-                # Add flag
                 flags = result.get('postflags', {})
                 flags['no_date_penalty'] = True
                 flags['date_penalty_factor'] = penalty_factor
@@ -467,17 +467,17 @@ class ProductionScorer:
 
                 no_date_count += 1
                 logger.debug(
-                    f"Date penalty: '{result.get('title', 'N/A')[:50]}...' "
-                    f"(factor={penalty_factor})"
+                    "Date penalty applied: '%s' (factor=%s)",
+                    (result.get('title', 'N/A') or '')[:60],
+                    penalty_factor,
                 )
 
             penalized_results.append(result)
 
         if no_date_count > 0:
-            logger.info(f"Date penalties: applied to {no_date_count}/{len(results)} articles without dates")
+            logger.info("Date penalties: applied to %s/%s articles without dates", no_date_count, len(results))
 
-        return penalized_results
-
+        return penalized_results, no_date_count
     def score_and_rank(self, results: List[Dict[str, Any]],
                       query: str,
                       apply_caps: bool = True,

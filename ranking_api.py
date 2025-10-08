@@ -19,6 +19,8 @@ from database.production_db_client import ProductionDBClient, SearchLogEntry
 from ranking_service.scorer import ProductionScorer, ScoringWeights
 from ranking_service.deduplication import DeduplicationEngine
 from ranking_service.diversification import MMRDiversifier
+from core.config import get_ask_config
+from core.metrics import get_metrics_collector
 from ranking_service.explainability import ExplainabilityEngine
 from openai_embedding_generator import OpenAIEmbeddingGenerator
 from caching_service import CachingService
@@ -60,35 +62,68 @@ class RankingAPI:
     """Production ranking API with full pipeline"""
 
     def __init__(self):
+        self.config = get_ask_config()
+        self.metrics = get_metrics_collector()
+
         self.db = ProductionDBClient()
-        self.scorer = ProductionScorer()
+        self.scorer = ProductionScorer(config=self.config)
         self.dedup_engine = DeduplicationEngine()
         self.diversifier = MMRDiversifier()
         self.explainer = ExplainabilityEngine()
         self.embedding_generator = OpenAIEmbeddingGenerator()
         self.cache = CachingService()
 
-        # Load dynamic weights from database
+        # Load dynamic weights from database / config overrides
         self._load_scoring_weights()
 
     def _load_scoring_weights(self):
-        """Load scoring weights from database configuration"""
+        """Load scoring weights from config, environment, and database overrides."""
+        weights = self.scorer.weights
+
+        # Config defaults
         try:
-            weights = self.db.get_scoring_weights()
-            if weights:
-                self.scorer.weights.semantic = weights.get('semantic', 0.58)
-                self.scorer.weights.fts = weights.get('fts', 0.32)
-                self.scorer.weights.freshness = weights.get('freshness', 0.06)
-                self.scorer.weights.source = weights.get('source', 0.04)
-                self.scorer.weights.tau_hours = weights.get('tau_hours', 72)
-                self.scorer.weights.max_per_domain = weights.get('max_per_domain', 3)
-                self.scorer.weights.max_per_article = weights.get('max_per_article', 2)
+            if self.config:
+                weights.semantic = getattr(self.config, 'semantic_weight', weights.semantic)
+                weights.fts = getattr(self.config, 'fts_weight', weights.fts)
+                weights.freshness = getattr(self.config, 'freshness_weight', weights.freshness)
+                weights.source = getattr(self.config, 'source_weight', weights.source)
+                weights.min_cosine_threshold = getattr(self.config, 'min_cosine_threshold', weights.min_cosine_threshold)
+                weights.require_dates_in_top_n = getattr(self.config, 'date_penalties_enabled', weights.require_dates_in_top_n)
+                weights.date_penalty_factor = getattr(self.config, 'date_penalty_factor', weights.date_penalty_factor)
+                weights.max_per_domain = getattr(self.config, 'max_per_domain', weights.max_per_domain)
+        except AttributeError:
+            pass
 
-                logger.info(f"Loaded scoring weights: {weights}")
+        # Environment overrides
+        weights.semantic = float(os.getenv('W_SEMANTIC', weights.semantic))
+        weights.fts = float(os.getenv('W_FTS', weights.fts))
+        weights.freshness = float(os.getenv('W_FRESH', weights.freshness))
+        weights.source = float(os.getenv('W_SOURCE', weights.source))
+        if os.getenv('ASK_MIN_COSINE'):
+            try:
+                weights.min_cosine_threshold = float(os.getenv('ASK_MIN_COSINE'))
+            except ValueError:
+                logger.warning('Invalid ASK_MIN_COSINE value; keeping %s', weights.min_cosine_threshold)
+        if os.getenv('ASK_MAX_PER_DOMAIN'):
+            try:
+                weights.max_per_domain = int(os.getenv('ASK_MAX_PER_DOMAIN'))
+            except ValueError:
+                logger.warning('Invalid ASK_MAX_PER_DOMAIN; keeping %s', weights.max_per_domain)
 
-        except Exception as e:
-            logger.warning(f"Failed to load scoring weights, using defaults: {e}")
-
+        # Database overrides
+        try:
+            db_weights = self.db.get_scoring_weights()
+            if db_weights:
+                weights.semantic = db_weights.get('semantic', weights.semantic)
+                weights.fts = db_weights.get('fts', weights.fts)
+                weights.freshness = db_weights.get('freshness', weights.freshness)
+                weights.source = db_weights.get('source', weights.source)
+                weights.tau_hours = db_weights.get('tau_hours', weights.tau_hours)
+                weights.max_per_domain = db_weights.get('max_per_domain', weights.max_per_domain)
+                weights.max_per_article = db_weights.get('max_per_article', weights.max_per_article)
+                logger.info(f"Loaded scoring weights (DB overrides): {db_weights}")
+        except Exception as exc:
+            logger.warning(f"Failed to load scoring weights, using configured defaults: {exc}")
     def _normalize_query(self, query: str) -> str:
         """Normalize query for consistent processing"""
         if not query:
@@ -281,7 +316,7 @@ class RankingAPI:
                 )
 
             # Step 2: Apply production scoring
-            scored_results = self.scorer.score_and_rank(candidates, query_normalized)
+            scored_results, _scoring_summary = self.scorer.score_and_rank(candidates, query_normalized)
 
             # Step 3: Apply deduplication (canonicalization)
             if len(scored_results) > 1:
@@ -372,99 +407,235 @@ class RankingAPI:
         sources: Optional[List[str]] = None,
         k_final: int = 5,
         use_rerank: bool = False,
-        intent: str = "news_current_events",  # NEW Sprint 2
-        filter_offtopic: bool = True,  # NEW Sprint 2
-        apply_category_penalties: bool = True,  # NEW Sprint 2
-        apply_date_penalties: bool = True  # NEW Sprint 2
-    ) -> List[Dict[str, Any]]:
-        """
-        Retrieve documents for analysis (trends/analyze commands)
+        intent: str = "news_current_events",
+        ensure_domain_diversity: bool = True,
+        require_dates: bool = True,
+        drop_offtopic: bool = True,
+        min_cosine: Optional[float] = None,
+        after_date: Optional[datetime] = None,
+        before_date: Optional[datetime] = None,
+        correlation_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Retrieve documents for /ask news-mode with ranking and diversity."""
+        overall_start = time.time()
+        metrics_payload: Dict[str, Any] = {"timings": {}}
 
-        Args:
-            query: Optional search query (None for trends without query)
-            window: Time window (6h, 12h, 24h, 1d, 3d, 1w, 2w, 1m, 3m, 6m, 1y)
-            lang: Language filter (ru, en, auto)
-            sources: Optional list of source domains to filter
-            k_final: Number of documents to return
-            use_rerank: Whether to use reranking (not implemented yet)
-            intent: Query intent (general_qa or news_current_events) [Sprint 2]
-            filter_offtopic: Apply off-topic guard (cosine < 0.28) [Sprint 2]
-            apply_category_penalties: Apply category penalties [Sprint 2]
-            apply_date_penalties: Apply date penalties [Sprint 2]
-
-        Returns:
-            List of document dictionaries with metadata
-        """
         try:
-            # Parse time window to hours
-            window_hours = {
-                "1h": 1, "6h": 6, "12h": 12,
-                "24h": 24, "1d": 24, "3d": 72,
-                "1w": 168, "2w": 336, "1m": 720,
-                "3m": 2160, "6m": 4320, "1y": 8760
-            }.get(window, 24)
+            window_key = (window or "7d").lower()
+            window_hours_map = {
+                "1h": 1,
+                "6h": 6,
+                "12h": 12,
+                "24h": 24,
+                "1d": 24,
+                "3d": 72,
+                "7d": 168,
+                "1w": 168,
+                "14d": 336,
+                "2w": 336,
+                "30d": 720,
+                "1m": 720,
+                "3m": 2160,
+                "6m": 4320,
+                "1y": 8760,
+            }
+            hours = window_hours_map.get(window_key, 168 if window_key in {"7d", "1w"} else 24)
 
-            # Build filters dict
-            filters = {}
+            filters: Dict[str, Any] = {}
             if sources:
-                filters['sources'] = sources
-            if lang and lang != 'auto':
-                filters['lang'] = lang
+                filters["sources"] = sources
+            if lang and lang != "auto":
+                filters["lang"] = lang
 
-            # If query provided, use hybrid search
-            if query:
-                query_normalized = self._normalize_query(query)
+            normalized_query = self._normalize_query(query or "")
+            query_embedding = None
+            if normalized_query:
+                try:
+                    embeddings = await self.embedding_generator.generate_embeddings([normalized_query])
+                    if embeddings and embeddings[0]:
+                        query_embedding = embeddings[0]
+                except Exception as embed_err:
+                    logger.warning("Failed to generate query embedding: %s", embed_err)
 
-                # Generate embedding
-                query_embeddings = await self.embedding_generator.generate_embeddings([query_normalized])
-                if not query_embeddings or not query_embeddings[0]:
-                    logger.warning("Failed to generate query embedding for retrieve_for_analysis")
-                    return []
+            db_start = time.time()
+            raw_results = await self.db.search_with_time_filter(
+                query=normalized_query,
+                query_embedding=query_embedding,
+                hours=hours,
+                limit=max(k_final * 4, 40),
+                filters=filters,
+                after_date=after_date,
+                before_date=before_date,
+                lang=lang,
+            )
+            metrics_payload["timings"]["db_query_ms"] = int((time.time() - db_start) * 1000)
 
-                query_embedding = query_embeddings[0]
+            logger.info(
+                "[%s] retrieve_for_analysis window=%s intent=%s results=%d",
+                correlation_id or "ask",
+                window,
+                intent,
+                len(raw_results),
+            )
 
-                # Search with time filter
-                results = await self.db.search_with_time_filter(
-                    query=query_normalized,
-                    query_embedding=query_embedding,
-                    hours=window_hours,
-                    limit=k_final * 2,  # Get more candidates
-                    filters=filters
+            if not raw_results:
+                metrics_payload.update(
+                    {
+                        "duplicates_removed": 0,
+                        "domains_diversity_index": 0.0,
+                        "with_date_ratio": 0.0,
+                        "offtopic_dropped": 0,
+                    }
                 )
-            else:
-                # No query - get recent articles for trends
-                results = await self.db.get_recent_articles(
-                    hours=window_hours,
-                    limit=k_final * 3,  # Get more for clustering
-                    filters=filters
-                )
+                metrics_payload["timings"]["ranking_ms"] = 0
+                metrics_payload["timings"]["end_to_end_ms"] = int((time.time() - overall_start) * 1000)
+                return {"docs": [], "metrics": metrics_payload}
 
-            # Apply scoring (NEW Sprint 2: pass intent and filter flags)
-            if results:
-                scored_results = self.scorer.score_and_rank(
-                    results,
-                    query or "",
-                    apply_caps=True,
-                    intent=intent,
-                    filter_offtopic=filter_offtopic,
-                    apply_category_penalties=apply_category_penalties,
-                    apply_date_penalties=apply_date_penalties
-                )
+            ranking_start = time.time()
+            scored_results, scoring_summary = self.scorer.score_and_rank(
+                raw_results,
+                normalized_query,
+                apply_caps=True,
+                intent=intent,
+                filter_offtopic=drop_offtopic,
+                apply_category_penalties=True,
+                apply_date_penalties=require_dates,
+                min_cosine=min_cosine,
+            )
+            metrics_payload["timings"]["ranking_ms"] = int((time.time() - ranking_start) * 1000)
 
-                # Apply deduplication
-                if len(scored_results) > 1:
-                    deduplicated = self.dedup_engine.canonicalize_articles(scored_results)
-                else:
-                    deduplicated = scored_results
+            deduped_results = self.dedup_engine.canonicalize_articles(scored_results)
+            duplicates_removed = len(scored_results) - len(deduped_results)
+            metrics_payload["duplicates_removed"] = max(0, duplicates_removed)
 
-                # Return top k_final
-                return deduplicated[:k_final]
+            diversified_results = self.diversifier.diversify_results(
+                deduped_results,
+                max_results=max(k_final * 2, 10),
+                ensure_domain_div=ensure_domain_diversity,
+            )
 
+            final_docs = diversified_results[:k_final]
+            if require_dates:
+                final_docs = self._enforce_date_requirement(final_docs)
+            if ensure_domain_diversity:
+                final_docs = self._ensure_minimum_domain_diversity(final_docs, diversified_results)
+
+            metrics_payload["domains_diversity_index"] = self._compute_domain_diversity_index(diversified_results, top_k=10)
+            metrics_payload["with_date_ratio"] = self._compute_with_date_ratio(diversified_results, top_k=10)
+            metrics_payload["offtopic_dropped"] = scoring_summary.get("offtopic_dropped", 0)
+            metrics_payload["category_penalties"] = scoring_summary.get("category_penalties", 0)
+            metrics_payload["date_penalties"] = scoring_summary.get("date_penalties", 0)
+            metrics_payload["timings"]["end_to_end_ms"] = int((time.time() - overall_start) * 1000)
+
+            return {"docs": final_docs, "metrics": metrics_payload}
+
+        except Exception as exc:
+            logger.error(f"retrieve_for_analysis failed: {exc}", exc_info=True)
+            metrics_payload.setdefault("timings", {})["end_to_end_ms"] = int((time.time() - overall_start) * 1000)
+            metrics_payload["error"] = str(exc)
+            return {"docs": [], "metrics": metrics_payload}
+    def _extract_domain(self, doc: Dict[str, Any]) -> str:
+        domain = doc.get("source_domain") or doc.get("domain") or doc.get("source") or ""
+        if not domain and doc.get("url"):
+            try:
+                from urllib.parse import urlparse
+
+                parsed = urlparse(doc["url"])
+                domain = parsed.netloc
+            except Exception:
+                domain = ""
+        return (domain or "").lower()
+
+    def _enforce_date_requirement(self, docs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        if not docs:
             return []
+        dated = [doc for doc in docs if doc.get("published_at")]
+        undated = [doc for doc in docs if not doc.get("published_at")]
+        return dated + undated
 
-        except Exception as e:
-            logger.error(f"retrieve_for_analysis failed: {e}", exc_info=True)
-            return []
+    def _ensure_minimum_domain_diversity(
+        self,
+        primary: List[Dict[str, Any]],
+        pool: List[Dict[str, Any]],
+        *,
+        min_unique: int = 3,
+        top_k: int = 5,
+    ) -> List[Dict[str, Any]]:
+        if not primary or min_unique <= 1:
+            return primary
+
+        top_range = min(top_k, len(primary))
+        domains = [self._extract_domain(doc) for doc in primary]
+        unique_top = {d for d in domains[:top_range] if d}
+        if len(unique_top) >= min_unique:
+            return primary
+
+        replacement_candidates: List[Dict[str, Any]] = []
+        seen = set(unique_top)
+        for doc in pool[top_range:]:
+            dom = self._extract_domain(doc)
+            if dom and dom not in seen:
+                replacement_candidates.append(doc)
+                seen.add(dom)
+                if len(seen) >= min_unique:
+                    break
+
+        if not replacement_candidates:
+            return primary
+
+        counts = {}
+        for dom in domains[:top_range]:
+            counts[dom] = counts.get(dom, 0) + 1
+
+        repl_iter = iter(replacement_candidates)
+        for idx in range(top_range - 1, -1, -1):
+            dom = domains[idx]
+            if counts.get(dom, 0) > 1:
+                try:
+                    candidate = next(repl_iter)
+                except StopIteration:
+                    break
+                candidate_domain = self._extract_domain(candidate)
+                if not candidate_domain:
+                    continue
+                primary[idx] = candidate
+                domains[idx] = candidate_domain
+                counts[dom] = counts.get(dom, 0) - 1
+                counts[candidate_domain] = counts.get(candidate_domain, 0) + 1
+                if len({d for d in domains[:top_range] if d}) >= min_unique:
+                    break
+
+        return primary
+
+    def _compute_domain_diversity_index(
+        self,
+        docs: List[Dict[str, Any]],
+        *,
+        top_k: int = 10,
+    ) -> float:
+        if not docs:
+            return 0.0
+        subset = docs[:top_k]
+        if not subset:
+            return 0.0
+        domains = {self._extract_domain(doc) for doc in subset if self._extract_domain(doc)}
+        if not subset:
+            return 0.0
+        return round(len(domains) / len(subset), 4)
+
+    def _compute_with_date_ratio(
+        self,
+        docs: List[Dict[str, Any]],
+        *,
+        top_k: int = 10,
+    ) -> float:
+        if not docs:
+            return 0.0
+        subset = docs[:top_k]
+        if not subset:
+            return 0.0
+        dated = sum(1 for doc in subset if doc.get("published_at"))
+        return round(dated / len(subset), 4)
 
     async def ask(self, query: str, limit_context: int = 5,
                  user_id: str = None) -> Dict[str, Any]:

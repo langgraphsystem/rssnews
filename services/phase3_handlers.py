@@ -7,6 +7,7 @@ import hashlib
 import logging
 import uuid
 from typing import Any, Dict, List, Optional, Tuple
+from datetime import datetime
 
 from core.orchestrator.phase3_orchestrator_new import Phase3Orchestrator
 from core.ux.formatter import format_for_telegram
@@ -47,6 +48,18 @@ class Phase3HandlerService:
                 raise
 
         raise TypeError(f"Unsupported Phase3 response type: {type(raw_response)!r}")
+
+    @staticmethod
+    def _serialize_datetime(value: Optional[Any]) -> Optional[str]:
+        """Serialize datetime-like values for callbacks."""
+        if value is None:
+            return None
+        if isinstance(value, datetime):
+            return value.isoformat()
+        try:
+            return str(value)
+        except Exception:
+            return None
 
     async def handle_ask_command(
         self,
@@ -127,7 +140,9 @@ class Phase3HandlerService:
                 "k_final": params.get("k_final", k_final),
                 "sources": sources or [],
                 "correlation_id": response_correlation,
-                "intent": intent,  # Add intent to meta
+                "intent": intent,
+                "after_date": self._serialize_datetime(after_date),
+                "before_date": self._serialize_datetime(before_date),
             }
 
             return self._augment_payload(payload, context=context_meta)
@@ -445,45 +460,65 @@ class Phase3HandlerService:
     # Helper methods
     # ------------------------------------------------------------------
 
-    def _augment_payload(self, payload: Dict[str, Any], *, context: Dict[str, Any]) -> Dict[str, Any]:
-        """Augment payload with context and buttons"""
+    def _augment_payload(
+        self,
+        payload: Dict[str, Any],
+        *,
+        context: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Augment payload with context metadata and control buttons"""
         enriched = dict(payload)
         enriched.setdefault("parse_mode", "Markdown")
-        enriched["context"] = context
 
-        # Add refresh button
-        buttons = []
-        refresh_button = self._build_refresh_button(context)
-        if refresh_button:
-            buttons.append(refresh_button)
+        context_copy = dict(context)
+        callback_key = context_copy.get("callback_key") or context_copy.get("correlation_id") or self._compact_query(context_copy.get("query", ""))
+        context_copy["callback_key"] = callback_key
+        enriched["context"] = context_copy
 
-        enriched["buttons"] = buttons
+        buttons: List[List[Dict[str, str]]] = []
+        existing = payload.get("buttons")
+        if existing:
+            buttons.extend(existing)
+
+        refresh_rows = self._build_refresh_button(context_copy)
+        if refresh_rows:
+            buttons.extend(refresh_rows)
+
+        enriched["buttons"] = buttons or None
         return enriched
 
-    def _build_refresh_button(self, context: Dict[str, Any]) -> List[Dict[str, str]]:
+    def _build_refresh_button(self, context: Dict[str, Any]) -> List[List[Dict[str, str]]]:
         """Build refresh button based on command"""
         command = context.get("command")
 
         if command == "ask":
-            query_key = self._compact_query(context.get("query", ""))
-            depth = context.get("depth", 3)
-            window = context.get("window", "24h")
-            return [{"text": "🔄 Повторить", "callback_data": f"ask:refresh:{query_key}:{depth}:{window}"}]
+            callback_key = context.get("callback_key") or self._compact_query(context.get("query", ""))
+            if context.get("intent") == "general_qa":
+                return []
+            rows: List[List[Dict[str, str]]] = []
+            rows.append([{ "text": "🔁 Show more", "callback_data": f"ask:more:{callback_key}" }])
+            rows.append([
+                { "text": "24h", "callback_data": f"ask:window:{callback_key}:24h" },
+                { "text": "7d", "callback_data": f"ask:window:{callback_key}:7d" },
+                { "text": "30d", "callback_data": f"ask:window:{callback_key}:30d" },
+            ])
+            rows.append([{ "text": "🏛 Only official", "callback_data": f"ask:official:{callback_key}" }])
+            return rows
 
-        elif command == "events":
+        if command == "events":
             topic = context.get("topic", "")
             window = context.get("window", "12h")
-            return [{"text": "🔄 Обновить", "callback_data": f"events:refresh:{topic}:{window}"}]
+            return [[{ "text": "🔄 Обновить", "callback_data": f"events:refresh:{topic}:{window}" }]]
 
-        elif command == "graph":
+        if command == "graph":
             query_key = self._compact_query(context.get("query", ""))
             hops = context.get("hops", 3)
             window = context.get("window", "24h")
-            return [{"text": "🔄 Перестроить", "callback_data": f"graph:refresh:{query_key}:{hops}:{window}"}]
+            return [[{ "text": "🔄 Перестроить", "callback_data": f"graph:refresh:{query_key}:{hops}:{window}" }]]
 
-        elif command == "memory":
+        if command == "memory":
             operation = context.get("operation", "recall")
-            return [{"text": "🔄 Обновить", "callback_data": f"memory:refresh:{operation}"}]
+            return [[{ "text": "🔄 Обновить", "callback_data": f"memory:refresh:{operation}" }]]
 
         return []
 
