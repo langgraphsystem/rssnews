@@ -81,10 +81,30 @@ class HealthCheckHandler(BaseHTTPRequestHandler):
     def handle_retrieve(self):
         """Handle /retrieve POST requests for search"""
         try:
+            # Capture common headers for tracing
+            req_id = (
+                self.headers.get('X-Request-Id')
+                or self.headers.get('OpenAI-Request-ID')
+                or self.headers.get('Openai-Request-Id')
+            )
             # Read request body
             content_length = int(self.headers.get('Content-Length', 0))
             body = self.rfile.read(content_length)
             request_data = json.loads(body.decode())
+
+            try:
+                q_preview = (request_data.get('query') or '')[:120].replace('\n', ' ')
+                logger.info(
+                    "[AB]/retrieve start | req_id=%s corr=%s hours=%s k=%s cursor=%s q='%s'",
+                    req_id,
+                    request_data.get('correlation_id'),
+                    request_data.get('hours'),
+                    request_data.get('k'),
+                    bool(request_data.get('cursor')),
+                    q_preview,
+                )
+            except Exception:
+                pass
 
             # Import RankingAPI
             from ranking_api import RankingAPI
@@ -227,9 +247,19 @@ class HealthCheckHandler(BaseHTTPRequestHandler):
             }
 
             self.send_json_response(200, response)
+            logger.info(
+                "[AB]/retrieve done | req_id=%s corr=%s returned=%s total=%s has_more=%s coverage=%.2f window=%s",
+                req_id,
+                correlation_id,
+                len(items),
+                total_available,
+                bool(next_cursor),
+                coverage,
+                window,
+            )
 
         except Exception as e:
-            logger.error(f"Retrieve endpoint error: {e}", exc_info=True)
+            logger.error(f"[AB]/retrieve fail | req_id={req_id} err={e}", exc_info=True)
             error_response = {
                 'error': {
                     'error_code': 'INTERNAL_ERROR',
