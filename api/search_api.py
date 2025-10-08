@@ -277,7 +277,11 @@ async def health_check():
 
 
 @app.post("/retrieve", response_model=RetrieveResponse)
-async def retrieve(request: RetrieveRequest):
+async def retrieve(
+    request: RetrieveRequest,
+    x_request_id: Optional[str] = Header(default=None, alias="X-Request-Id"),
+    openai_request_id: Optional[str] = Header(default=None, alias="OpenAI-Request-ID"),
+):
     """
     Main search endpoint for GPT Actions
 
@@ -300,10 +304,22 @@ async def retrieve(request: RetrieveRequest):
         # Convert hours to window
         window = _hours_to_window(request.hours)
 
-        # Log request
+        # Log request (safe)
+        req_id = x_request_id or openai_request_id
+        q_preview = (request.query or "")[:120].replace("\n", " ")
+        try:
+            filt_keys = list((request.filters or {}).keys())
+        except Exception:
+            filt_keys = []
         logger.info(
-            f"Retrieve: query='{request.query}', hours={request.hours}, "
-            f"k={request.k}, offset={offset}, correlation_id={request.correlation_id}"
+            "[AB]/retrieve start | req_id=%s corr=%s hours=%s k=%s offset=%s filters=%s q='%s'",
+            req_id,
+            request.correlation_id,
+            request.hours,
+            request.k,
+            offset,
+            filt_keys,
+            q_preview,
         )
 
         # Call RankingAPI's retrieve_for_analysis method
@@ -370,7 +386,7 @@ async def retrieve(request: RetrieveRequest):
         }
 
         # Return response
-        return RetrieveResponse(
+        resp = RetrieveResponse(
             items=items,
             next_cursor=next_cursor,
             total_available=total_available,
@@ -379,10 +395,23 @@ async def retrieve(request: RetrieveRequest):
             diagnostics=diagnostics
         )
 
+        logger.info(
+            "[AB]/retrieve done | req_id=%s corr=%s returned=%s total=%s has_more=%s coverage=%.2f window=%s",
+            req_id,
+            request.correlation_id,
+            len(items),
+            total_available,
+            bool(next_cursor),
+            coverage,
+            window,
+        )
+        return resp
+
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Retrieve endpoint error: {e}", exc_info=True)
+        req_id = locals().get("x_request_id") or locals().get("openai_request_id")
+        logger.error(f"[AB]/retrieve fail | req_id={req_id} corr={request.correlation_id} err={e}", exc_info=True)
         raise HTTPException(
             status_code=500,
             detail={"error_code": ErrorCode.INTERNAL_ERROR, "message": str(e)}
