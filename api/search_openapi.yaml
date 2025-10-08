@@ -138,10 +138,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
               examples:
-                invalid_filter:
-                  summary: Invalid filter
+                invalid_params:
+                  summary: Invalid parameters
                   value:
-                    code: "INVALID_FILTER"
+                    code: "INVALID_PARAMS"
                     message: "Invalid source filter: unknown-domain.com"
 
         '500':
@@ -154,8 +154,8 @@ paths:
                 server_error:
                   summary: Internal error
                   value:
-                    code: "SERVER_ERROR"
-                    message: "Database connection failed"
+                    code: "INTERNAL_ERROR"
+                    message: "Internal server error"
 
 components:
   securitySchemes:
