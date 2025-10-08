@@ -88,7 +88,6 @@ class HealthCheckHandler(BaseHTTPRequestHandler):
 
             # Import RankingAPI
             from ranking_api import RankingAPI
-            from pg_client_new import PgClientNew
             import asyncio
             import base64
 
@@ -118,10 +117,8 @@ class HealthCheckHandler(BaseHTTPRequestHandler):
             else:
                 window = "72h"
 
-            # Initialize clients
-            pg_dsn = os.getenv('PG_DSN')
-            pg_client = PgClientNew(pg_dsn)
-            ranking_api = RankingAPI(pg_client=pg_client)
+            # Initialize RankingAPI (creates its own DB client)
+            ranking_api = RankingAPI()
 
             # Run async retrieval
             async def do_retrieve():
