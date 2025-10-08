@@ -231,6 +231,73 @@ def _format_error_response(error_response: ErrorResponse) -> Dict[str, Any]:
     }
 
 
+def format_result_details(response: BaseAnalysisResponse, *, detail_type: str = "sources") -> str:
+    """Produce detailed Markdown text for callbacks (sources/insights/meta).
+
+    This is a lightweight utility used by orchestrator callbacks to render
+    additional details on demand. It intentionally avoids buttons and returns
+    plain Markdown text.
+    """
+    try:
+        dt = (detail_type or "sources").lower()
+        lines: List[str] = []
+
+        if dt in {"insight", "insights"}:
+            lines.append("🧩 Insights (detailed)")
+            if not response.insights:
+                lines.append("• No insights available")
+            else:
+                for i, ins in enumerate(response.insights, 1):
+                    refs = ", ".join(
+                        filter(
+                            None,
+                            [
+                                getattr(ref, "date", None)
+                                for ref in (ins.evidence_refs or [])
+                            ],
+                        )
+                    )
+                    lines.append(f"{i}. {ins.type}: {ins.text}")
+                    if refs:
+                        lines.append(f"   📅 {refs}")
+            return "\n".join(lines)
+
+        if dt in {"meta", "metrics", "details"}:
+            m = response.meta
+            lines.append("📊 Meta")
+            lines.append(f"Model: {m.model} ({m.version})")
+            lines.append(f"Confidence: {int(m.confidence*100)}%")
+            lines.append(f"Correlation ID: {m.correlation_id}")
+            if response.warnings:
+                lines.append("")
+                lines.append("⚠️ Warnings:")
+                for w in response.warnings[:5]:
+                    lines.append(f"• {w}")
+            return "\n".join(lines)
+
+        # Default: sources
+        lines.append("📰 Sources (full)")
+        if not response.evidence:
+            lines.append("• No sources available")
+        else:
+            for i, ev in enumerate(response.evidence, 1):
+                title = ev.title
+                url = ev.url or ""
+                date = ev.date or ""
+                if url:
+                    lines.append(f"{i}. [{title}]({url})")
+                else:
+                    lines.append(f"{i}. {title}")
+                if date:
+                    lines.append(f"   📅 {date}")
+                if ev.snippet:
+                    lines.append(f"   🧾 {ev.snippet}")
+        return "\n".join(lines)
+    except Exception as exc:
+        logger.error("format_result_details failed: %s", exc, exc_info=True)
+        return "❌ Failed to render details."
+
+
 def _build_evidence_index(evidence: List[Evidence]) -> Dict[str, Evidence]:
     index: Dict[str, Evidence] = {}
     for ev in evidence:
