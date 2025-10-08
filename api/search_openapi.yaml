@@ -4,7 +4,7 @@ info:
   description: |
     Search API endpoint for SearchAgent to retrieve news articles.
 
-    **Base URL:** https://search-api-production-XXXX.up.railway.app (replace with your Railway service URL)
+    **Base URL:** https://rssnews-production-eaa2.up.railway.app
 
     **Authentication:** Optional (can be configured with Railway environment variables)
   version: 1.0.0
@@ -12,9 +12,9 @@ info:
     name: RSS News API
 
 servers:
-  - url: https://search-api-production-XXXX.up.railway.app
-    description: Production (Railway)
-  - url: http://localhost:8001
+  - url: https://rssnews-production-eaa2.up.railway.app
+    description: Production (Railway Bot Service)
+  - url: http://localhost:8080
     description: Local development
 
 security:
