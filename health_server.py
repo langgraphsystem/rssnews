@@ -120,6 +120,10 @@ class HealthCheckHandler(BaseHTTPRequestHandler):
             # Initialize RankingAPI (creates its own DB client)
             ranking_api = RankingAPI()
 
+            # Extract filters
+            sources = filters.get('sources') if filters else None
+            lang = filters.get('lang', 'auto') if filters else 'auto'
+
             # Run async retrieval
             async def do_retrieve():
                 k_total = k + offset
@@ -128,7 +132,8 @@ class HealthCheckHandler(BaseHTTPRequestHandler):
                     window=window,
                     k_final=k_total,
                     intent="news_current_events",
-                    filters=filters
+                    sources=sources,
+                    lang=lang
                 )
                 return results
 
