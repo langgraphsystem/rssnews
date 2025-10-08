@@ -52,7 +52,9 @@ async def retrieval_node(state: Dict[str, Any]) -> Dict[str, Any]:
             lang=lang,
             sources=sources,
             k_final=k_final,
-            use_rerank=use_rerank
+            use_rerank=use_rerank,
+            intent='news_current_events',
+            correlation_id=state.get('correlation_id')
         )
 
         # DEGRADATION: If no docs, try expanding window
@@ -82,7 +84,9 @@ async def retrieval_node(state: Dict[str, Any]) -> Dict[str, Any]:
                     lang=lang,
                     sources=sources,
                     k_final=k_final,
-                    use_rerank=use_rerank
+                    use_rerank=use_rerank,
+                    intent='news_current_events',
+                    correlation_id=state.get('correlation_id')
                 )
 
                 if docs:
@@ -99,7 +103,9 @@ async def retrieval_node(state: Dict[str, Any]) -> Dict[str, Any]:
                 lang=lang,
                 sources=sources,
                 k_final=k_final,
-                use_rerank=False
+                use_rerank=False,
+                intent='news_current_events',
+                correlation_id=state.get('correlation_id')
             )
 
         # DEGRADATION: If still no docs, increase k_final
@@ -113,7 +119,9 @@ async def retrieval_node(state: Dict[str, Any]) -> Dict[str, Any]:
                 lang=lang,
                 sources=sources,
                 k_final=10,
-                use_rerank=False
+                use_rerank=False,
+                intent='news_current_events',
+                correlation_id=state.get('correlation_id')
             )
 
         # Update state

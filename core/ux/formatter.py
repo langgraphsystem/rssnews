@@ -66,7 +66,7 @@ def _format_general_qa_response(response: BaseAnalysisResponse) -> Dict[str, Any
     return {
         "text": "\n".join(lines).strip(),
         "buttons": None,
-        "parse_mode": "Markdown",
+        "parse_mode": "MarkdownV2",
     }
 
 
@@ -98,7 +98,7 @@ def _format_news_response(response: BaseAnalysisResponse) -> Dict[str, Any]:
     return {
         "text": "\n".join(lines).strip(),
         "buttons": None,  # Buttons injected later by Phase3 handlers
-        "parse_mode": "Markdown",
+        "parse_mode": "MarkdownV2",
     }
 
 
@@ -204,7 +204,7 @@ def _format_legacy_success_response(response: BaseAnalysisResponse) -> Dict[str,
     return {
         "text": text,
         "buttons": buttons,
-        "parse_mode": "Markdown"
+        "parse_mode": "MarkdownV2"
     }
 
 
@@ -227,7 +227,7 @@ def _format_error_response(error_response: ErrorResponse) -> Dict[str, Any]:
     return {
         "text": text,
         "buttons": None,
-        "parse_mode": "Markdown"
+        "parse_mode": "MarkdownV2"
     }
 
 
@@ -281,17 +281,17 @@ def format_result_details(response: BaseAnalysisResponse, *, detail_type: str = 
             lines.append("• No sources available")
         else:
             for i, ev in enumerate(response.evidence, 1):
-                title = ev.title
+                title = _escape_markdown(ev.title)
                 url = ev.url or ""
                 date = ev.date or ""
+                # Avoid Markdown links to prevent parse errors; print plain URL
+                lines.append(f"{i}. {title}")
                 if url:
-                    lines.append(f"{i}. [{title}]({url})")
-                else:
-                    lines.append(f"{i}. {title}")
+                    lines.append(f"   🔗 {url}")
                 if date:
                     lines.append(f"   📅 {date}")
                 if ev.snippet:
-                    lines.append(f"   🧾 {ev.snippet}")
+                    lines.append(f"   🧾 {_escape_markdown(ev.snippet)}")
         return "\n".join(lines)
     except Exception as exc:
         logger.error("format_result_details failed: %s", exc, exc_info=True)

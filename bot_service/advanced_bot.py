@@ -253,7 +253,7 @@ class AdvancedRSSBot:
 
     async def _send_message(self, chat_id: str, text: str,
                            reply_markup: Dict = None,
-                           parse_mode: str = "Markdown") -> bool:
+                           parse_mode: str = "MarkdownV2") -> bool:
         """Send message to Telegram chat with rate limiting"""
         try:
             logger.debug(f"📤 Sending message to chat {chat_id}: {text[:100]}...")
@@ -378,7 +378,7 @@ class AdvancedRSSBot:
 
     async def _send_long_message(self, chat_id: str, text: str,
                                 reply_markup: Dict = None,
-                                parse_mode: str = "Markdown") -> bool:
+                                parse_mode: str = "MarkdownV2") -> bool:
         """Send long message, splitting if necessary"""
         max_length = 4000
 
