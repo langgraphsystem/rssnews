@@ -141,9 +141,12 @@ class HealthCheckHandler(BaseHTTPRequestHandler):
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
             try:
-                results = loop.run_until_complete(do_retrieve())
+                result_dict = loop.run_until_complete(do_retrieve())
             finally:
                 loop.close()
+
+            # Extract docs from result dict
+            results = result_dict.get('docs', []) if isinstance(result_dict, dict) else []
 
             # Paginate results
             paginated_results = results[offset:offset + k] if results else []

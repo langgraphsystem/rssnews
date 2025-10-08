@@ -464,9 +464,6 @@ class RankingAPI:
                 hours=hours,
                 limit=max(k_final * 4, 40),
                 filters=filters,
-                after_date=after_date,
-                before_date=before_date,
-                lang=lang,
             )
             metrics_payload["timings"]["db_query_ms"] = int((time.time() - db_start) * 1000)
 
