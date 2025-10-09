@@ -146,7 +146,9 @@ def _build_source_entries(evidence: List[Evidence]) -> List[str]:
         url = ev.url or ""
         date_text = _format_iso_date(ev.date) or "Date unknown"
         domain = _escape_markdown(_extract_domain(url)) if url else "Unknown domain"
-        snippet = _escape_markdown(_truncate(ev.snippet or ev.text or "", 160))
+        # Evidence model guarantees 'snippet'; avoid accessing non-existent 'text'
+        snippet_raw = getattr(ev, 'snippet', None)
+        snippet = _escape_markdown(_truncate(snippet_raw or "", 160))
 
         if url:
             entries.append(f"- [{title}]({url}) · {date_text} · {domain}")

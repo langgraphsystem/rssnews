@@ -207,17 +207,42 @@ class ModelRouter:
 
         actual_model = self.MODEL_MAP.get(model_name, model_name)
 
-        response = await self.openai_client.chat.completions.create(
-            model=actual_model,
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=max_tokens,
-            temperature=temperature
-        )
-
-        content = response.choices[0].message.content
-        tokens = response.usage.total_tokens
-
-        return content, tokens
+        # Some newer models (e.g., gpt-5 family) reject 'max_tokens' on chat.completions and
+        # expect 'max_completion_tokens' via Responses API. Try chat.completions first,
+        # then gracefully retry with Responses API if we hit a 400 parameter error.
+        try:
+            response = await self.openai_client.chat.completions.create(
+                model=actual_model,
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=max_tokens,
+                temperature=temperature
+            )
+            content = response.choices[0].message.content
+            tokens = getattr(response, 'usage', None).total_tokens if getattr(response, 'usage', None) else self._estimate_tokens(prompt, content)
+            return content, tokens
+        except Exception as e:
+            msg = str(e)
+            if "Unsupported parameter" in msg and "max_tokens" in msg:
+                # Retry using Responses API with 'max_completion_tokens'
+                try:
+                    resp = await self.openai_client.responses.create(
+                        model=actual_model,
+                        input=prompt,
+                        max_completion_tokens=max_tokens,
+                        temperature=temperature
+                    )
+                    # Responses API returns content in a different structure
+                    content = "".join([
+                        (blk.text or "") if hasattr(blk, 'text') else ''.join(
+                            [part.text for part in getattr(blk, 'content', []) if hasattr(part, 'text')]
+                        ) for blk in getattr(resp, 'output', [])
+                    ]) or (getattr(resp, 'output_text', None) or "")
+                    tokens = getattr(resp, 'usage', None).total_tokens if getattr(resp, 'usage', None) else self._estimate_tokens(prompt, content)
+                    return content, tokens
+                except Exception as e2:
+                    raise ModelUnavailableError(f"OpenAI Responses API fallback failed: {e2}")
+            raise
+        
 
     async def _call_anthropic(
         self,
