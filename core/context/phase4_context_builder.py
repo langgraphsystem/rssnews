@@ -366,7 +366,10 @@ class Phase4ContextBuilder:
         query = self._build_retrieval_query(params)
 
         # Attempt 1: Normal
-        docs = await self._retrieve_docs(query, window, lang, sources, k_final, rerank_enabled)
+        docs = await self._retrieve_docs(
+            query, window, lang, sources, k_final, rerank_enabled,
+            correlation_id=correlation_id, intent="phase4_context"
+        )
 
         if docs:
             return self._build_retrieval_dict(docs, window, lang, sources, k_final, rerank_enabled), warnings
@@ -380,7 +383,10 @@ class Phase4ContextBuilder:
                     break
                 window = new_window
                 warnings.append(f"expanded window to {window}")
-                docs = await self._retrieve_docs(query, window, lang, sources, k_final, rerank_enabled)
+                docs = await self._retrieve_docs(
+                    query, window, lang, sources, k_final, rerank_enabled,
+                    correlation_id=correlation_id, intent="phase4_context"
+                )
                 if docs:
                     return self._build_retrieval_dict(docs, window, lang, sources, k_final, rerank_enabled), warnings
 
@@ -389,7 +395,10 @@ class Phase4ContextBuilder:
             lang = "auto"
             sources = None
             warnings.append("relaxed filters (lang=auto, no sources)")
-            docs = await self._retrieve_docs(query, window, lang, sources, k_final, rerank_enabled)
+            docs = await self._retrieve_docs(
+                query, window, lang, sources, k_final, rerank_enabled,
+                correlation_id=correlation_id, intent="phase4_context"
+            )
             if docs:
                 return self._build_retrieval_dict(docs, window, lang, sources, k_final, rerank_enabled), warnings
 
@@ -398,7 +407,10 @@ class Phase4ContextBuilder:
             rerank_enabled = False
             k_final = 10
             warnings.append("disabled rerank, k_final=10")
-            docs = await self._retrieve_docs(query, window, lang, sources, k_final, rerank_enabled)
+            docs = await self._retrieve_docs(
+                query, window, lang, sources, k_final, rerank_enabled,
+                correlation_id=correlation_id, intent="phase4_context"
+            )
             if docs:
                 return self._build_retrieval_dict(docs, window, lang, sources, k_final, rerank_enabled), warnings
 
@@ -422,7 +434,10 @@ class Phase4ContextBuilder:
         lang: str,
         sources: Optional[List[str]],
         k_final: int,
-        rerank_enabled: bool
+        rerank_enabled: bool,
+        *,
+        correlation_id: str,
+        intent: str
     ) -> List[Dict[str, Any]]:
         """Perform retrieval"""
         try:
@@ -433,7 +448,9 @@ class Phase4ContextBuilder:
                 lang=lang,
                 sources=sources,
                 k_final=k_final,
-                use_rerank=rerank_enabled
+                use_rerank=rerank_enabled,
+                intent=intent,
+                correlation_id=correlation_id
             )
 
             docs = resp.get("docs", []) if isinstance(resp, dict) else resp

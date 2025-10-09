@@ -383,7 +383,8 @@ class Phase3ContextBuilder:
 
         # Attempt 1: Normal retrieval
         docs = await self._retrieve_docs(
-            query, window, lang, sources, k_final, rerank_enabled
+            query, window, lang, sources, k_final, rerank_enabled,
+            correlation_id=correlation_id, intent="news_current_events"
         )
 
         if docs:
@@ -411,7 +412,8 @@ class Phase3ContextBuilder:
                 warnings.append(f"expanded window to {window}")
 
                 docs = await self._retrieve_docs(
-                    query, window, lang, sources, k_final, rerank_enabled
+                    query, window, lang, sources, k_final, rerank_enabled,
+                    correlation_id=correlation_id, intent="news_current_events"
                 )
 
                 if docs:
@@ -426,7 +428,8 @@ class Phase3ContextBuilder:
             warnings.append("relaxed lang to auto, removed source filters")
 
             docs = await self._retrieve_docs(
-                query, window, lang, sources, k_final, rerank_enabled
+                query, window, lang, sources, k_final, rerank_enabled,
+                correlation_id=correlation_id, intent="news_current_events"
             )
 
             if docs:
@@ -441,7 +444,8 @@ class Phase3ContextBuilder:
             warnings.append("disabled rerank, increased k_final to 10")
 
             docs = await self._retrieve_docs(
-                query, window, lang, sources, k_final, rerank_enabled
+                query, window, lang, sources, k_final, rerank_enabled,
+                correlation_id=correlation_id, intent="news_current_events"
             )
 
             if docs:
@@ -473,7 +477,10 @@ class Phase3ContextBuilder:
         lang: str,
         sources: Optional[List[str]],
         k_final: int,
-        rerank_enabled: bool
+        rerank_enabled: bool,
+        *,
+        correlation_id: str,
+        intent: str
     ) -> List[Dict[str, Any]]:
         """Perform actual retrieval"""
         try:
@@ -485,7 +492,9 @@ class Phase3ContextBuilder:
                 sources=sources,
                 k_final=k_final,
                 use_rerank=rerank_enabled,
-                use_cache=False
+                use_cache=False,
+                intent=intent,
+                correlation_id=correlation_id
             )
 
             docs = resp.get("docs", []) if isinstance(resp, dict) else resp
