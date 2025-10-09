@@ -80,6 +80,8 @@ class AskMetricsCollector:
         self.retrieval_executed_total = MetricCounter("ask_retrieval_executed_total")
         self.retrieval_empty_results_total = MetricCounter("ask_retrieval_empty_results_total")
         self.retrieval_window_expansion_total = MetricCounter("ask_retrieval_window_expansion_total")
+        # Optional cache hits (used by RetrievalClient)
+        self.retrieval_cache_hits_total = MetricCounter("ask_retrieval_cache_hits_total")
 
         # Retrieval results distribution
         self.retrieval_results_count_histogram = MetricHistogram("ask_retrieval_results_count")
@@ -106,6 +108,8 @@ class AskMetricsCollector:
         self.response_time_histogram = MetricHistogram("ask_response_time_seconds")
         self.llm_calls_total = MetricCounter("ask_llm_calls_total")
         self.llm_tokens_histogram = MetricHistogram("ask_llm_tokens")
+        # Generic latency buckets by name (populated on first use)
+        self.latency_histograms: Dict[str, MetricHistogram] = {}
 
         # Quality metrics
         self.top10_unique_domains_histogram = MetricHistogram("ask_top10_unique_domains")
@@ -140,6 +144,18 @@ class AskMetricsCollector:
     # RETRIEVAL METRICS
     # ==========================================================================
 
+    # Backward-compat helpers expected by RetrievalClient
+    def record_retrieval_cached(self, intent: str):
+        """Record cache hit during retrieval (no-op compatible)."""
+        with self._lock:
+            self.retrieval_cache_hits_total.increment()
+            logger.debug(f"Metrics: Retrieval cache hit (intent={intent})")
+
+    def record_retrieval_attempt(self, intent: str, window: str):
+        """Record retrieval attempt start (lightweight)."""
+        # Intentionally lightweight to avoid double-counting; actual results recorded later
+        logger.debug(f"Metrics: Retrieval attempt (intent={intent}, window={window})")
+
     def record_retrieval_bypassed(self):
         """Record that retrieval was bypassed (general-QA mode)"""
         with self._lock:
@@ -162,6 +178,14 @@ class AskMetricsCollector:
 
             logger.debug(f"Metrics: Retrieval executed window={window}, results={results_count}")
 
+    def record_retrieval_success(self, window: str, results_count: int):
+        """Alias to record successful retrieval (maps to executed)."""
+        self.record_retrieval_executed(window, results_count)
+
+    def record_retrieval_no_candidates(self, window: str):
+        """Alias to record empty retrieval result."""
+        self.record_retrieval_executed(window, 0)
+
     def record_window_expansion(self, original_window: str, expanded_window: str):
         """Record window expansion event"""
         with self._lock:
@@ -177,6 +201,10 @@ class AskMetricsCollector:
         with self._lock:
             self.filter_offtopic_dropped_total.increment(dropped_count)
             logger.debug(f"Metrics: Off-topic filtering dropped {dropped_count} articles")
+
+    # Compatibility name used by RetrievalClient
+    def record_offtopic_dropped(self, dropped_count: int):
+        self.record_offtopic_filtering(dropped_count)
 
     def record_category_penalty(self, category: str):
         """Record category penalty application"""
@@ -194,6 +222,33 @@ class AskMetricsCollector:
         with self._lock:
             self.filter_domain_diversity_dropped_total.increment(dropped_count)
             logger.debug(f"Metrics: Domain diversity dropped {dropped_count} articles")
+
+    # Compatibility helpers for RetrievalClient telemetry
+    def record_duplicates_removed(self, count: int):
+        with self._lock:
+            # Reuse duplicates_found counter to reflect removals
+            self.dedup_duplicates_found_total.increment(count)
+            logger.debug(f"Metrics: Duplicates removed {count}")
+
+    def record_domains_diversity_index(self, value: float):
+        with self._lock:
+            # Reuse unique domains histogram to store diversity index proxy
+            self.top10_unique_domains_histogram.observe(value)
+            logger.debug(f"Metrics: Domains diversity index {value}")
+
+    def record_with_date_ratio(self, value: float):
+        with self._lock:
+            # Reuse dated articles percentage histogram
+            self.top10_dated_articles_percentage_histogram.observe(value)
+            logger.debug(f"Metrics: With-date ratio {value}")
+
+    def record_latency_metric(self, name: str, value_ms: float):
+        with self._lock:
+            if name not in self.latency_histograms:
+                metric_name = f"ask_latency_{name}"
+                self.latency_histograms[name] = MetricHistogram(metric_name)
+            self.latency_histograms[name].observe(float(value_ms))
+            logger.debug(f"Metrics: latency {name}={value_ms}ms")
 
     # ==========================================================================
     # DEDUPLICATION METRICS
