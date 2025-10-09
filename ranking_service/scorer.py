@@ -478,13 +478,17 @@ class ProductionScorer:
             logger.info("Date penalties: applied to %s/%s articles without dates", no_date_count, len(results))
 
         return penalized_results, no_date_count
-    def score_and_rank(self, results: List[Dict[str, Any]],
-                      query: str,
-                      apply_caps: bool = True,
-                      intent: str = "news_current_events",
-                      filter_offtopic: bool = True,
-                      apply_category_penalties: bool = True,
-                      apply_date_penalties: bool = True) -> List[Dict[str, Any]]:
+    def score_and_rank(
+        self,
+        results: List[Dict[str, Any]],
+        query: str,
+        apply_caps: bool = True,
+        intent: str = "news_current_events",
+        filter_offtopic: bool = True,
+        apply_category_penalties: bool = True,
+        apply_date_penalties: bool = True,
+        min_cosine: Optional[float] = None,
+    ) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
         """
         Complete scoring pipeline with filtering and penalties
 
@@ -494,11 +498,14 @@ class ProductionScorer:
         - Date penalties (missing published_at)
         """
         if not results:
-            return results
+            return results, {"offtopic_dropped": 0, "category_penalties": 0, "date_penalties": 0}
+
+        summary = {"offtopic_dropped": 0, "category_penalties": 0, "date_penalties": 0}
 
         # Step 1: Filter off-topic articles
         if filter_offtopic:
-            results, dropped = self.filter_offtopic(results, query)
+            results, dropped = self.filter_offtopic(results, query, threshold=min_cosine)
+            summary["offtopic_dropped"] = dropped
             if dropped > 0:
                 logger.info(f"Off-topic filter: {dropped} articles dropped")
 
@@ -507,11 +514,13 @@ class ProductionScorer:
 
         # Step 3: Apply category penalties (NEW Sprint 2)
         if apply_category_penalties:
-            scored_results = self.apply_category_penalties(scored_results, intent)
+            scored_results, cat_count = self.apply_category_penalties(scored_results, intent, query)
+            summary["category_penalties"] = cat_count
 
         # Step 4: Apply date penalties (NEW Sprint 2)
-        if apply_date_penalties:
-            scored_results = self.apply_date_penalties(scored_results)
+        if apply_date_penalties is not None:
+            scored_results, date_count = self.apply_date_penalties(scored_results, require_dates=apply_date_penalties)
+            summary["date_penalties"] = date_count
 
         # Step 5: Apply duplicate penalties
         penalized_results = self.calculate_penalties(scored_results)
@@ -526,4 +535,4 @@ class ProductionScorer:
         final_results.sort(key=lambda x: x['scores']['final'], reverse=True)
 
         logger.info(f"Scoring complete: {len(results)} -> {len(final_results)} final results")
-        return final_results
+        return final_results, summary
