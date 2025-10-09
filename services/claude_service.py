@@ -17,9 +17,10 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class ClaudeConfig:
-    """Configuration for Claude API"""
+    """Configuration for Claude API (Sonnet 4.5 only)"""
     api_key: str
-    model: str = "claude-3-5-sonnet-20241022"  # Claude Sonnet 4
+    # Force Sonnet 4.5 by default; allow override via env
+    model: str = os.getenv("ANTHROPIC_CLAUDE_MODEL", "claude-4.5-sonnet")
     max_tokens: int = 4000
     temperature: float = 0.3
     timeout: int = 30

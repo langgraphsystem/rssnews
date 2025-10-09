@@ -41,7 +41,9 @@ class ModelRouter:
         "gpt-5-mini": os.getenv('OPENAI_GPT5_MINI_MODEL', 'gpt-5-mini'),
         "gpt-5-nano": os.getenv('OPENAI_GPT5_NANO_MODEL', 'gpt-5-nano'),
         "gpt-3.5-turbo": "gpt-3.5-turbo",
-        "claude-4.5": os.getenv('ANTHROPIC_CLAUDE_MODEL', 'claude-3-5-sonnet-20241022'),
+        # Force Anthropic to use Claude Sonnet 4.5 only (configurable via ANTHROPIC_CLAUDE_MODEL)
+        # If env var not set, default to 'claude-4.5-sonnet'.
+        "claude-4.5": os.getenv('ANTHROPIC_CLAUDE_MODEL', 'claude-4.5-sonnet'),
         "gemini-2.5-pro": os.getenv('GOOGLE_GEMINI_MODEL', 'gemini-1.5-pro-latest')
     }
 
