@@ -426,7 +426,8 @@ class Phase4ContextBuilder:
     ) -> List[Dict[str, Any]]:
         """Perform retrieval"""
         try:
-            docs = await self.retrieval_client.retrieve(
+            # RetrievalClient.retrieve returns a dict with 'docs' and telemetry
+            resp = await self.retrieval_client.retrieve(
                 query=query,
                 window=window,
                 lang=lang,
@@ -434,6 +435,8 @@ class Phase4ContextBuilder:
                 k_final=k_final,
                 use_rerank=rerank_enabled
             )
+
+            docs = resp.get("docs", []) if isinstance(resp, dict) else resp
 
             cleaned_docs = []
             for doc in docs:

@@ -46,7 +46,7 @@ async def retrieval_node(state: Dict[str, Any]) -> Dict[str, Any]:
         )
 
         # Retrieve documents
-        docs = await client.retrieve(
+        resp = await client.retrieve(
             query=query,
             window=window,
             lang=lang,
@@ -56,6 +56,7 @@ async def retrieval_node(state: Dict[str, Any]) -> Dict[str, Any]:
             intent='news_current_events',
             correlation_id=state.get('correlation_id')
         )
+        docs = resp.get("docs", []) if isinstance(resp, dict) else resp
 
         # DEGRADATION: If no docs, try expanding window
         if not docs:
@@ -78,7 +79,7 @@ async def retrieval_node(state: Dict[str, Any]) -> Dict[str, Any]:
                 logger.info(f"Degradation step 1: Expanding window to {expanded_window}")
                 warnings.append(f"degradation_window_expanded: {window} → {expanded_window}")
 
-                docs = await client.retrieve(
+                resp = await client.retrieve(
                     query=query,
                     window=expanded_window,
                     lang=lang,
@@ -88,6 +89,7 @@ async def retrieval_node(state: Dict[str, Any]) -> Dict[str, Any]:
                     intent='news_current_events',
                     correlation_id=state.get('correlation_id')
                 )
+                docs = resp.get("docs", []) if isinstance(resp, dict) else resp
 
                 if docs:
                     window = expanded_window  # Update for meta
@@ -97,7 +99,7 @@ async def retrieval_node(state: Dict[str, Any]) -> Dict[str, Any]:
             logger.warning(f"Still no docs, degradation step 2: disabling rerank")
             warnings.append("degradation_rerank_disabled")
 
-            docs = await client.retrieve(
+            resp = await client.retrieve(
                 query=query,
                 window=window,
                 lang=lang,
@@ -107,13 +109,14 @@ async def retrieval_node(state: Dict[str, Any]) -> Dict[str, Any]:
                 intent='news_current_events',
                 correlation_id=state.get('correlation_id')
             )
+            docs = resp.get("docs", []) if isinstance(resp, dict) else resp
 
         # DEGRADATION: If still no docs, increase k_final
         if not docs and k_final < 10:
             logger.warning(f"Still no docs, degradation step 3: increasing k_final to 10")
             warnings.append("degradation_k_final_increased")
 
-            docs = await client.retrieve(
+            resp = await client.retrieve(
                 query=query,
                 window=window,
                 lang=lang,
@@ -123,6 +126,7 @@ async def retrieval_node(state: Dict[str, Any]) -> Dict[str, Any]:
                 intent='news_current_events',
                 correlation_id=state.get('correlation_id')
             )
+            docs = resp.get("docs", []) if isinstance(resp, dict) else resp
 
         # Update state
         state["docs"] = docs

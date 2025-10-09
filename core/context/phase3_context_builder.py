@@ -477,14 +477,18 @@ class Phase3ContextBuilder:
     ) -> List[Dict[str, Any]]:
         """Perform actual retrieval"""
         try:
-            docs = await self.retrieval_client.retrieve(
+            # RetrievalClient.retrieve returns a dict with 'docs' and telemetry
+            resp = await self.retrieval_client.retrieve(
                 query=query,
                 window=window,
                 lang=lang,
                 sources=sources,
                 k_final=k_final,
-                use_rerank=rerank_enabled
+                use_rerank=rerank_enabled,
+                use_cache=False
             )
+
+            docs = resp.get("docs", []) if isinstance(resp, dict) else resp
 
             # Clean and validate docs
             cleaned_docs = []
