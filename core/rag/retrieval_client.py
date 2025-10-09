@@ -23,6 +23,11 @@ _SYN_ONTOLOGY: Dict[str, List[str]] = {
     "ai regulation": ["ai act", "artificial intelligence law", "ai law"],
     "sanction": ["sanctions", "penalties"],
     "election": ["vote", "poll"],
+    # Lightweight typo-corrections for common entities
+    # Appended to query to preserve user intent while improving recall
+    "tump": ["trump"],
+    "bidon": ["biden"],
+    "pudin": ["putin"],
 }
 
 _OFFICIAL_SOURCES: List[str] = [
