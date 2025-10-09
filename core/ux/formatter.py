@@ -150,10 +150,11 @@ def _build_source_entries(evidence: List[Evidence]) -> List[str]:
         snippet_raw = getattr(ev, 'snippet', None)
         snippet = _escape_markdown(_truncate(snippet_raw or "", 160))
 
+        bullet = "•"  # Use Unicode bullet to avoid Telegram MarkdownV2 '-' escape issues
         if url:
-            entries.append(f"- [{title}]({url}) · {date_text} · {domain}")
+            entries.append(f"{bullet} [{title}]({url}) · {date_text} · {domain}")
         else:
-            entries.append(f"- {title} · {date_text} · {domain}")
+            entries.append(f"{bullet} {title} · {date_text} · {domain}")
         if snippet:
             entries.append(f"  {snippet}")
     return entries
@@ -383,6 +384,7 @@ def _truncate(text: str, limit: int) -> str:
 def _escape_markdown(text: str) -> str:
     if not text:
         return ""
+    # Telegram MarkdownV2 requires escaping: _ * [ ] ( ) ~ ` > # + - = | { } . !
     replacements = {
         '\\': '\\\\',
         '`': '\\`',
@@ -392,6 +394,17 @@ def _escape_markdown(text: str) -> str:
         ']': '\\]',
         '(': '\\(',
         ')': '\\)',
+        '~': '\\~',
+        '>': '\\>',
+        '#': '\\#',
+        '+': '\\+',
+        '-': '\\-',
+        '=': '\\=',
+        '|': '\\|',
+        '{': '\\{',
+        '}': '\\}',
+        '.': '\\.',
+        '!': '\\!',
     }
     result = text
     for target, replacement in replacements.items():
