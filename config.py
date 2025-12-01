@@ -2,11 +2,16 @@ import os
 
 # === ОБЩИЕ НАСТРОЙКИ ===
 TZ = "America/Chicago"
-FRESH_DAYS_LIMIT = 7  # правило 7 дней для активных RSS
+FRESH_DAYS_LIMIT = 7
 MAX_ITEMS_PER_FEED_PER_POLL = 20
-PENDING_BATCH_SIZE = 100  # сколько строк за раз воркер лочит и обрабатывает
+PENDING_BATCH_SIZE = 100
 LOCK_TTL_MINUTES = 30
-CLEAN_TEXT_SHEETS_LIMIT = 20000  # символов; безопасный трим для Google Sheets
+CLEAN_TEXT_SHEETS_LIMIT = 20000
+
+# === LOCAL STORAGE ===
+SQLITE_DB_PATH = r"D:\Articles\SQLite\rag.db"
+ANALYSIS_DB_PATH = r"D:\Articles\SQLite\analysis.db"
+CHROMA_DB_PATH = r"D:\Articles\chromadb"
 
 # === GOOGLE SHEETS ===
 SPREADSHEET_ID = os.getenv("SPREADSHEET_ID", "")
@@ -14,72 +19,28 @@ SPREADSHEET_TITLE = os.getenv("SPREADSHEET_TITLE", "NewsPipeline")
 SERVICE_ACCOUNT_JSON = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON", "service_account.json")
 
 # === ХРАНИЛИЩЕ ПОЛНОГО ТЕКСТА ===
-FULLTEXT_DIR = os.getenv("FULLTEXT_DIR", "./storage/articles")  # файлы .txt по url_hash
+FULLTEXT_DIR = os.getenv("FULLTEXT_DIR", "./storage/articles")
 
 # === ФИЛЬТРАЦИЯ/КАНОНИЗАЦИЯ ===
 TRACKING_PARAMS = {
-    "utm_source",
-    "utm_medium",
-    "utm_campaign",
-    "utm_term",
-    "utm_content",
-    "utm_id",
-    "gclid",
-    "fbclid",
-    "mc_cid",
-    "mc_eid",
-    "yclid",
-    "vero_id",
-    "rb_clickid",
-    "ref",
-    "ref_src",
+    "utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content",
+    "utm_id", "gclid", "fbclid", "mc_cid", "mc_eid", "yclid", "vero_id",
+    "rb_clickid", "ref", "ref_src",
 }
 REMOVE_PATH_SUFFIXES = {"/amp", "/index.html", "/index.htm"}
 
 # === РУБРИКАЦИЯ (до LLM) ===
 POLITICS_KEYS = {
-    "government",
-    "election",
-    "senate",
-    "parliament",
-    "congress",
-    "policy",
-    "bill",
-    "minister",
-    "cabinet",
-    "president",
-    "presidency",
-    "diplomacy",
-    "sanctions",
-    "ceasefire",
-    "regulator",
-    "supreme court",
-    "white house",
-    "kremlin",
-    "eu commission",
-    "parliamentary",
+    "government", "election", "senate", "parliament", "congress", "policy",
+    "bill", "minister", "cabinet", "president", "presidency", "diplomacy",
+    "sanctions", "ceasefire", "regulator", "supreme court", "white house",
+    "kremlin", "eu commission", "parliamentary",
 }
 SPORTS_KEYS = {
-    "match",
-    "game",
-    "player",
-    "coach",
-    "league",
-    "cup",
-    "tournament",
-    "goal",
-    "score",
-    "transfer",
-    "nba",
-    "nfl",
-    "mlb",
-    "nhl",
-    "fifa",
-    "uefa",
-    "olympics",
-    "grand slam",
+    "match", "game", "player", "coach", "league", "cup", "tournament",
+    "goal", "score", "transfer", "nba", "nfl", "mlb", "nhl", "fifa",
+    "uefa", "olympics", "grand slam",
 }
-
 
 def load_config():
     """Load configuration from environment variables and constants"""
@@ -98,4 +59,10 @@ def load_config():
         'remove_path_suffixes': REMOVE_PATH_SUFFIXES,
         'politics_keys': POLITICS_KEYS,
         'sports_keys': SPORTS_KEYS,
+        'sqlite_db_path': SQLITE_DB_PATH,
+        'analysis_db_path': ANALYSIS_DB_PATH,
+        'chroma_db_path': CHROMA_DB_PATH,
+        'ollama_embedding_model': os.getenv("OLLAMA_EMBEDDING_MODEL", "mxbai-embed-large"),
     }
+
+

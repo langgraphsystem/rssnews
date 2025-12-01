@@ -1,0 +1,29 @@
+Я создал справочник всех команд проекта! Вот основные:
+
+🔄 Главный пайплайн:
+python collect_news.py - собрать новости из RSS
+python process_articles.py - обработать текст + эмбеддинги
+python process_deep_analysis.py - глубокий анализ (10 параметров)
+python uca_batch_processor.py - генерация идей
+📊 Проверка состояния:
+python check_analysis_db.py - статистика Analysis DB
+python compare_databases.py - сравнить rag.db и analysis.db
+python show_analysis_result.py <ID> - показать анализ статьи
+📡 Управление фидами:
+python list_feeds.py - список всех RSS
+python cleanup_feeds.py - удалить невалидные
+python import_feeds.py - импорт из файлаЯ создал справочник всех команд проекта! Вот основные:
+
+🔄 Главный пайплайн:
+python collect_news.py - собрать новости из RSS
+python process_articles.py - обработать текст + эмбеддинги
+python process_deep_analysis.py - глубокий анализ (10 параметров)
+python uca_batch_processor.py - генерация идей
+📊 Проверка состояния:
+python check_analysis_db.py - статистика Analysis DB
+python compare_databases.py - сравнить rag.db и analysis.db
+python show_analysis_result.py <ID> - показать анализ статьи
+📡 Управление фидами:
+python list_feeds.py - список всех RSS
+python cleanup_feeds.py - удалить невалидные
+python import_feeds.py - импорт из файла

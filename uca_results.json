@@ -1,0 +1,303 @@
+[
+  {
+    "meta": {
+      "agent_mode": "Store Owner",
+      "timestamp": "2025-11-26T00:19:14.969128",
+      "source_id": "db_2456"
+    },
+    "trend_analysis": {
+      "lifecycle_stage": "Short-Term Shift",
+      "velocity_score": 3.5,
+      "dominant_emotions": [
+        "Surprise / Shock",
+        "Joy / Nostalgia"
+      ],
+      "empathy_map": {
+        "think": "Is this deal actually legit? Why such a huge discount—are they clearing old stock or is something wrong with the drive? Should I grab one before it sells out? Do I really need 22TB or am I just reacting to the price drop?",
+        "feel": "A jolt of excitement mixed with disbelief, like stumbling on a rare find. Slight suspicion but mostly energized by the idea of scoring a massive storage upgrade for cheap.",
+        "say": "\"Yo 22TB for THAT price?? Wild. #BlackFridayDeals #TechSteal #SeagateSale\" \"This can’t be real lol someone confirm before I smash buy.\"",
+        "do": "Checking Amazon reviews, comparing prices with other brands, searching Reddit for reliability posts, adding the drive to cart, sending the link to friends, reposting the deal in tech groups."
+      },
+      "commercial_viability_score": 8.5
+    },
+    "commercial_opportunities": [
+      {
+        "category_id": "Stickers / Decals",
+        "product_title": "22TB? For THAT Price?! Shock Sticker",
+        "description": "A bold, meme‑ready sticker capturing the exact moment you realize a massive 22TB deal might actually be real.",
+        "design_text": "22TB?! THIS PRICE CAN'T BE REAL",
+        "visual_prompt": {
+          "engine": "Flux.1",
+          "prompt": "Vector-style decal design featuring a hyper-expressive shocked face micro-expression, wide eyes, raised brows, open mouth, rendered in clean bold line-art contours. Include a stylized external hard drive icon with exaggerated ‘22TB’ label glowing as if too good to be true. Add high-context tech-humor visual cues like discount tag sparks and disbelief motion lines. Energetic composition, crisp vector strokes, perfect for sticker printing, text rendering enabled.",
+          "aspect_ratio": "1:1",
+          "negative_prompt": "no gradients, no photographic textures"
+        },
+        "file_structure": null,
+        "price_point_suggestion": "$3.99"
+      },
+      {
+        "category_id": "Apparel (T-shirts/Hoodies)",
+        "product_title": "22TB? Deal of the Decade Tee",
+        "description": "A bold, hype-driven tee capturing the wild disbelief of scoring a massive 22TB Black Friday tech steal.",
+        "design_text": "22TB?! THIS PRICE IS ILLEGAL",
+        "visual_prompt": {
+          "engine": "Flux.1",
+          "prompt": "High‑contrast apparel design focused on bold, short, punchline text: '22TB?! THIS PRICE IS ILLEGAL'. Shocked tech‑deal aesthetic, glitch‑energy typography, humorous anger vibes, Black Friday chaos energy, sharp lighting, crisp contrast, centered composition, clean vector style for perfect text rendering, suitable for T‑shirt screenprint.",
+          "aspect_ratio": "1:1",
+          "negative_prompt": "no detailed illustrations, no gradients, no complex imagery"
+        },
+        "file_structure": null,
+        "price_point_suggestion": "$19.95"
+      },
+      {
+        "category_id": "Social Media Templates",
+        "product_title": "Black Friday Shockwave Tech Deal Promo Templates",
+        "description": "A bold, influencer-ready template pack designed to amplify the shock and hype around unbelievable tech discounts like the 22TB mega‑deal.",
+        "design_text": null,
+        "visual_prompt": {
+          "engine": "Midjourney V6",
+          "prompt": "Canva‑style influencer promo layout highlighting shock and surprise, bold headline space like “22TB for THAT price?!” with dynamic tech‑themed accents, neon contrast elements, clean geometric frames, social‑media‑ready typography placeholders, subtle gradients, product highlight section for hard drive imagery, modern digital‑commerce aesthetic, high‑impact viral design optimized for TikTok and Instagram",
+          "aspect_ratio": "--ar 1:1",
+          "negative_prompt": "no clutter, no low‑res icons, no unrealistic product renders"
+        },
+        "file_structure": null,
+        "price_point_suggestion": "$9.99"
+      }
+    ],
+    "marketing_assets": {
+      "tiktok_campaign": {
+        "hook_type": "Tension",
+        "script_audio": "Trending Suspense",
+        "script_visual": "Show product",
+        "caption": "Check this out",
+        "hashtags": [
+          "#viral"
+        ]
+      },
+      "seo_tags": {
+        "amazon_kdp": [],
+        "etsy": []
+      }
+    },
+    "legal_check": {
+      "status": "PASSED",
+      "flagged_terms": [],
+      "risk_level": "Low",
+      "notes": null
+    },
+    "funnel_strategy": {
+      "bundle_name": "Starter Pack",
+      "core_product": "T-Shirt",
+      "order_bump": "Sticker",
+      "upsell": "Planner",
+      "logic": "Standard funnel"
+    },
+    "original_article": {
+      "title": "Seagate 22TB External Hard Drive Drops 60%, Amazon Clears Stock for Black Friday",
+      "url": "https://kotaku.com/seagate-22tb-external-hard-drive-drops-60-amazon-clears-stock-for-black-friday-2000645970",
+      "id": 2456,
+      "content": "<p><img alt=\"Seagate 14tb\" class=\"attachment-full size-full wp-post-image\" height=\"1000\" src=\"https://kotaku.com/app/uploads/2025/10/seagate-14tb.jpg\" style=\"height: auto; margin: auto;\" width=\"1500\" /></p>\n<p>Twenty-two terabytes USB 3.0 with professional data recovery services.</p>\n<p>The post <a href=\"https://kotaku.com/seagate-22tb-external-hard-drive-drops-60-amazon-clears-stock-for-black-friday-2000645970\">Seagate 22TB External Hard Drive Drops 60%, Amazon Clears Stock for Black Friday</a> appeared first on <a href=\"https://kotaku.com\">Kotaku</a>.</p>"
+    }
+  },
+  {
+    "meta": {
+      "agent_mode": "Store Owner",
+      "timestamp": "2025-11-26T00:19:33.111616",
+      "source_id": "db_2457"
+    },
+    "trend_analysis": {
+      "lifecycle_stage": "Ultra-Hype (Micro-trend)",
+      "velocity_score": 2.0,
+      "dominant_emotions": [
+        "Joy / Nostalgia",
+        "Confusion",
+        "Surprise / Shock"
+      ],
+      "empathy_map": {
+        "think": "Ничего себе, сколько всего произошло, а игра всё ещё не вышла. Хорошо бы она оправдала ожидания. Забавно осознавать, что я уже другой человек, но всё ещё жду Metroid. А вдруг ощущения будут такими же, как раньше?",
+        "feel": "Тёплая ностальгия, лёгкая трогательность от воспоминаний о прошлом, радость от того, что ожидание наконец движется куда‑то.",
+        "say": "«Жесть, я заказал это ещё до того, как у меня ребёнок родился 😂 #MetroidPrime4 #Finally #NostalgiaTrip»",
+        "do": "Пересматривают трейлеры, листают старые форумы, делятся мемами в соцсетях, проверяют статус предзаказа, обсуждают с друзьями, ищут ретроспективы серии."
+      },
+      "commercial_viability_score": 4.0
+    },
+    "commercial_opportunities": [
+      {
+        "category_id": "Wall Art / Posters",
+        "product_title": "Metroid: The Long-Awaited Light",
+        "description": "An inspiring nostalgia-charged art piece capturing the epic feeling of waiting years for a universe you still believe in.",
+        "design_text": null,
+        "visual_prompt": {
+          "engine": "Midjourney V6",
+          "prompt": "Абстрактная, вдохновляющая постерная композиция, посвящённая ожиданию великого возвращения: силуэт далёкой героини в стиле Metroid на фоне туманной космической туманности, мягкие лучи света прорываются из глубины сцены, символизируя годы ожидания и личный рост; тонкие намёки на ретро-сайфай эстетику начала 2000-х, яркие, но сбалансированные неоновые акценты, текстуры космической пыли, эмоциональная атмосфера радостной ностальгии; изящный художественный фокус на Эстетике и Вдохновении, плавные формы, лёгкая зернистость плёночного постера, высокая детализация.",
+          "aspect_ratio": "--ar 2:3",
+          "negative_prompt": "no logos, no copyrighted characters, no text"
+        },
+        "file_structure": null,
+        "price_point_suggestion": "$14.99–$19.99"
+      },
+      {
+        "category_id": "Apparel (T-shirts/Hoodies)",
+        "product_title": "Still Waiting, Still Hyped Tee",
+        "description": "A nostalgic, humorous tribute to the years of anticipation that somehow made the journey as memorable as the final release.",
+        "design_text": "«Жду так давно, что уже стал финальным боссом»",
+        "visual_prompt": {
+          "engine": "Flux.1",
+          "prompt": "High‑contrast apparel graphic, bold minimalistic composition, sharp silhouettes of a lone space‑explorer figure standing in a beam of light, retro‑sci‑fi atmosphere without using any copyrighted characters, dramatic contrast, subtle cosmic background texture, gritty humor energy, short punchy slogan prominently rendered using Flux text rendering, expressive lighting, slight vintage wear effect, emotional tone of humorous frustration and nostalgia.",
+          "aspect_ratio": "--ar 2:3",
+          "negative_prompt": "no copyrighted characters, no logos"
+        },
+        "file_structure": null,
+        "price_point_suggestion": "$24.99"
+      },
+      {
+        "category_id": "Audio / Sound Packs",
+        "product_title": "Metroid Memory Echoes: Retro Joy SFX Pack",
+        "description": "A nostalgic sound pack blending classic sci‑fi bleeps and atmospheric echoes to recreate the childlike excitement of waiting years for a game that still feels like coming home.",
+        "design_text": null,
+        "visual_prompt": {
+          "engine": "Midjourney V6",
+          "prompt": "cover art for an audio sound pack inspired by retro sci-fi exploration games, glowing holographic interface elements, warm nostalgic ambient lighting, soft orange and teal glows, abstract planetary shapes, subtle energy waves radiating outward like sound ripples, evokes joy and wistful anticipation, cinematic composition, highly detailed textures, moody vaporwave-sci-fi fusion, gentle grain for a retro feel",
+          "aspect_ratio": "--ar 1:1",
+          "negative_prompt": "text, logo"
+        },
+        "file_structure": null,
+        "price_point_suggestion": "$9.99"
+      }
+    ],
+    "marketing_assets": {
+      "tiktok_campaign": {
+        "hook_type": "Tension",
+        "script_audio": "Trending Suspense",
+        "script_visual": "Show product",
+        "caption": "Check this out",
+        "hashtags": [
+          "#viral"
+        ]
+      },
+      "seo_tags": {
+        "amazon_kdp": [],
+        "etsy": []
+      }
+    },
+    "legal_check": {
+      "status": "PASSED",
+      "flagged_terms": [],
+      "risk_level": "Low",
+      "notes": null
+    },
+    "funnel_strategy": {
+      "bundle_name": "Starter Pack",
+      "core_product": "T-Shirt",
+      "order_bump": "Sticker",
+      "upsell": "Planner",
+      "logic": "Standard funnel"
+    },
+    "original_article": {
+      "title": "Fans Who Pre-Ordered Metroid Prime 4 Six years Ago Have Seen Their Entire Lives Change",
+      "url": "https://kotaku.com/fans-who-pre-ordered-metroid-prime-4-six-years-ago-have-seen-their-entire-lives-change-2000645936",
+      "id": 2457,
+      "content": "<p><img alt=\"\" class=\"attachment-full size-full wp-post-image\" height=\"1080\" src=\"https://kotaku.com/app/uploads/2025/11/agingmetroid.jpg\" style=\"height: auto; margin: auto;\" width=\"1920\" /></p>\n<p>People have bought houses, had kids, changed careers, and more since pre-ordering Nintendo's long-awaited sci-fi shooter</p>\n<p>The post <a href=\"https://kotaku.com/fans-who-pre-ordered-metroid-prime-4-six-years-ago-have-seen-their-entire-lives-change-2000645936\">Fans Who Pre-Ordered &lt;i&gt;Metroid Prime 4&lt;/i&gt; Six years Ago Have Seen Their Entire Lives Change</a> appeared first on <a href=\"https://kotaku.com\">Kotaku</a>.</p>"
+    }
+  },
+  {
+    "meta": {
+      "agent_mode": "Store Owner",
+      "timestamp": "2025-11-26T00:19:50.731190",
+      "source_id": "db_2458"
+    },
+    "trend_analysis": {
+      "lifecycle_stage": "Ultra-Hype (Micro-trend)",
+      "velocity_score": 2.0,
+      "dominant_emotions": [
+        "Joy / Nostalgia",
+        "Surprise / Shock"
+      ],
+      "empathy_map": {
+        "think": "Наконец-то можно недорого украсить дом так, как всегда мечтал. Вспоминают, как в детстве гирлянды создавали уют, и надеются повторить это ощущение. Немного переживают, хватит ли времени и сил всё красиво установить.",
+        "feel": "Тёплая волна ностальгии и радостного предвкушения — как будто праздник уже начался. Лёгкое воодушевление от мысли, что яркий декоративный свет станет частью их пространства.",
+        "say": "«Ого, 200 футов света за такие деньги?! Вибы прям как раньше! #glowup #nostalgiafeels #cozylights»",
+        "do": "Пробивают отзывы, сравнивают цену с другими наборами, сохраняют в избранное, делятся ссылкой в чате или сторис, планируют, как украсят задний двор или балкон."
+      },
+      "commercial_viability_score": 8.0
+    },
+    "commercial_opportunities": [
+      {
+        "category_id": "Wall Art / Posters",
+        "product_title": "Glow Nostalgia Dreams — Retro Lightwave Poster",
+        "description": "Абстрактный постер, наполняющий комнату тем самым тёплым, уютным светом из детства, помогая легко создать атмосферу радости и домашних вибов.",
+        "design_text": null,
+        "visual_prompt": {
+          "engine": "Midjourney V6",
+          "prompt": "Абстрактная композиция, вдохновлённая ностальгическими огнями детства: мягкие теплые гирлянды, превращённые в художественные световые дорожки; нежные лучи, плавно переплетающиеся и создающие атмосферу уюта; эстетика ретро-свечения, напоминающая лампочки на ёлке; яркие, но мягкие оттенки янтаря, меда, персика и золотистого сияния; художественный расфокус, тонкая зернистость, вдохновляющее настроение, воздушные текстуры; фокус на эстетике и вдохновении, абстрактные темы, глубокая эмоциональная теплота; высокодетализированное освещение, кинематографическая глубина",
+          "aspect_ratio": "--ar 2:3",
+          "negative_prompt": "лишние предметы, текст, посторонние символы, реалистичные лица"
+        },
+        "file_structure": null,
+        "price_point_suggestion": "$9.99–$14.99"
+      },
+      {
+        "category_id": "Apparel (T-shirts/Hoodies)",
+        "product_title": "Nostalgia Glow Crew — Retro Light Vibes Tee",
+        "description": "A bold, funny blast of retro-cozy holiday energy that taps childhood memories of glowing garlands in one high‑impact wearable statement.",
+        "design_text": "BRING BACK THE GLOW (BEFORE ADULTING KILLS IT)",
+        "visual_prompt": {
+          "engine": "Flux.1 text rendering",
+          "prompt": "High-contrast graphic T-shirt design featuring bold retro holiday light garlands, saturated warm glows, neon-tinted nostalgia ambiance, humorous rebellious energy, short punchy slogan in large clean typography, retro-futuristic edges, cozy childhood lighting vibes clashing with adult frustration, crisp vector look, centered layout, apparel print ready",
+          "aspect_ratio": "--ar 2:3",
+          "negative_prompt": "blurry text, low contrast, busy backgrounds"
+        },
+        "file_structure": null,
+        "price_point_suggestion": "$24.95"
+      },
+      {
+        "category_id": "Audio / Sound Packs",
+        "product_title": "Cozy Nostalgia Glow FX Pack",
+        "description": "A warm, joy-filled collection of retro holiday light hums, soft crackles, and magical ambience that instantly transports you back to childhood cozy vibes.",
+        "design_text": null,
+        "visual_prompt": {
+          "engine": "Midjourney V6",
+          "prompt": "retro-cozy holiday ambience cover art, warm glowing string lights draped across a vintage living room, soft bokeh, nostalgic warm tones, subtle dust motes floating, retro-tape aesthetic, dreamy atmosphere, cinematic soft-focus, joyful and homey mood, high-detail textural lighting, inviting warm light gradients, serene emotional ambience",
+          "aspect_ratio": "--ar 1:1",
+          "negative_prompt": "text, watermark, logo"
+        },
+        "file_structure": null,
+        "price_point_suggestion": "$7.99"
+      }
+    ],
+    "marketing_assets": {
+      "tiktok_campaign": {
+        "hook_type": "Tension",
+        "script_audio": "Trending Suspense",
+        "script_visual": "Show product",
+        "caption": "Check this out",
+        "hashtags": [
+          "#viral"
+        ]
+      },
+      "seo_tags": {
+        "amazon_kdp": [],
+        "etsy": []
+      }
+    },
+    "legal_check": {
+      "status": "PASSED",
+      "flagged_terms": [],
+      "risk_level": "Low",
+      "notes": null
+    },
+    "funnel_strategy": {
+      "bundle_name": "Starter Pack",
+      "core_product": "T-Shirt",
+      "order_bump": "Sticker",
+      "upsell": "Planner",
+      "logic": "Standard funnel"
+    },
+    "original_article": {
+      "title": "Govee 200ft Outdoor Lights Pro Drops 40% on Amazon, Now Cheaper Than Budget Home Lighting",
+      "url": "https://kotaku.com/govee-200ft-outdoor-lights-pro-drops-40-on-amazon-now-cheaper-than-budget-home-lighting-2000645934",
+      "id": 2458,
+      "content": "<p><img alt=\"Govee 200 Ft Lightning\" class=\"attachment-full size-full wp-post-image\" height=\"1280\" src=\"https://kotaku.com/app/uploads/2025/11/govee-200-ft-lightning.jpg\" style=\"height: auto; margin: auto;\" width=\"1920\" /></p>\n<p>120 individually controlled RGBWWIC LEDs span 200 feet with 50,000-hour weatherproof lifespan.</p>\n<p>The post <a href=\"https://kotaku.com/govee-200ft-outdoor-lights-pro-drops-40-on-amazon-now-cheaper-than-budget-home-lighting-2000645934\">Govee 200ft Outdoor Lights Pro Drops 40% on Amazon, Now Cheaper Than Budget Home Lighting</a> appeared first on <a href=\"https://kotaku.com\">Kotaku</a>.</p>"
+    }
+  }
+]
